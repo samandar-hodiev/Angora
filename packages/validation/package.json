@@ -1,0 +1,22 @@
+{
+  "name": "@engora/validation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Zod schemas shared by Engora clients; rules mirror the API's validation",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@engora/config": "*",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

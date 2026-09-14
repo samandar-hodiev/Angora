@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS ai_analyses;
+DROP TABLE IF EXISTS ai_usage;
+DROP TABLE IF EXISTS ai_requests;

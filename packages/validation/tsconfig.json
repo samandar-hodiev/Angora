@@ -1,0 +1,4 @@
+{
+  "extends": "@engora/config/tsconfig/library.json",
+  "include": ["src"]
+}

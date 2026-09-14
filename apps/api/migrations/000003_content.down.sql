@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS vocabulary;
+DROP TABLE IF EXISTS grammar_topics;
+DROP TABLE IF EXISTS content_items;
+DROP TABLE IF EXISTS lessons;
+DROP TABLE IF EXISTS topics;

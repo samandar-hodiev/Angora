@@ -1,0 +1,20 @@
+{
+  "name": "engora",
+  "private": true,
+  "description": "Engora — Your AI English Coach",
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @engora/web",
+    "build:web": "npm run build -w @engora/web",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

@@ -1,0 +1,27 @@
+# Secrets — never commit real environment files
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+
+# Go
+apps/api/bin/
+apps/api/coverage.out
+
+# Local runtime data (local object storage, uploads)
+var/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.log

@@ -1,0 +1,137 @@
+import type { ApiEnvelope, User, WebSession } from "@engora/types";
+
+import { ApiError } from "@/lib/api/errors";
+
+/**
+ * Web session management.
+ *
+ * - The access token lives only in memory (never localStorage), so XSS cannot read a
+ *   long-lived credential from storage.
+ * - The refresh token lives in an httpOnly, SameSite=Strict cookie set by this app's own
+ *   route handler (src/app/api/session/[action]/route.ts). Browser JS never sees it.
+ * - The Go API stays platform-agnostic: it returns both tokens in JSON; mobile apps keep
+ *   them in the device keychain instead.
+ */
+
+export type SessionStatus = "loading" | "authenticated" | "anonymous";
+
+export interface SessionState {
+  status: SessionStatus;
+  accessToken: string | null;
+  expiresAt: number | null;
+  user: User | null;
+}
+
+type Listener = () => void;
+
+function createSessionStore() {
+  let state: SessionState = { status: "loading", accessToken: null, expiresAt: null, user: null };
+  const listeners = new Set<Listener>();
+
+  const emit = () => listeners.forEach((l) => l());
+
+  return {
+    getState: () => state,
+    subscribe(listener: Listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    setSession(session: WebSession) {
+      state = {
+        status: "authenticated",
+        accessToken: session.access_token,
+        expiresAt: Date.parse(session.access_token_expires_at),
+        user: session.user,
+      };
+      emit();
+    },
+    clear() {
+      if (state.status === "anonymous" && state.accessToken === null) return;
+      state = { status: "anonymous", accessToken: null, expiresAt: null, user: null };
+      emit();
+    },
+  };
+}
+
+export const sessionStore = createSessionStore();
+
+const SESSION_ROUTE = "/api/session";
+
+async function callSessionRoute(action: "login" | "register" | "refresh" | "logout", body?: unknown) {
+  let response: Response;
+  try {
+    response = await fetch(`${SESSION_ROUTE}/${action}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        // Custom header: a cross-site form cannot set it, which blocks CSRF on these routes.
+        "X-Engora-Session": "1",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw ApiError.network();
+  }
+  if (response.status === 204) return null;
+
+  let envelope: ApiEnvelope<WebSession>;
+  try {
+    envelope = (await response.json()) as ApiEnvelope<WebSession>;
+  } catch {
+    throw ApiError.invalidResponse(response.status);
+  }
+  if (!envelope.success) throw new ApiError(response.status, envelope.error);
+  return envelope.data;
+}
+
+export async function login(input: { email: string; password: string }): Promise<WebSession> {
+  const session = await callSessionRoute("login", input);
+  sessionStore.setSession(session!);
+  return session!;
+}
+
+export async function register(input: {
+  display_name: string;
+  email: string;
+  password: string;
+  timezone?: string;
+}): Promise<WebSession> {
+  const session = await callSessionRoute("register", input);
+  sessionStore.setSession(session!);
+  return session!;
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await callSessionRoute("logout");
+  } finally {
+    sessionStore.clear();
+  }
+}
+
+let inflightRefresh: Promise<string | null> | null = null;
+
+/**
+ * Renews the access token using the refresh cookie. Concurrent callers share one request,
+ * because the API rotates refresh tokens and treats parallel reuse as token theft.
+ */
+export function refreshSession(): Promise<string | null> {
+  inflightRefresh ??= callSessionRoute("refresh")
+    .then((session) => {
+      if (!session) {
+        sessionStore.clear();
+        return null;
+      }
+      sessionStore.setSession(session);
+      return session.access_token;
+    })
+    .catch(() => {
+      sessionStore.clear();
+      return null;
+    })
+    .finally(() => {
+      inflightRefresh = null;
+    });
+  return inflightRefresh;
+}
