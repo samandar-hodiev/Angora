@@ -94,6 +94,7 @@ export type LimitPeriod = "day" | "week" | "month" | "lifetime";
 export interface PlanEntitlement {
   key: string;
   kind: EntitlementKind;
+  description: string;
   limit: number | null;
   period: LimitPeriod | null;
 }
@@ -112,6 +113,7 @@ export interface SubscriptionPlan {
 }
 
 export interface LimitState {
+  label: string;
   limit: number | null;
   used: number;
   remaining: number | null;

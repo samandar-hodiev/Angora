@@ -11,6 +11,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const REFRESH_COOKIE = "engora_rt";
 const COOKIE_PATH = "/api/session";
+/**
+ * Non-secret hint readable by client JS. It only says "a session probably exists", letting
+ * anonymous visitors skip a pointless refresh request on page load.
+ */
+export const SESSION_HINT_COOKIE = "engora_session";
 
 const upstreamPaths = {
   login: "/auth/login",
@@ -31,6 +36,7 @@ function errorResponse(status: number, code: string, message: string) {
 
 function clearRefreshCookie(response: NextResponse) {
   response.cookies.set(REFRESH_COOKIE, "", { httpOnly: true, path: COOKIE_PATH, maxAge: 0 });
+  response.cookies.set(SESSION_HINT_COOKIE, "", { path: "/", maxAge: 0 });
   return response;
 }
 
@@ -102,6 +108,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: COOKIE_PATH,
+    expires: new Date(refresh_token_expires_at),
+  });
+  response.cookies.set(SESSION_HINT_COOKIE, "1", {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
     expires: new Date(refresh_token_expires_at),
   });
   return response;

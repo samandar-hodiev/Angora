@@ -1,0 +1,43 @@
+import type { Entitlements, LimitState, PlanEntitlement, SubscriptionPlan } from "@engora/types";
+
+/**
+ * Entitlement helpers. UI never checks plan codes ("pro"); it asks whether a feature or
+ * limit is present in the entitlements returned by the API.
+ */
+
+export function hasFeature(entitlements: Entitlements | undefined, key: string): boolean {
+  return entitlements?.features.includes(key) ?? false;
+}
+
+export function limitOf(entitlements: Entitlements | undefined, key: string): LimitState | undefined {
+  return entitlements?.limits[key];
+}
+
+/** 0–100 usage for progress bars; unlimited limits report 0. */
+export function usagePercent(limit: LimitState): number {
+  if (limit.limit === null || limit.limit === 0) return 0;
+  return Math.min(100, Math.round((limit.used / limit.limit) * 100));
+}
+
+const periodLabel: Record<string, string> = {
+  day: "per day",
+  week: "per week",
+  month: "per month",
+  lifetime: "total",
+};
+
+export function describeEntitlement(e: PlanEntitlement): string {
+  if (e.kind === "feature") return e.description;
+  if (e.limit === null) return `Unlimited ${e.description.toLowerCase()}`;
+  return `${e.limit} ${e.description.toLowerCase()} ${periodLabel[e.period ?? "lifetime"] ?? ""}`.trim();
+}
+
+export function formatPlanPrice(plan: SubscriptionPlan, locale?: string): string {
+  if (plan.price_cents === 0) return "Free";
+  const amount = new Intl.NumberFormat(locale, { style: "currency", currency: plan.currency }).format(
+    plan.price_cents / 100,
+  );
+  if (plan.billing_interval === "month") return `${amount} / month`;
+  if (plan.billing_interval === "year") return `${amount} / year`;
+  return amount;
+}

@@ -77,7 +77,7 @@ func (s *PostgresStore) plans(ctx context.Context, where string, args ...any) ([
 		ids = append(ids, p.ID)
 	}
 	erows, err := s.pool.Query(ctx, `
-		SELECT pe.plan_id, e.key, e.kind, pe.limit_value, pe.limit_period
+		SELECT pe.plan_id, e.key, e.kind, e.description, pe.limit_value, pe.limit_period
 		FROM plan_entitlements pe
 		JOIN entitlements e ON e.key = pe.entitlement_key
 		WHERE pe.plan_id = ANY ($1)
@@ -89,7 +89,7 @@ func (s *PostgresStore) plans(ctx context.Context, where string, args ...any) ([
 	for erows.Next() {
 		var planID uuid.UUID
 		var pe PlanEntitlement
-		if err := erows.Scan(&planID, &pe.Key, &pe.Kind, &pe.Limit, &pe.Period); err != nil {
+		if err := erows.Scan(&planID, &pe.Key, &pe.Kind, &pe.Description, &pe.Limit, &pe.Period); err != nil {
 			return nil, err
 		}
 		i := index[planID]

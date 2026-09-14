@@ -1,0 +1,6 @@
+.env
+.env.*
+bin
+var
+coverage.out
+.DS_Store

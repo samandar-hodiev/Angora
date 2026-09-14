@@ -9,7 +9,10 @@ export class ApiError extends Error {
   readonly details: ApiErrorBody["details"];
   readonly requestId: string | undefined;
 
-  constructor(status: number, body: Pick<ApiErrorBody, "message"> & Partial<ApiErrorBody> & { code: ClientErrorCode }) {
+  constructor(
+    status: number,
+    body: { code: ClientErrorCode; message: string } & Partial<Omit<ApiErrorBody, "code" | "message">>,
+  ) {
     super(body.message);
     this.name = "ApiError";
     this.status = status;

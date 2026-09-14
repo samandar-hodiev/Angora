@@ -33,10 +33,11 @@ const (
 )
 
 type PlanEntitlement struct {
-	Key    string  `json:"key"`
-	Kind   Kind    `json:"kind"`
-	Limit  *int    `json:"limit"` // nil = unlimited (limits only)
-	Period *Period `json:"period"`
+	Key         string  `json:"key"`
+	Kind        Kind    `json:"kind"`
+	Description string  `json:"description"`
+	Limit       *int    `json:"limit"` // nil = unlimited (limits only)
+	Period      *Period `json:"period"`
 }
 
 type Plan struct {
@@ -64,6 +65,7 @@ type Subscription struct {
 }
 
 type LimitState struct {
+	Label     string     `json:"label"`
 	Limit     *int       `json:"limit"`
 	Used      int        `json:"used"`
 	Remaining *int       `json:"remaining"`
@@ -121,7 +123,7 @@ func Resolve(plan Plan, sub *Subscription, usage map[UsageKey]int, now time.Time
 			}
 			start, resets := Window(period, now)
 			used := usage[UsageKey{Entitlement: pe.Key, PeriodStart: start}]
-			state := LimitState{Limit: pe.Limit, Used: used, Period: period, ResetsAt: resets}
+			state := LimitState{Label: pe.Description, Limit: pe.Limit, Used: used, Period: period, ResetsAt: resets}
 			if pe.Limit != nil {
 				remaining := max(*pe.Limit-used, 0)
 				state.Remaining = &remaining
