@@ -16,6 +16,8 @@ export interface EmailChallenge {
   code_length: number;
   expires_at: Timestamp;
   resend_available_at: Timestamp;
+  /** Development only, when the API has no mail provider configured. */
+  dev_code?: string;
 }
 
 // ---- Onboarding ------------------------------------------------------------------------------

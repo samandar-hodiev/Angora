@@ -89,7 +89,10 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		return nil, fmt.Errorf("ai gateway: %w", err)
 	}
 
-	c.Mailer = mail.New(cfg.Mail.Provider, log)
+	c.Mailer = mail.New(cfg.Mail, log)
+	if cfg.Mail.Provider == "log" {
+		log.Warn("emails are not sent (MAIL_PROVIDER=log): verification codes are logged and shown on the verify page in development")
+	}
 	c.Users = users.NewPostgresRepository(c.DB)
 	c.Tokens = auth.NewTokenIssuer(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
 	c.Analytics = analytics.NewPostgresTracker(c.DB, log)
@@ -110,7 +113,11 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	} else {
 		log.Warn("google sign-in disabled: GOOGLE_CLIENT_IDS is not set")
 	}
-	c.Auth, err = auth.NewService(authDeps, auth.Options{RefreshTTL: cfg.Auth.RefreshTokenTTL, ResetTTL: time.Hour, WebURL: cfg.App.WebURL})
+	c.Auth, err = auth.NewService(authDeps, auth.Options{
+		RefreshTTL: cfg.Auth.RefreshTokenTTL, ResetTTL: time.Hour, WebURL: cfg.App.WebURL,
+		// Only when nothing can deliver email locally; never in production.
+		ExposeDevCodes: cfg.App.Env == config.EnvDevelopment && cfg.Mail.Provider == "log",
+	})
 	if err != nil {
 		c.Close()
 		return nil, fmt.Errorf("auth: %w", err)

@@ -51,8 +51,13 @@ type AppConfig struct {
 }
 
 type MailConfig struct {
-	Provider string
-	From     string
+	Provider     string // smtp | resend | log | none
+	From         string
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	SMTPPassword string
+	ResendAPIKey string
 }
 
 func (a AppConfig) IsProduction() bool { return a.Env == EnvProduction }
@@ -176,8 +181,13 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			MaxUploadBytes: int64(r.int("STORAGE_MAX_UPLOAD_MB", 25)) << 20,
 		},
 		Mail: MailConfig{
-			Provider: strings.ToLower(r.str("MAIL_PROVIDER", "log")),
-			From:     r.str("MAIL_FROM", "Engora <no-reply@engora.local>"),
+			Provider:     strings.ToLower(r.str("MAIL_PROVIDER", "log")),
+			From:         r.str("MAIL_FROM", "Engora <no-reply@engora.local>"),
+			SMTPHost:     r.str("SMTP_HOST", ""),
+			SMTPPort:     r.int("SMTP_PORT", 587),
+			SMTPUsername: r.str("SMTP_USERNAME", ""),
+			SMTPPassword: r.str("SMTP_PASSWORD", ""),
+			ResendAPIKey: r.str("RESEND_API_KEY", ""),
 		},
 		Observability: ObservabilityConfig{
 			ErrorTracker: strings.ToLower(r.str("ERROR_TRACKER", "log")),
@@ -249,6 +259,23 @@ func (c *Config) validate() []error {
 	case "log":
 		if c.App.IsProduction() {
 			errs = append(errs, errors.New("MAIL_PROVIDER=log is not allowed in production (it logs reset links)"))
+		}
+	case "smtp":
+		if c.Mail.SMTPHost == "" {
+			errs = append(errs, errors.New("SMTP_HOST is required when MAIL_PROVIDER=smtp"))
+		}
+		if c.Mail.SMTPPort <= 0 || c.Mail.SMTPPort > 65535 {
+			errs = append(errs, fmt.Errorf("SMTP_PORT must be a valid port, got %d", c.Mail.SMTPPort))
+		}
+		if (c.Mail.SMTPUsername == "") != (c.Mail.SMTPPassword == "") {
+			errs = append(errs, errors.New("SMTP_USERNAME and SMTP_PASSWORD must be set together"))
+		}
+		if !strings.Contains(c.Mail.From, "@") {
+			errs = append(errs, errors.New("MAIL_FROM must contain a sender email address"))
+		}
+	case "resend":
+		if c.Mail.ResendAPIKey == "" {
+			errs = append(errs, errors.New("RESEND_API_KEY is required when MAIL_PROVIDER=resend"))
 		}
 	case "none":
 	default:

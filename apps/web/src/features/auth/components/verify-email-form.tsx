@@ -34,6 +34,7 @@ function VerifyEmailFields({ email }: { email: string }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<ReactNode>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [devCode, setDevCode] = useState<string | null>(() => loadChallenge(email)?.dev_code ?? null);
   const [resendAt, setResendAt] = useState<number>(() => {
     const challenge = loadChallenge(email);
     return challenge ? Date.parse(challenge.resend_available_at) : 0;
@@ -80,6 +81,7 @@ function VerifyEmailFields({ email }: { email: string }) {
       const challenge = await resend.mutateAsync(email);
       saveChallenge(challenge);
       setResendAt(Date.parse(challenge.resend_available_at));
+      setDevCode(challenge.dev_code ?? null);
       setCode("");
       setNotice("We sent a new code to your email.");
     } catch (err) {
@@ -95,6 +97,12 @@ function VerifyEmailFields({ email }: { email: string }) {
         Enter the 6-digit code we sent to <span className="font-medium break-all text-foreground">{email}</span>
       </p>
 
+      {devCode && (
+        <div role="note" className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-center text-caption text-fg-secondary">
+          Development mode: email sending isn&apos;t configured, so your code is shown here.
+          <span className="mt-1 block text-h3 font-semibold tracking-[0.3em] text-foreground tabular-nums">{devCode}</span>
+        </div>
+      )}
       {error && (
         <Alert variant="destructive" id="otp-error">
           <CircleAlert />

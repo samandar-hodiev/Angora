@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/samandar-hodiev/engora/apps/api/config"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/logger"
 )
 
@@ -36,10 +37,14 @@ type Nop struct{}
 
 func (Nop) Send(context.Context, Message) error { return nil }
 
-// New selects a mailer from MAIL_PROVIDER. A real provider (SES, Postmark, Resend, ...)
-// is added here by implementing Mailer.
-func New(provider string, log *slog.Logger) Mailer {
-	switch provider {
+// New selects a mailer from MAIL_PROVIDER: smtp (any SMTP service), resend, log
+// (development: prints emails) or none. More providers implement Mailer.
+func New(cfg config.MailConfig, log *slog.Logger) Mailer {
+	switch cfg.Provider {
+	case "smtp":
+		return NewSMTP(SMTPConfig{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword, From: cfg.From})
+	case "resend":
+		return NewResend(cfg.ResendAPIKey, cfg.From)
 	case "log":
 		return LogMailer{Log: log}
 	default:

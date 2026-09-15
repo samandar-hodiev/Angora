@@ -94,6 +94,9 @@ type Options struct {
 	ResetTTL   time.Duration
 	// WebURL is the origin used to build links in emails.
 	WebURL string
+	// ExposeDevCodes returns email verification codes in API responses. Development only,
+	// when no mail provider is configured.
+	ExposeDevCodes bool
 }
 
 type Service struct {
@@ -111,6 +114,7 @@ type Service struct {
 	refreshTTL time.Duration
 	resetTTL   time.Duration
 	webURL     string
+	devCodes   bool
 	now        func() time.Time
 	// dummyHash is verified when an email is unknown so that "no such user" and
 	// "wrong password" take the same time and cannot be told apart.
@@ -130,7 +134,7 @@ func NewService(d Deps, o Options) (*Service, error) {
 		audit: d.Audit, mailer: d.Mailer, identities: d.Identities, google: d.Google, emailCodes: d.EmailCodes,
 		tracker:    trackerOrNop(d.Tracker),
 		refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
-		webURL: strings.TrimRight(o.WebURL, "/"), now: time.Now, dummyHash: dummy,
+		webURL: strings.TrimRight(o.WebURL, "/"), devCodes: o.ExposeDevCodes, now: time.Now, dummyHash: dummy,
 	}, nil
 }
 

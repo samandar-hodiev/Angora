@@ -90,6 +90,8 @@ type EmailChallenge struct {
 	CodeLength        int       `json:"code_length"`
 	ExpiresAt         time.Time `json:"expires_at"`
 	ResendAvailableAt time.Time `json:"resend_available_at"`
+	// DevCode is only set in development when no mail provider is configured.
+	DevCode string `json:"dev_code,omitempty"`
 }
 
 func trackerOrNop(t analytics.Tracker) analytics.Tracker {
@@ -211,7 +213,11 @@ func (s *Service) issueEmailCode(ctx context.Context, email string, previous *Em
 	}
 	s.tracker.Track(ctx, analytics.Event{Name: analytics.EventEmailVerificationSent, Source: "server", Platform: client.Platform,
 		Properties: map[string]any{"send_count": c.SendCount}})
-	return challengeOf(c), nil
+	challenge := challengeOf(c)
+	if s.devCodes {
+		challenge.DevCode = code
+	}
+	return challenge, nil
 }
 
 func codeError(reason, message string, extra map[string]any) *apperr.Error {

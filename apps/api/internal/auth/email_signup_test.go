@@ -220,6 +220,21 @@ func TestEmailResendCooldownAndHourlyLimit(t *testing.T) {
 	}
 }
 
+func TestDevCodesOnlyWhenEnabled(t *testing.T) {
+	svc, mailer, c, _, _ := newEmailSignupService(t)
+	ctx := context.Background()
+	ch, err := svc.StartEmailSignup(ctx, EmailStartInput{Email: "a@example.com"}, client)
+	if err != nil || ch.DevCode != "" {
+		t.Fatalf("codes must not be exposed by default: %+v %v", ch, err)
+	}
+	svc.devCodes = true
+	c.t = c.t.Add(time.Minute)
+	ch, err = svc.ResendEmailSignup(ctx, EmailStartInput{Email: "a@example.com"}, client)
+	if err != nil || ch.DevCode != mailer.lastCode(t) {
+		t.Errorf("dev code = %q, emailed %q (%v)", ch.DevCode, mailer.lastCode(t), err)
+	}
+}
+
 func TestSetPassword(t *testing.T) {
 	svc, mailer, _, _, _ := newEmailSignupService(t)
 	ctx := context.Background()
