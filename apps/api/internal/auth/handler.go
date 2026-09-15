@@ -26,8 +26,23 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup, rateLimit gin.HandlerFunc)
 	g.POST("/login", h.login)
 	g.POST("/refresh", h.refresh)
 	g.POST("/logout", h.logout)
+	g.POST("/google", h.google)
 	g.POST("/password/forgot", h.forgotPassword)
 	g.POST("/password/reset", h.resetPassword)
+}
+
+func (h *Handler) google(c *gin.Context) {
+	var in GoogleLoginInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	session, err := h.svc.LoginWithGoogle(c.Request.Context(), in, clientInfo(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, session)
 }
 
 func (h *Handler) forgotPassword(c *gin.Context) {

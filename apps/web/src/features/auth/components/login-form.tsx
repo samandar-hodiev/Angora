@@ -18,7 +18,7 @@ import { useLogin } from "../hooks";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
-  const loginMutation = useLogin();
+  const loginMutation = useLogin(redirectTo);
   const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<LoginInput>({

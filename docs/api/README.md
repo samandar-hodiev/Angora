@@ -82,6 +82,16 @@ Clients branch on `error.code` (stable), never on `message`.
 | POST | `/api/v1/auth/login` | `{ email, password }` | 200 `Session` |
 | POST | `/api/v1/auth/refresh` | `{ refresh_token }` | 200 `Session` (rotated refresh token) |
 | POST | `/api/v1/auth/logout` | `{ refresh_token }` | 204 |
+| POST | `/api/v1/auth/google` | `{ id_token, timezone? }` | 200 `Session` with `is_new_user` |
+
+**Google sign-in.** Web (Google Identity Services) and iOS/Android (native Google Sign-In)
+all send the Google **ID token** here. The API verifies the signature against Google's
+published keys, the issuer, the audience (must be one of `GOOGLE_CLIENT_IDS`), expiry and
+`email_verified`. It then signs in the linked account, links Google to an existing account
+with the same email, or creates a new password-less account (`is_new_user: true` → start
+onboarding). Without `GOOGLE_CLIENT_IDS` the endpoint returns `501 NOT_IMPLEMENTED`.
+Identities live in `user_identities (provider, provider_subject)`; phone sign-in (SMS OTP)
+will be added as another provider.
 
 Rate limited per IP (`RATE_LIMIT_AUTH_PER_MINUTE`).
 

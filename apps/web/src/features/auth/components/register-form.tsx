@@ -15,14 +15,7 @@ import { Input } from "@/components/ui/input";
 import { applyApiErrors } from "@/lib/forms/apply-api-errors";
 
 import { useRegister } from "../hooks";
-
-function browserTimezone(): string | undefined {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return undefined;
-  }
-}
+import { browserTimezone, ONBOARDING_PATH } from "../session";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -39,8 +32,7 @@ export function RegisterForm() {
     setFormError(null);
     try {
       await registerMutation.mutateAsync(toRegisterPayload({ ...values, timezone: browserTimezone() }));
-      // New learners set up their goal, level and plan before seeing the dashboard.
-      router.replace("/onboarding");
+      router.replace(ONBOARDING_PATH);
     } catch (error) {
       setFormError(applyApiErrors(error, form.setError, ["display_name", "email", "password"]));
     }

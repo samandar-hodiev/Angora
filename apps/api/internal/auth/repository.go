@@ -112,6 +112,48 @@ func (r *PostgresTokenRepository) RevokeAllForUser(ctx context.Context, userID u
 	return err
 }
 
+// ---- external identities (Google now; Apple and phone later) ------------------------
+
+const ProviderGoogle = "google"
+
+var ErrIdentityNotFound = errors.New("identity not found")
+
+type IdentityStore interface {
+	UserIDByIdentity(ctx context.Context, provider, subject string) (uuid.UUID, error)
+	// LinkIdentity attaches an identity to a user, or refreshes it if already linked.
+	LinkIdentity(ctx context.Context, userID uuid.UUID, provider, subject, email string) error
+}
+
+type PostgresIdentityStore struct {
+	pool *pgxpool.Pool
+}
+
+func NewPostgresIdentityStore(pool *pgxpool.Pool) *PostgresIdentityStore {
+	return &PostgresIdentityStore{pool: pool}
+}
+
+func (s *PostgresIdentityStore) UserIDByIdentity(ctx context.Context, provider, subject string) (uuid.UUID, error) {
+	var userID uuid.UUID
+	err := s.pool.QueryRow(ctx,
+		`SELECT user_id FROM user_identities WHERE provider = $1 AND provider_subject = $2`, provider, subject,
+	).Scan(&userID)
+	if database.IsNotFound(err) {
+		return uuid.Nil, ErrIdentityNotFound
+	}
+	return userID, err
+}
+
+func (s *PostgresIdentityStore) LinkIdentity(ctx context.Context, userID uuid.UUID, provider, subject, email string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO user_identities (user_id, provider, provider_subject, email)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (provider, provider_subject) DO UPDATE
+			SET email = EXCLUDED.email, last_login_at = now()
+			WHERE user_identities.user_id = EXCLUDED.user_id`,
+		userID, provider, subject, email)
+	return err
+}
+
 // ---- password reset tokens ------------------------------------------------------
 
 type PasswordReset struct {

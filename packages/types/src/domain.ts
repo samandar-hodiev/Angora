@@ -25,6 +25,8 @@ export interface AuthSession {
   refresh_token_expires_at: Timestamp;
   token_type: "Bearer";
   user: User;
+  /** True when this sign-in created the account (e.g. first Google sign-in): start onboarding. */
+  is_new_user?: boolean;
 }
 
 /** What the web app's own session route returns: the refresh token stays in an httpOnly cookie. */

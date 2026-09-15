@@ -10,21 +10,22 @@ export const metadata: Metadata = { title: "Log in", robots: { index: false } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
+  const redirectTo = safeRedirect(next);
   return (
     <AuthCard
       title="Welcome back"
       description="Log in to continue learning."
       footer={
         <>
-          New to Engora?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
             Create an account
           </Link>
         </>
       }
     >
-      <SocialAuth />
-      <LoginForm redirectTo={safeRedirect(next)} />
+      <SocialAuth mode="signin" redirectTo={redirectTo} />
+      <LoginForm redirectTo={redirectTo} />
     </AuthCard>
   );
 }

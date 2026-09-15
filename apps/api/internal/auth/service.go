@@ -25,6 +25,7 @@ type UserStore interface {
 	GetCredentialsByEmail(ctx context.Context, email string) (users.Credentials, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 }
 
 // ClientInfo describes the calling device for session metadata only. It never changes
@@ -63,6 +64,8 @@ type Session struct {
 	RefreshTokenExpiresAt time.Time  `json:"refresh_token_expires_at"`
 	TokenType             string     `json:"token_type"`
 	User                  users.User `json:"user"`
+	// IsNewUser is true when this sign-in created the account (clients start onboarding).
+	IsNewUser bool `json:"is_new_user"`
 }
 
 // Deps are the collaborators of the auth service.
@@ -74,6 +77,9 @@ type Deps struct {
 	Issuer *TokenIssuer
 	Audit  audit.Recorder
 	Mailer mail.Mailer
+	// Identities and Google are optional; without them Google sign-in reports NOT_IMPLEMENTED.
+	Identities IdentityStore
+	Google     GoogleVerifier
 }
 
 type Options struct {
@@ -91,6 +97,8 @@ type Service struct {
 	issuer     *TokenIssuer
 	audit      audit.Recorder
 	mailer     mail.Mailer
+	identities IdentityStore
+	google     GoogleVerifier
 	refreshTTL time.Duration
 	resetTTL   time.Duration
 	webURL     string
@@ -110,7 +118,8 @@ func NewService(d Deps, o Options) (*Service, error) {
 	}
 	return &Service{
 		users: d.Users, tokens: d.Tokens, resets: d.Resets, hasher: d.Hasher, issuer: d.Issuer,
-		audit: d.Audit, mailer: d.Mailer, refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
+		audit: d.Audit, mailer: d.Mailer, identities: d.Identities, google: d.Google,
+		refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
 		webURL: strings.TrimRight(o.WebURL, "/"), now: time.Now, dummyHash: dummy,
 	}, nil
 }
@@ -119,11 +128,8 @@ var errInvalidCredentials = apperr.Unauthorized("Invalid email or password")
 var errInvalidSession = apperr.Unauthorized("Session is invalid or has expired")
 
 func (s *Service) Register(ctx context.Context, in RegisterInput, client ClientInfo) (Session, error) {
-	tz := strings.TrimSpace(in.Timezone)
-	if tz == "" {
-		tz = "UTC"
-	}
-	if _, err := time.LoadLocation(tz); err != nil {
+	tz, ok := resolveTimezone(in.Timezone)
+	if !ok {
 		return Session{}, apperr.Validation(map[string]any{
 			"fields": map[string]any{"timezone": "must be a valid IANA timezone"},
 		})
@@ -150,8 +156,24 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, client ClientI
 		EntityType: "user", EntityID: user.ID.String(), IP: client.IP, UserAgent: client.UserAgent,
 		Metadata: map[string]any{"platform": client.Platform}})
 
-	return s.startSession(ctx, user, uuid.New(), client)
+	session, err := s.startSession(ctx, user, newFamilyID(), client)
+	session.IsNewUser = err == nil
+	return session, err
 }
+
+// resolveTimezone returns a valid IANA timezone (UTC when empty) and whether the input was valid.
+func resolveTimezone(tz string) (string, bool) {
+	tz = strings.TrimSpace(tz)
+	if tz == "" {
+		return "UTC", true
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		return "UTC", false
+	}
+	return tz, true
+}
+
+func newFamilyID() uuid.UUID { return uuid.New() }
 
 func (s *Service) Login(ctx context.Context, in LoginInput, client ClientInfo) (Session, error) {
 	creds, err := s.users.GetCredentialsByEmail(ctx, normalizeEmail(in.Email))

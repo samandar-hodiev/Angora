@@ -55,9 +55,28 @@ function createSessionStore() {
 
 export const sessionStore = createSessionStore();
 
+/**
+ * Where to land after a sign-in completes. Set just before the session is stored, so the
+ * GuestGuard (which reacts to the new session) and the form agree on one destination —
+ * e.g. onboarding for brand-new accounts instead of the dashboard.
+ */
+let pendingRedirect: string | null = null;
+
+export function takePendingRedirect(): string | null {
+  const next = pendingRedirect;
+  pendingRedirect = null;
+  return next;
+}
+
+function completeSignIn(session: WebSession, landing: string) {
+  pendingRedirect = landing;
+  sessionStore.setSession(session);
+  return session;
+}
+
 const SESSION_ROUTE = "/api/session";
 
-async function callSessionRoute(action: "login" | "register" | "refresh" | "logout", body?: unknown) {
+async function callSessionRoute(action: "login" | "register" | "google" | "refresh" | "logout", body?: unknown) {
   let response: Response;
   try {
     response = await fetch(`${SESSION_ROUTE}/${action}`, {
@@ -85,10 +104,15 @@ async function callSessionRoute(action: "login" | "register" | "refresh" | "logo
   return envelope.data;
 }
 
-export async function login(input: { email: string; password: string }): Promise<WebSession> {
+export const ONBOARDING_PATH = "/onboarding";
+export const DEFAULT_LANDING_PATH = "/app/dashboard";
+
+export async function login(
+  input: { email: string; password: string },
+  landing: string = DEFAULT_LANDING_PATH,
+): Promise<WebSession> {
   const session = await callSessionRoute("login", input);
-  sessionStore.setSession(session!);
-  return session!;
+  return completeSignIn(session!, landing);
 }
 
 export async function register(input: {
@@ -98,8 +122,25 @@ export async function register(input: {
   timezone?: string;
 }): Promise<WebSession> {
   const session = await callSessionRoute("register", input);
-  sessionStore.setSession(session!);
-  return session!;
+  // New learners set up their goal, level and plan before seeing the dashboard.
+  return completeSignIn(session!, ONBOARDING_PATH);
+}
+
+/** Exchanges a Google ID token (from Google Identity Services) for an Engora session. */
+export async function loginWithGoogle(
+  input: { id_token: string; timezone?: string },
+  landing: string = DEFAULT_LANDING_PATH,
+): Promise<WebSession> {
+  const session = await callSessionRoute("google", input);
+  return completeSignIn(session!, session!.is_new_user ? ONBOARDING_PATH : landing);
+}
+
+export function browserTimezone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function logout(): Promise<void> {

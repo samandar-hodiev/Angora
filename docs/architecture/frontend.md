@@ -64,7 +64,7 @@ Rules enforced by convention and lint:
 | Refresh token (30 days) | `httpOnly`, `SameSite=Strict` cookie, path `/api/session` | Browser JS never sees it. |
 | `engora_session=1` hint | Plain cookie | Lets anonymous visitors skip a pointless refresh call. |
 
-`/api/session/{login,register,refresh,logout}` is a thin Next.js route handler that forwards to the
+`/api/session/{login,register,google,refresh,logout}` is a thin Next.js route handler that forwards to the
 Go API and moves the refresh token into the cookie. It requires an `X-Engora-Session` header, which
 cross-site forms cannot send (CSRF defence). The Go API stays platform-agnostic; mobile apps call
 `/api/v1/auth/*` directly and store tokens in the keychain.

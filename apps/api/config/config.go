@@ -75,6 +75,9 @@ type AuthConfig struct {
 	JWTIssuer       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+	// GoogleClientIDs are the OAuth client IDs (web, iOS, Android) whose Google ID tokens are
+	// accepted. Empty disables Google sign-in.
+	GoogleClientIDs []string
 }
 
 type AIConfig struct {
@@ -148,6 +151,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			JWTIssuer:       r.str("JWT_ISSUER", "engora"),
 			AccessTokenTTL:  r.duration("JWT_ACCESS_TTL", 15*time.Minute),
 			RefreshTokenTTL: r.duration("REFRESH_TOKEN_TTL", 30*24*time.Hour),
+			GoogleClientIDs: r.list("GOOGLE_CLIENT_IDS"),
 		},
 		AI: AIConfig{
 			Provider:      strings.ToLower(r.str("AI_PROVIDER", "mock")),

@@ -46,6 +46,10 @@ func (f *fakeUsers) CreateAccount(_ context.Context, in users.NewAccount) (users
 		return users.User{}, users.ErrEmailTaken
 	}
 	u := users.User{ID: uuid.New(), Email: in.Email, Role: authz.RoleUser, Status: users.StatusActive}
+	if in.EmailVerified {
+		now := time.Now()
+		u.EmailVerifiedAt = &now
+	}
 	f.byID[u.ID] = users.Credentials{User: u, PasswordHash: in.PasswordHash}
 	f.byMail[in.Email] = u.ID
 	return u, nil
@@ -72,6 +76,18 @@ func (f *fakeUsers) GetCredentialsByEmail(_ context.Context, email string) (user
 }
 
 func (f *fakeUsers) TouchLastLogin(context.Context, uuid.UUID) error { return nil }
+
+func (f *fakeUsers) MarkEmailVerified(_ context.Context, id uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c := f.byID[id]
+	if c.EmailVerifiedAt == nil {
+		now := time.Now()
+		c.EmailVerifiedAt = &now
+		f.byID[id] = c
+	}
+	return nil
+}
 
 func (f *fakeUsers) UpdatePassword(_ context.Context, id uuid.UUID, hash string) error {
 	f.mu.Lock()

@@ -84,15 +84,22 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	c.Mailer = mail.New(cfg.Mail.Provider, log)
 	c.Users = users.NewPostgresRepository(c.DB)
 	c.Tokens = auth.NewTokenIssuer(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
-	c.Auth, err = auth.NewService(auth.Deps{
-		Users:  c.Users,
-		Tokens: auth.NewPostgresTokenRepository(c.DB),
-		Resets: auth.NewPostgresResetStore(c.DB),
-		Hasher: auth.DefaultArgon2id(),
-		Issuer: c.Tokens,
-		Audit:  c.Audit,
-		Mailer: c.Mailer,
-	}, auth.Options{RefreshTTL: cfg.Auth.RefreshTokenTTL, ResetTTL: time.Hour, WebURL: cfg.App.WebURL})
+	authDeps := auth.Deps{
+		Users:      c.Users,
+		Tokens:     auth.NewPostgresTokenRepository(c.DB),
+		Resets:     auth.NewPostgresResetStore(c.DB),
+		Identities: auth.NewPostgresIdentityStore(c.DB),
+		Hasher:     auth.DefaultArgon2id(),
+		Issuer:     c.Tokens,
+		Audit:      c.Audit,
+		Mailer:     c.Mailer,
+	}
+	if len(cfg.Auth.GoogleClientIDs) > 0 {
+		authDeps.Google = auth.NewGoogleVerifier(cfg.Auth.GoogleClientIDs)
+	} else {
+		log.Warn("google sign-in disabled: GOOGLE_CLIENT_IDS is not set")
+	}
+	c.Auth, err = auth.NewService(authDeps, auth.Options{RefreshTTL: cfg.Auth.RefreshTokenTTL, ResetTTL: time.Hour, WebURL: cfg.App.WebURL})
 	if err != nil {
 		c.Close()
 		return nil, fmt.Errorf("auth: %w", err)

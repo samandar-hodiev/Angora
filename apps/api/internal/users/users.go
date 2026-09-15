@@ -40,10 +40,13 @@ type Credentials struct {
 
 // NewAccount creates a user and their profile atomically.
 type NewAccount struct {
-	Email        string
+	Email string
+	// PasswordHash is empty for accounts created through an external identity (Google).
 	PasswordHash string
 	DisplayName  string
 	Timezone     string
+	// EmailVerified marks the email as verified at creation (verified by the identity provider).
+	EmailVerified bool
 }
 
 var (
@@ -57,5 +60,6 @@ type Repository interface {
 	GetCredentialsByEmail(ctx context.Context, email string) (Credentials, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 	List(ctx context.Context, offset, limit int) ([]User, int64, error)
 }

@@ -3,16 +3,25 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
-import { login, logout, register, sessionStore } from "./session";
+import { login, loginWithGoogle, logout, register, sessionStore } from "./session";
 
 export function useSession() {
   return useSyncExternalStore(sessionStore.subscribe, sessionStore.getState, sessionStore.getState);
 }
 
-export function useLogin() {
+export function useLogin(landing?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: login,
+    mutationFn: (input: Parameters<typeof login>[0]) => login(input, landing),
+    // Never show a previous user's cached data to the next one.
+    onSuccess: () => queryClient.clear(),
+  });
+}
+
+export function useGoogleLogin(landing?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof loginWithGoogle>[0]) => loginWithGoogle(input, landing),
     // Never show a previous user's cached data to the next one.
     onSuccess: () => queryClient.clear(),
   });

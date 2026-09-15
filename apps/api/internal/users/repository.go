@@ -34,8 +34,10 @@ func (r *PostgresRepository) CreateAccount(ctx context.Context, in NewAccount) (
 	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
 		var err error
 		user, err = scanUser(tx.QueryRow(ctx,
-			`INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING `+userColumns,
-			in.Email, in.PasswordHash,
+			`INSERT INTO users (email, password_hash, email_verified_at)
+			 VALUES ($1, NULLIF($2, ''), CASE WHEN $3::boolean THEN now() END)
+			 RETURNING `+userColumns,
+			in.Email, in.PasswordHash, in.EmailVerified,
 		))
 		if err != nil {
 			if database.IsUniqueViolation(err) {
@@ -96,6 +98,11 @@ func (r *PostgresRepository) UpdatePassword(ctx context.Context, id uuid.UUID, p
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (r *PostgresRepository) MarkEmailVerified(ctx context.Context, id uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id = $1`, id)
+	return err
 }
 
 func (r *PostgresRepository) List(ctx context.Context, offset, limit int) ([]User, int64, error) {

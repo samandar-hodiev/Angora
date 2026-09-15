@@ -21,7 +21,7 @@ export default function RegisterPage() {
         </>
       }
     >
-      <SocialAuth />
+      <SocialAuth mode="signup" />
       <RegisterForm />
     </AuthCard>
   );

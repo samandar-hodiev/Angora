@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * Web-only session bridge (a thin backend-for-frontend).
  *
- * Proxies login/register/refresh/logout to the Go API and keeps the refresh token in an
+ * Proxies login/register/google/refresh/logout to the Go API and keeps the refresh token in an
  * httpOnly cookie scoped to this route, so browser JavaScript never handles it.
  * The Go API itself has no web-specific logic.
  */
@@ -20,6 +20,7 @@ export const SESSION_HINT_COOKIE = "engora_session";
 const upstreamPaths = {
   login: "/auth/login",
   register: "/auth/register",
+  google: "/auth/google",
   refresh: "/auth/refresh",
   logout: "/auth/logout",
 } as const;
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
   }
 
   let payload: unknown;
-  if (action === "login" || action === "register") {
+  if (action === "login" || action === "register" || action === "google") {
     payload = await request.json().catch(() => null);
     if (!payload || typeof payload !== "object") {
       return errorResponse(400, "BAD_REQUEST", "Request body is not valid JSON");
