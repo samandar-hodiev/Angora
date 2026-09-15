@@ -62,10 +62,10 @@ export function HeaderAccount({ guest }: { guest: ReactNode }) {
         <button
           type="button"
           aria-label={t.nav.account}
-          className="glass-button flex h-9 max-w-56 items-center gap-2 rounded-lg py-1 pr-3 pl-1 text-body-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          className="flex h-9 max-w-56 items-center gap-2 rounded-lg px-1.5 text-body-sm font-medium text-fg-secondary outline-none transition-colors duration-micro hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
         >
-          <AccountAvatar name={name} avatar={avatar} className="size-7" />
           {loadingProfile ? <Skeleton className="h-4 w-20" /> : <span className="truncate">{name}</span>}
+          <AccountAvatar name={name} avatar={avatar} className="size-6 text-[0.625rem]" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
