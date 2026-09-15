@@ -45,6 +45,8 @@ func New(cfg config.MailConfig, log *slog.Logger) Mailer {
 		return NewSMTP(SMTPConfig{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword, From: cfg.From})
 	case "resend":
 		return NewResend(cfg.ResendAPIKey, cfg.From)
+	case "brevo":
+		return NewBrevo(cfg.BrevoAPIKey, cfg.From)
 	case "log":
 		return LogMailer{Log: log}
 	default:

@@ -209,7 +209,8 @@ func (s *Service) issueEmailCode(ctx context.Context, email string, previous *Em
 		Text: fmt.Sprintf("Your Engora verification code is %s.\n\nIt expires in %d minutes. "+
 			"If you didn't try to create an Engora account, you can ignore this email.", code, int(emailCodeTTL.Minutes())),
 	}); err != nil {
-		return EmailChallenge{}, apperr.New(apperr.CodeUnavailable, "We couldn't send the email. Please try again.")
+		// The cause (bad credentials, network) is for operators; users get a generic message.
+		return EmailChallenge{}, apperr.Wrap(err, apperr.CodeUnavailable, "We couldn't send the email. Please try again.")
 	}
 	s.tracker.Track(ctx, analytics.Event{Name: analytics.EventEmailVerificationSent, Source: "server", Platform: client.Platform,
 		Properties: map[string]any{"send_count": c.SendCount}})

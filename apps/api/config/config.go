@@ -58,6 +58,7 @@ type MailConfig struct {
 	SMTPUsername string
 	SMTPPassword string
 	ResendAPIKey string
+	BrevoAPIKey  string
 }
 
 func (a AppConfig) IsProduction() bool { return a.Env == EnvProduction }
@@ -188,6 +189,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			SMTPUsername: r.str("SMTP_USERNAME", ""),
 			SMTPPassword: r.str("SMTP_PASSWORD", ""),
 			ResendAPIKey: r.str("RESEND_API_KEY", ""),
+			BrevoAPIKey:  r.str("BREVO_API_KEY", ""),
 		},
 		Observability: ObservabilityConfig{
 			ErrorTracker: strings.ToLower(r.str("ERROR_TRACKER", "log")),
@@ -272,6 +274,13 @@ func (c *Config) validate() []error {
 		}
 		if !strings.Contains(c.Mail.From, "@") {
 			errs = append(errs, errors.New("MAIL_FROM must contain a sender email address"))
+		}
+	case "brevo":
+		if c.Mail.BrevoAPIKey == "" {
+			errs = append(errs, errors.New("BREVO_API_KEY is required when MAIL_PROVIDER=brevo"))
+		}
+		if !strings.Contains(c.Mail.From, "@") {
+			errs = append(errs, errors.New("MAIL_FROM must be the sender address verified in Brevo"))
 		}
 	case "resend":
 		if c.Mail.ResendAPIKey == "" {
