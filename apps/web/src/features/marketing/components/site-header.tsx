@@ -8,7 +8,6 @@ import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import { Brand } from "@/components/common/brand";
 import { Button, IconButton } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/overlay";
-import { cn } from "@/lib/utils";
 
 import { useI18n } from "../i18n";
 import { LanguageOptions, LanguageSelector, ThemeOptions, ThemeToggle } from "./preferences";
@@ -54,15 +53,12 @@ export function SiteHeader() {
   return (
     <header className="sticky top-3 z-40 px-3 sm:px-4">
       <div
-        className={cn(
-          "relative mx-auto flex h-14 max-w-6xl items-center gap-4 overflow-hidden rounded-xl border px-3 transition-[background-color,box-shadow,border-color] duration-normal sm:px-4",
-          "border-(--glass-border) shadow-[inset_0_1px_0_0_var(--glass-highlight),var(--shadow-glass)] backdrop-blur-xl backdrop-saturate-150",
-          scrolled ? "bg-(--glass)" : "bg-(--glass-base)",
-        )}
+        data-scrolled={scrolled || undefined}
+        className="glass-frosted relative mx-auto flex h-14 max-w-6xl items-center gap-4 overflow-hidden rounded-xl px-3 sm:px-4"
       >
-        {/* Subtle moving green light inside the bar */}
+        {/* Faint moving green light behind the frosted surface */}
         <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-          <span className="absolute -top-10 left-1/4 h-24 w-1/2 animate-liquid-slow rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] blur-2xl motion-reduce:animate-none" />
+          <span className="absolute -top-10 left-1/4 h-24 w-1/2 animate-liquid-slow rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-70 blur-2xl motion-reduce:animate-none" />
         </span>
 
         <Brand className="relative" />

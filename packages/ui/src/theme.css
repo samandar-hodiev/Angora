@@ -70,6 +70,11 @@
   --liquid-2: oklch(0.8 0.09 185 / 0.2);
   --liquid-3: oklch(0.86 0.08 140 / 0.18);
 
+  --frost-bg: oklch(1 0 0 / 0.5);
+  --frost-bg-scrolled: oklch(1 0 0 / 0.74);
+  --frost-border: oklch(0.2 0.02 165 / 0.1);
+  --frost-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
   --shadow-glass: 0 8px 32px -14px oklch(0.3 0.05 165 / 0.2);
   --shadow-glass-card: 0 1px 2px oklch(0.2 0.02 165 / 0.04), 0 14px 34px -18px oklch(0.25 0.05 165 / 0.16);
 }
@@ -124,6 +129,11 @@
   --liquid-1: oklch(69.6% 0.17 162.48 / 0.24);
   --liquid-2: oklch(0.6 0.1 185 / 0.15);
   --liquid-3: oklch(0.55 0.1 140 / 0.13);
+
+  --frost-bg: oklch(0.21 0.005 165 / 0.4);
+  --frost-bg-scrolled: oklch(0.18 0.005 165 / 0.62);
+  --frost-border: oklch(1 0 0 / 0.1);
+  --frost-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   --shadow-glass: 0 12px 40px -12px oklch(0 0 0 / 0.55);
   --shadow-glass-card: 0 1px 0 oklch(0 0 0 / 0.2), 0 18px 40px -24px oklch(0 0 0 / 0.65);
@@ -314,6 +324,32 @@
   box-shadow: inset 0 1px 0 0 var(--glass-highlight), var(--shadow-glass);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   backdrop-filter: blur(16px) saturate(140%);
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background-color: var(--surface-elevated);
+  }
+}
+
+/* ---- Frosted (matte) glass: floating navigation ------------------------------------------
+ * More transparent than `glass`, heavier blur, low saturation and a very fine grain so the
+ * surface reads as matte rather than glossy. Add `data-scrolled` to densify over content. */
+
+@utility glass-frosted {
+  background-color: var(--frost-bg);
+  background-image: var(--frost-noise), linear-gradient(180deg, oklch(1 0 0 / 0.05), transparent 65%);
+  border: 1px solid var(--frost-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    var(--shadow-glass);
+  -webkit-backdrop-filter: blur(32px) saturate(110%);
+  backdrop-filter: blur(32px) saturate(110%);
+  transition:
+    background-color 240ms var(--ease-standard),
+    box-shadow 240ms var(--ease-standard);
+
+  &[data-scrolled] {
+    background-color: var(--frost-bg-scrolled);
+  }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background-color: var(--surface-elevated);
