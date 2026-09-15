@@ -44,10 +44,13 @@ Source of truth: `packages/ui/src/tokens.ts` (TS, shareable with React Native) m
 | success, warning, error, info | `text-success`, `bg-error`, … |
 | text-primary, text-secondary, text-muted, text-disabled | `text-fg`, `text-fg-secondary`, `text-fg-muted`, `text-fg-disabled` |
 
-Brand accent: indigo-violet (`oklch(0.52 0.165 276)` light, `oklch(0.7 0.13 276)` dark). shadcn
+Brand accent: green `oklch(69.6% 0.17 162.48)` in both themes (dark text on green fills for contrast). Dark is the default theme. Visual rule: ~90% dark/neutral, ~10% green light (CTAs, progress, labels, icon accents, ambient glow). shadcn
 aliases (`card`, `muted`, `accent`, `destructive`, …) point at the same tokens.
 
 ### Dark mode
+
+Landing surfaces use `glass-card`, `glass-panel`, `glass-hover`, `glass-button` and `btn-liquid` (Button `variant="liquid"`). The public site is translated (English default, O‘zbek, Русский) via `apps/web/src/locales` and `features/marketing/i18n.tsx`; the choice persists in localStorage. Product terms (IELTS, AI, Speaking, Writing, Reading, Listening, AI Coach) stay untranslated.
+
 
 Light / Dark / System. Dark is its own palette: layered surfaces
 (background → surface → surface-elevated), subtle borders, muted secondary text and a lighter,

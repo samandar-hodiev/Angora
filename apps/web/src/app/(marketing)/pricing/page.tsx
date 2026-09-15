@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 import { faqs } from "@/features/marketing/content";
-import { FAQList, PageHero, PricingPlans, Section } from "@/features/marketing/components/sections";
+import { PricingPlans } from "@/features/marketing/components/pricing-plans";
+import { FAQList, PageHero, Section } from "@/features/marketing/components/sections";
 
 export const metadata: Metadata = {
   title: "Pricing",

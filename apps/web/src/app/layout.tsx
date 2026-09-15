@@ -32,14 +32,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fcfcfd" },
-    { media: "(prefers-color-scheme: dark)", color: "#16161d" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d110f" },
+    { media: "(prefers-color-scheme: light)", color: "#fbfcfb" },
   ],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} dark`} suppressHydrationWarning>
       <head>
         {/* Applies light/dark before first paint to avoid a theme flash. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />

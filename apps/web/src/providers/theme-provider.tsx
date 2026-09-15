@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 import {
+  DEFAULT_THEME,
   isThemePreference,
   resolveTheme,
   THEME_STORAGE_KEY,
@@ -24,9 +25,9 @@ const darkQuery = "(prefers-color-scheme: dark)";
 function readPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemePreference(stored) ? stored : "system";
+    return isThemePreference(stored) ? stored : DEFAULT_THEME;
   } catch {
-    return "system";
+    return DEFAULT_THEME;
   }
 }
 
@@ -51,7 +52,7 @@ function subscribeSystem(callback: () => void) {
  * other devices (see features/profile/appearance.ts).
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const preference = useSyncExternalStore(subscribePreference, readPreference, () => "system" as const);
+  const preference = useSyncExternalStore(subscribePreference, readPreference, () => DEFAULT_THEME);
   const systemDark = useSyncExternalStore(subscribeSystem, () => window.matchMedia(darkQuery).matches, () => false);
   const resolved = resolveTheme(preference, systemDark);
 

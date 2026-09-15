@@ -21,6 +21,10 @@ const buttonVariants = cva(
         outline: "border bg-surface text-foreground shadow-xs hover:bg-surface-hover",
         ghost: "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
         subtle: "bg-primary-subtle text-primary-subtle-foreground hover:bg-primary-subtle/70",
+        /** Primary call to action with the liquid-glass treatment. */
+        liquid: "btn-liquid font-semibold text-primary-foreground",
+        /** Secondary action on glass surfaces. */
+        glass: "glass-button text-foreground",
         destructive: "bg-error text-error-foreground shadow-xs hover:bg-error/90",
         link: "h-auto px-0 text-primary underline-offset-4 hover:underline active:translate-y-0",
       },

@@ -10,7 +10,11 @@ import { cn } from "@/lib/utils";
 const getHealth = () => apiClient.get<HealthReport>("/health", { auth: false });
 
 /** Small status indicator proving the web client reaches /api/v1. */
-export function ApiStatus() {
+export function ApiStatus({
+  labels = { checking: "Checking API…", degraded: "API unavailable", operational: "All systems operational" },
+}: {
+  labels?: { checking: string; degraded: string; operational: string };
+}) {
   const { data, isPending, isError } = useQuery({
     queryKey: queryKeys.system.health,
     queryFn: getHealth,
@@ -19,7 +23,7 @@ export function ApiStatus() {
   });
 
   const state = isPending ? "checking" : isError || data?.status !== "ok" ? "degraded" : "operational";
-  const label = { checking: "Checking API…", degraded: "API unavailable", operational: "All systems operational" }[state];
+  const label = labels[state];
 
   return (
     <span role="status" className="inline-flex items-center gap-2 text-xs text-muted-foreground">

@@ -61,6 +61,7 @@ export function Meter({
   max = 100,
   display,
   tone = "primary",
+  glow = false,
   className,
 }: {
   label: React.ReactNode;
@@ -68,6 +69,8 @@ export function Meter({
   max?: number;
   display?: React.ReactNode;
   tone?: "primary" | "success" | "warning" | "error" | "muted";
+  /** Soft glow around the filled part (hero/marketing progress only). */
+  glow?: boolean;
   className?: string;
 }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
@@ -92,7 +95,10 @@ export function Meter({
         aria-valuenow={value}
         className="h-1.5 overflow-hidden rounded-full bg-surface-active"
       >
-        <div className={cn("h-full rounded-full transition-[width] duration-emphasis ease-emphasized", color)} style={{ width: `${pct}%` }} />
+        <div
+          className={cn("h-full rounded-full transition-[width] duration-emphasis ease-emphasized", color, glow && "shadow-[0_0_12px_0_var(--primary-glow)]")}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );

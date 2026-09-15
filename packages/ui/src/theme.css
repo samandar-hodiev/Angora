@@ -1,18 +1,20 @@
 /*
  * Engora theme for Tailwind CSS v4 + shadcn/ui. Values mirror src/tokens.ts.
  *
- * Token → utility
- *   background / foreground            bg-background, text-foreground
- *   surface, surface-elevated,         bg-surface, bg-surface-elevated,
- *   surface-hover, surface-active      bg-surface-hover, bg-surface-active
- *   border, border-subtle              border-border, border-border-subtle
- *   primary(-hover/-active/-foreground) bg-primary, hover:bg-primary-hover, text-primary-foreground
- *   primary-subtle(-foreground)        bg-primary-subtle, text-primary-subtle-foreground
- *   success / warning / error / info   text-success, bg-error, ...
- *   text-primary/secondary/muted/disabled  text-fg, text-fg-secondary, text-fg-muted, text-fg-disabled
+ * Brand: premium dark with a single green accent — oklch(69.6% 0.17 162.48).
+ * Green is an accent and ambient light, never the dominant surface (≈90% neutral / 10% green).
  *
- * shadcn aliases (card, popover, muted, accent, secondary, destructive, input) point at the
- * same tokens so generated components stay on-system.
+ * Token → utility
+ *   background / foreground                 bg-background, text-foreground
+ *   surface(-elevated/-hover/-active)       bg-surface, bg-surface-elevated, ...
+ *   border, border-subtle                   border-border, border-border-subtle
+ *   primary(-hover/-active/-foreground)     bg-primary, hover:bg-primary-hover, text-primary-foreground
+ *   primary-subtle(-foreground), primary-glow
+ *   success / warning / error / info        text-success, bg-error, ...
+ *   text-primary/secondary/muted/disabled   text-fg, text-fg-secondary, text-fg-muted, text-fg-disabled
+ *
+ * Surface treatments: glass (floating UI), glass-card / glass-panel (liquid-glass cards),
+ * glass-hover (interactive lift), glass-button, btn-liquid (primary CTA), liquid-field (ambient light).
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -20,91 +22,111 @@
 :root {
   color-scheme: light;
 
-  --background: oklch(0.99 0.002 270);
-  --foreground: oklch(0.2 0.018 270);
+  --background: oklch(0.985 0.003 165);
+  --foreground: oklch(0.19 0.012 165);
 
   --surface: oklch(1 0 0);
   --surface-elevated: oklch(1 0 0);
-  --surface-hover: oklch(0.972 0.003 270);
-  --surface-active: oklch(0.948 0.006 270);
+  --surface-hover: oklch(0.966 0.004 165);
+  --surface-active: oklch(0.94 0.006 165);
 
-  --border: oklch(0.915 0.005 270);
-  --border-subtle: oklch(0.95 0.003 270);
+  --border: oklch(0.905 0.006 165);
+  --border-subtle: oklch(0.94 0.004 165);
 
-  --primary: oklch(0.52 0.165 276);
-  --primary-hover: oklch(0.48 0.165 276);
-  --primary-active: oklch(0.44 0.155 276);
-  --primary-foreground: oklch(0.99 0.002 270);
-  --primary-subtle: oklch(0.962 0.022 276);
-  --primary-subtle-foreground: oklch(0.42 0.13 276);
+  --primary: oklch(69.6% 0.17 162.48);
+  --primary-hover: oklch(65% 0.165 162.48);
+  --primary-active: oklch(60% 0.155 162.48);
+  --primary-foreground: oklch(0.18 0.035 162.48);
+  --primary-subtle: oklch(69.6% 0.17 162.48 / 0.12);
+  --primary-subtle-foreground: oklch(0.42 0.1 162.48);
+  --primary-glow: oklch(69.6% 0.17 162.48 / 0.28);
 
-  --success: oklch(0.58 0.12 155);
+  --success: oklch(0.56 0.12 158);
   --success-foreground: oklch(0.99 0 0);
   --warning: oklch(0.74 0.14 72);
   --warning-foreground: oklch(0.26 0.05 72);
   --error: oklch(0.57 0.2 25);
   --error-foreground: oklch(0.99 0 0);
-  --info: oklch(0.58 0.11 240);
+  --info: oklch(0.55 0.05 230);
   --info-foreground: oklch(0.99 0 0);
 
-  --text-primary: oklch(0.2 0.018 270);
-  --text-secondary: oklch(0.42 0.014 270);
-  --text-muted: oklch(0.55 0.011 270);
-  --text-disabled: oklch(0.72 0.006 270);
+  --text-primary: oklch(0.19 0.012 165);
+  --text-secondary: oklch(0.4 0.012 165);
+  --text-muted: oklch(0.53 0.01 165);
+  --text-disabled: oklch(0.72 0.006 165);
 
-  --ring: oklch(0.52 0.165 276);
-  --glass: oklch(1 0 0 / 0.64);
-  --glass-border: oklch(1 0 0 / 0.7);
-  --liquid-1: oklch(0.72 0.12 276 / 0.55);
-  --liquid-2: oklch(0.8 0.08 230 / 0.45);
-  --liquid-3: oklch(0.82 0.07 320 / 0.35);
+  --ring: oklch(69.6% 0.17 162.48);
 
-  --shadow-glass: 0 8px 32px -12px oklch(0.2 0.03 276 / 0.18);
+  --glass: oklch(1 0 0 / 0.72);
+  --glass-border: oklch(0.2 0.02 165 / 0.09);
+  --glass-base: oklch(1 0 0 / 0.64);
+  --glass-tint: oklch(69.6% 0.17 162.48 / 0.08);
+  --glass-tint-soft: oklch(69.6% 0.17 162.48 / 0.045);
+  --glass-tint-faint: oklch(69.6% 0.17 162.48 / 0.02);
+  --glass-highlight: oklch(1 0 0 / 0.9);
+  --glass-border-hover: oklch(69.6% 0.17 162.48 / 0.38);
+
+  --liquid-1: oklch(69.6% 0.17 162.48 / 0.26);
+  --liquid-2: oklch(0.8 0.09 185 / 0.2);
+  --liquid-3: oklch(0.86 0.08 140 / 0.18);
+
+  --shadow-glass: 0 8px 32px -14px oklch(0.3 0.05 165 / 0.2);
+  --shadow-glass-card: 0 1px 2px oklch(0.2 0.02 165 / 0.04), 0 14px 34px -18px oklch(0.25 0.05 165 / 0.16);
 }
 
 .dark {
   color-scheme: dark;
 
-  --background: oklch(0.155 0.008 270);
-  --foreground: oklch(0.955 0.004 270);
+  --background: oklch(0.14 0.004 165);
+  --foreground: oklch(0.96 0.004 165);
 
-  --surface: oklch(0.19 0.009 270);
-  --surface-elevated: oklch(0.225 0.01 270);
-  --surface-hover: oklch(0.235 0.01 270);
-  --surface-active: oklch(0.27 0.012 270);
+  --surface: oklch(0.175 0.005 165);
+  --surface-elevated: oklch(0.205 0.006 165);
+  --surface-hover: oklch(0.22 0.006 165);
+  --surface-active: oklch(0.255 0.008 165);
 
-  --border: oklch(0.29 0.01 270);
-  --border-subtle: oklch(0.235 0.009 270);
+  --border: oklch(0.275 0.008 165);
+  --border-subtle: oklch(0.22 0.006 165);
 
-  --primary: oklch(0.7 0.13 276);
-  --primary-hover: oklch(0.74 0.12 276);
-  --primary-active: oklch(0.66 0.13 276);
-  --primary-foreground: oklch(0.16 0.01 270);
-  --primary-subtle: oklch(0.27 0.045 276);
-  --primary-subtle-foreground: oklch(0.86 0.06 276);
+  --primary: oklch(69.6% 0.17 162.48);
+  --primary-hover: oklch(74% 0.16 162.48);
+  --primary-active: oklch(64% 0.16 162.48);
+  --primary-foreground: oklch(0.16 0.03 162.48);
+  --primary-subtle: oklch(69.6% 0.17 162.48 / 0.13);
+  --primary-subtle-foreground: oklch(0.84 0.11 162.48);
+  --primary-glow: oklch(69.6% 0.17 162.48 / 0.35);
 
-  --success: oklch(0.72 0.12 155);
-  --success-foreground: oklch(0.16 0.01 270);
+  --success: oklch(0.72 0.13 158);
+  --success-foreground: oklch(0.16 0.02 165);
   --warning: oklch(0.8 0.13 75);
   --warning-foreground: oklch(0.2 0.04 75);
   --error: oklch(0.68 0.18 25);
-  --error-foreground: oklch(0.16 0.01 270);
-  --info: oklch(0.72 0.1 240);
-  --info-foreground: oklch(0.16 0.01 270);
+  --error-foreground: oklch(0.16 0.02 165);
+  --info: oklch(0.72 0.05 230);
+  --info-foreground: oklch(0.16 0.02 165);
 
-  --text-primary: oklch(0.955 0.004 270);
-  --text-secondary: oklch(0.8 0.008 270);
-  --text-muted: oklch(0.65 0.01 270);
-  --text-disabled: oklch(0.48 0.008 270);
+  --text-primary: oklch(0.96 0.004 165);
+  --text-secondary: oklch(0.79 0.006 165);
+  --text-muted: oklch(0.64 0.008 165);
+  --text-disabled: oklch(0.47 0.006 165);
 
-  --ring: oklch(0.7 0.13 276);
-  --glass: oklch(0.23 0.01 270 / 0.62);
-  --glass-border: oklch(1 0 0 / 0.09);
-  --liquid-1: oklch(0.55 0.14 276 / 0.45);
-  --liquid-2: oklch(0.5 0.1 230 / 0.35);
-  --liquid-3: oklch(0.5 0.1 320 / 0.25);
+  --ring: oklch(69.6% 0.17 162.48);
 
-  --shadow-glass: 0 12px 40px -12px oklch(0 0 0 / 0.5);
+  --glass: oklch(0.2 0.006 165 / 0.62);
+  --glass-border: oklch(1 0 0 / 0.08);
+  --glass-base: oklch(0.19 0.006 165 / 0.55);
+  --glass-tint: oklch(69.6% 0.17 162.48 / 0.07);
+  --glass-tint-soft: oklch(69.6% 0.17 162.48 / 0.045);
+  --glass-tint-faint: oklch(69.6% 0.17 162.48 / 0.022);
+  --glass-highlight: oklch(1 0 0 / 0.06);
+  --glass-border-hover: oklch(69.6% 0.17 162.48 / 0.32);
+
+  --liquid-1: oklch(69.6% 0.17 162.48 / 0.24);
+  --liquid-2: oklch(0.6 0.1 185 / 0.15);
+  --liquid-3: oklch(0.55 0.1 140 / 0.13);
+
+  --shadow-glass: 0 12px 40px -12px oklch(0 0 0 / 0.55);
+  --shadow-glass-card: 0 1px 0 oklch(0 0 0 / 0.2), 0 18px 40px -24px oklch(0 0 0 / 0.65);
 }
 
 @theme inline {
@@ -127,6 +149,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-subtle: var(--primary-subtle);
   --color-primary-subtle-foreground: var(--primary-subtle-foreground);
+  --color-primary-glow: var(--primary-glow);
 
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
@@ -169,18 +192,18 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
 
-  --shadow-xs: 0 1px 2px 0 oklch(0.2 0.02 270 / 0.05);
-  --shadow-sm: 0 1px 3px 0 oklch(0.2 0.02 270 / 0.06), 0 1px 2px -1px oklch(0.2 0.02 270 / 0.05);
-  --shadow-md: 0 6px 16px -4px oklch(0.2 0.02 270 / 0.08);
-  --shadow-lg: 0 16px 40px -12px oklch(0.2 0.02 270 / 0.14);
+  --shadow-xs: 0 1px 2px 0 oklch(0.2 0.02 165 / 0.05);
+  --shadow-sm: 0 1px 3px 0 oklch(0.2 0.02 165 / 0.06), 0 1px 2px -1px oklch(0.2 0.02 165 / 0.05);
+  --shadow-md: 0 6px 16px -4px oklch(0.2 0.02 165 / 0.08);
+  --shadow-lg: 0 16px 40px -12px oklch(0.2 0.02 165 / 0.14);
   --shadow-glass: var(--shadow-glass);
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
-  --animate-liquid: liquid-drift 8s var(--ease-standard) infinite alternate;
-  --animate-liquid-slow: liquid-drift 14s var(--ease-standard) infinite alternate-reverse;
+  --animate-liquid: liquid-drift 10s var(--ease-standard) infinite alternate;
+  --animate-liquid-slow: liquid-drift 18s var(--ease-standard) infinite alternate-reverse;
   --animate-breathe: breathe 2.4s var(--ease-standard) infinite;
   --animate-shimmer: shimmer 2s linear infinite;
 
@@ -189,10 +212,10 @@
       transform: translate3d(0, 0, 0) scale(1);
     }
     50% {
-      transform: translate3d(6%, -8%, 0) scale(1.12);
+      transform: translate3d(5%, -6%, 0) scale(1.08);
     }
     100% {
-      transform: translate3d(-6%, 5%, 0) scale(0.94);
+      transform: translate3d(-5%, 4%, 0) scale(0.96);
     }
   }
   @keyframes breathe {
@@ -219,14 +242,14 @@
 /* ---- Typography scale --------------------------------------------------------------- */
 
 @utility text-display {
-  font-size: clamp(2.5rem, 2rem + 3vw, 3.5rem);
-  line-height: 1.07;
+  font-size: clamp(2.5rem, 2rem + 3vw, 3.75rem);
+  line-height: 1.05;
   letter-spacing: -0.035em;
   font-weight: 600;
 }
 @utility text-h1 {
-  font-size: clamp(1.75rem, 1.5rem + 1vw, 2rem);
-  line-height: 1.25;
+  font-size: clamp(1.75rem, 1.45rem + 1.2vw, 2.25rem);
+  line-height: 1.2;
   letter-spacing: -0.025em;
   font-weight: 600;
 }
@@ -250,15 +273,15 @@
 }
 @utility text-body-lg {
   font-size: 1.125rem;
-  line-height: 1.75rem;
+  line-height: 1.8rem;
 }
 @utility text-body {
   font-size: 1rem;
-  line-height: 1.5rem;
+  line-height: 1.6rem;
 }
 @utility text-body-sm {
   font-size: 0.875rem;
-  line-height: 1.25rem;
+  line-height: 1.4rem;
 }
 @utility text-caption {
   font-size: 0.75rem;
@@ -283,21 +306,105 @@
   transition-duration: 420ms;
 }
 
-/* ---- Glass: floating, contextual surfaces only (nav, player, AI panels, dialogs) ----- */
+/* ---- Glass: floating, contextual surfaces (nav, player, toasts, AI panels) ----------- */
 
 @utility glass {
   background-color: var(--glass);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-glass);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: inset 0 1px 0 0 var(--glass-highlight), var(--shadow-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background-color: var(--surface-elevated);
   }
 }
 
-/* ---- Liquid: AI, voice and progress visuals only ------------------------------------- */
+/* ---- Liquid glass cards: dark translucent base + barely visible green light ----------- */
+
+@utility glass-card {
+  background-color: var(--glass-base);
+  background-image:
+    radial-gradient(120% 90% at 0% 0%, var(--glass-tint), transparent 55%),
+    linear-gradient(135deg, var(--glass-tint-soft), oklch(1 0 0 / 0.012) 45%, var(--glass-tint-faint));
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 0 var(--glass-highlight), var(--shadow-glass-card);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+
+/* Stronger ambient light for hero-level panels (dashboard preview, IELTS, CTA). */
+@utility glass-panel {
+  background-color: var(--glass-base);
+  background-image:
+    radial-gradient(90% 70% at 100% 0%, var(--glass-tint), transparent 60%),
+    radial-gradient(80% 60% at 0% 100%, var(--glass-tint-soft), transparent 60%),
+    linear-gradient(160deg, oklch(1 0 0 / 0.02), transparent 40%);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 0 var(--glass-highlight), var(--shadow-glass-card);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+
+@utility glass-hover {
+  transition:
+    transform 240ms var(--ease-standard),
+    border-color 240ms var(--ease-standard),
+    box-shadow 240ms var(--ease-standard);
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--glass-border-hover);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-highlight),
+      var(--shadow-glass-card),
+      0 18px 44px -26px var(--primary-glow);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+@utility glass-button {
+  background-color: var(--glass-base);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 0 var(--glass-highlight);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+
+  &:hover {
+    border-color: var(--glass-border-hover);
+    background-color: var(--surface-hover);
+  }
+}
+
+/* Primary CTA: green tinted glass with an inner highlight and soft glow. */
+@utility btn-liquid {
+  background-color: color-mix(in oklch, var(--primary) 90%, transparent);
+  background-image:
+    linear-gradient(180deg, oklch(1 0 0 / 0.26), oklch(1 0 0 / 0) 55%),
+    radial-gradient(120% 140% at 50% 130%, oklch(1 0 0 / 0.16), transparent 60%);
+  border: 1px solid oklch(1 0 0 / 0.22);
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.35),
+    0 10px 28px -12px var(--primary-glow);
+  transition:
+    box-shadow 240ms var(--ease-standard),
+    filter 240ms var(--ease-standard),
+    transform 120ms var(--ease-standard);
+
+  &:hover {
+    filter: brightness(1.06);
+    box-shadow:
+      inset 0 1px 0 0 oklch(1 0 0 / 0.4),
+      0 14px 36px -12px var(--primary-glow);
+  }
+}
+
+/* ---- Liquid: ambient light for AI, voice and progress moments ---------------------------- */
 
 @utility liquid-field {
   position: absolute;
@@ -307,7 +414,7 @@
     radial-gradient(40% 45% at 25% 30%, var(--liquid-1), transparent 70%),
     radial-gradient(35% 40% at 75% 35%, var(--liquid-2), transparent 70%),
     radial-gradient(45% 40% at 55% 80%, var(--liquid-3), transparent 70%);
-  filter: blur(28px);
+  filter: blur(36px);
 }
 
 @layer base {
@@ -320,6 +427,6 @@
   }
   ::selection {
     background-color: var(--primary-subtle);
-    color: var(--primary-subtle-foreground);
+    color: var(--foreground);
   }
 }

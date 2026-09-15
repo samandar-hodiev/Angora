@@ -7,84 +7,87 @@
  * React Native app imports this module directly, so both clients share one visual language.
  * Keep theme.css in sync when changing values here.
  *
- * Colors are OKLCH. One brand accent (indigo-violet); everything else is neutral or
+ * Colors are OKLCH. One brand accent (green, oklch(69.6% 0.17 162.48)); everything else is neutral or
  * semantic (success / warning / error / info).
  */
 
 const light = {
-  background: "oklch(0.99 0.002 270)",
-  foreground: "oklch(0.2 0.018 270)",
+  background: "oklch(0.985 0.003 165)",
+  foreground: "oklch(0.19 0.012 165)",
 
   surface: "oklch(1 0 0)",
   surfaceElevated: "oklch(1 0 0)",
-  surfaceHover: "oklch(0.972 0.003 270)",
-  surfaceActive: "oklch(0.948 0.006 270)",
+  surfaceHover: "oklch(0.966 0.004 165)",
+  surfaceActive: "oklch(0.94 0.006 165)",
 
-  border: "oklch(0.915 0.005 270)",
-  borderSubtle: "oklch(0.95 0.003 270)",
+  border: "oklch(0.905 0.006 165)",
+  borderSubtle: "oklch(0.94 0.004 165)",
 
-  primary: "oklch(0.52 0.165 276)",
-  primaryHover: "oklch(0.48 0.165 276)",
-  primaryActive: "oklch(0.44 0.155 276)",
-  primaryForeground: "oklch(0.99 0.002 270)",
-  primarySubtle: "oklch(0.962 0.022 276)",
-  primarySubtleForeground: "oklch(0.42 0.13 276)",
+  primary: "oklch(69.6% 0.17 162.48)",
+  primaryHover: "oklch(65% 0.165 162.48)",
+  primaryActive: "oklch(60% 0.155 162.48)",
+  primaryForeground: "oklch(0.18 0.035 162.48)",
+  primarySubtle: "oklch(69.6% 0.17 162.48 / 0.12)",
+  primarySubtleForeground: "oklch(0.42 0.1 162.48)",
+  primaryGlow: "oklch(69.6% 0.17 162.48 / 0.28)",
 
-  success: "oklch(0.58 0.12 155)",
+  success: "oklch(0.56 0.12 158)",
   successForeground: "oklch(0.99 0 0)",
   warning: "oklch(0.74 0.14 72)",
   warningForeground: "oklch(0.26 0.05 72)",
   error: "oklch(0.57 0.2 25)",
   errorForeground: "oklch(0.99 0 0)",
-  info: "oklch(0.58 0.11 240)",
+  info: "oklch(0.55 0.05 230)",
   infoForeground: "oklch(0.99 0 0)",
 
-  textPrimary: "oklch(0.2 0.018 270)",
-  textSecondary: "oklch(0.42 0.014 270)",
-  textMuted: "oklch(0.55 0.011 270)",
-  textDisabled: "oklch(0.72 0.006 270)",
+  textPrimary: "oklch(0.19 0.012 165)",
+  textSecondary: "oklch(0.4 0.012 165)",
+  textMuted: "oklch(0.53 0.01 165)",
+  textDisabled: "oklch(0.72 0.006 165)",
 
-  ring: "oklch(0.52 0.165 276)",
-  glass: "oklch(1 0 0 / 0.64)",
-  glassBorder: "oklch(1 0 0 / 0.7)",
+  ring: "oklch(69.6% 0.17 162.48)",
+  glass: "oklch(1 0 0 / 0.72)",
+  glassBorder: "oklch(0.2 0.02 165 / 0.09)",
 } as const;
 
+/** Dark is the default Engora experience. */
 const dark = {
-  background: "oklch(0.155 0.008 270)",
-  foreground: "oklch(0.955 0.004 270)",
+  background: "oklch(0.14 0.004 165)",
+  foreground: "oklch(0.96 0.004 165)",
 
-  surface: "oklch(0.19 0.009 270)",
-  surfaceElevated: "oklch(0.225 0.01 270)",
-  surfaceHover: "oklch(0.235 0.01 270)",
-  surfaceActive: "oklch(0.27 0.012 270)",
+  surface: "oklch(0.175 0.005 165)",
+  surfaceElevated: "oklch(0.205 0.006 165)",
+  surfaceHover: "oklch(0.22 0.006 165)",
+  surfaceActive: "oklch(0.255 0.008 165)",
 
-  border: "oklch(0.29 0.01 270)",
-  borderSubtle: "oklch(0.235 0.009 270)",
+  border: "oklch(0.275 0.008 165)",
+  borderSubtle: "oklch(0.22 0.006 165)",
 
-  primary: "oklch(0.7 0.13 276)",
-  primaryHover: "oklch(0.74 0.12 276)",
-  primaryActive: "oklch(0.66 0.13 276)",
-  primaryForeground: "oklch(0.16 0.01 270)",
-  primarySubtle: "oklch(0.27 0.045 276)",
-  primarySubtleForeground: "oklch(0.86 0.06 276)",
+  primary: "oklch(69.6% 0.17 162.48)",
+  primaryHover: "oklch(74% 0.16 162.48)",
+  primaryActive: "oklch(64% 0.16 162.48)",
+  primaryForeground: "oklch(0.16 0.03 162.48)",
+  primarySubtle: "oklch(69.6% 0.17 162.48 / 0.13)",
+  primarySubtleForeground: "oklch(0.84 0.11 162.48)",
+  primaryGlow: "oklch(69.6% 0.17 162.48 / 0.35)",
 
-  success: "oklch(0.72 0.12 155)",
-  successForeground: "oklch(0.16 0.01 270)",
+  success: "oklch(0.72 0.13 158)",
+  successForeground: "oklch(0.16 0.02 165)",
   warning: "oklch(0.8 0.13 75)",
   warningForeground: "oklch(0.2 0.04 75)",
   error: "oklch(0.68 0.18 25)",
-  errorForeground: "oklch(0.16 0.01 270)",
-  info: "oklch(0.72 0.1 240)",
-  infoForeground: "oklch(0.16 0.01 270)",
+  errorForeground: "oklch(0.16 0.02 165)",
+  info: "oklch(0.72 0.05 230)",
+  infoForeground: "oklch(0.16 0.02 165)",
 
-  textPrimary: "oklch(0.955 0.004 270)",
-  textSecondary: "oklch(0.8 0.008 270)",
-  textMuted: "oklch(0.65 0.01 270)",
-  textDisabled: "oklch(0.48 0.008 270)",
+  textPrimary: "oklch(0.96 0.004 165)",
+  textSecondary: "oklch(0.79 0.006 165)",
+  textMuted: "oklch(0.64 0.008 165)",
+  textDisabled: "oklch(0.47 0.006 165)",
 
-  ring: "oklch(0.7 0.13 276)",
-  glass: "oklch(0.23 0.01 270 / 0.62)",
-  glassBorder: "oklch(1 0 0 / 0.09)",
+  ring: "oklch(69.6% 0.17 162.48)",
+  glass: "oklch(0.2 0.006 165 / 0.62)",
+  glassBorder: "oklch(1 0 0 / 0.08)",
 } as const satisfies Record<keyof typeof light, string>;
 
 export const colors = { light, dark } as const;
@@ -134,11 +137,11 @@ export const typography = {
 
 /** Border first, then surface contrast, then a very soft shadow. */
 export const shadows = {
-  xs: "0 1px 2px 0 oklch(0.2 0.02 270 / 0.05)",
-  sm: "0 1px 3px 0 oklch(0.2 0.02 270 / 0.06), 0 1px 2px -1px oklch(0.2 0.02 270 / 0.05)",
-  md: "0 6px 16px -4px oklch(0.2 0.02 270 / 0.08)",
-  lg: "0 16px 40px -12px oklch(0.2 0.02 270 / 0.14)",
-  glass: "0 8px 32px -12px oklch(0.2 0.03 276 / 0.18)",
+  xs: "0 1px 2px 0 oklch(0.2 0.02 165 / 0.05)",
+  sm: "0 1px 3px 0 oklch(0.2 0.02 165 / 0.06), 0 1px 2px -1px oklch(0.2 0.02 165 / 0.05)",
+  md: "0 6px 16px -4px oklch(0.2 0.02 165 / 0.08)",
+  lg: "0 16px 40px -12px oklch(0.2 0.02 165 / 0.14)",
+  glass: "0 8px 32px -12px oklch(0.3 0.05 165 / 0.18)",
 } as const;
 
 /** Motion communicates state, hierarchy, feedback, progress and AI processing only. */

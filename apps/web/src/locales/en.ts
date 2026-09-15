@@ -1,0 +1,240 @@
+/**
+ * Landing page copy (English, default). uz.ts and ru.ts must provide the same structure;
+ * a test enforces parity. Internationally recognised product terms (IELTS, AI, Speaking,
+ * Writing, Reading, Listening, AI Coach) are intentionally not translated.
+ */
+
+export type LimitPeriod = "day" | "week" | "month" | "lifetime";
+
+export const en = {
+  nav: {
+    main: "Main",
+    features: "Features",
+    ielts: "IELTS",
+    howItWorks: "How it works",
+    pricing: "Pricing",
+    signIn: "Sign in",
+    createAccount: "Create an account",
+    openMenu: "Open menu",
+    menu: "Menu",
+    language: "Language",
+    theme: "Theme",
+    light: "Light",
+    dark: "Dark",
+    switchToLight: "Switch to light theme",
+    switchToDark: "Switch to dark theme",
+  },
+  hero: {
+    badge: "Your AI English Coach",
+    titleLine1: "Your English.",
+    titleLine2: "Your AI Coach.",
+    subtitle: "Practice speaking, writing, reading and listening with AI feedback that adapts to what you need to improve.",
+    primaryCta: "Start learning",
+    secondaryCta: "See how it works",
+  },
+  preview: {
+    ariaLabel: "Preview of the Engora dashboard with a daily goal, a recommended speaking task and skill progress",
+    greeting: "Good morning",
+    plan: "Here's your plan for today",
+    level: "B1 English",
+    streak: "12 day streak",
+    goal: "Today's goal",
+    goalProgress: "Daily goal progress",
+    minutes: "min",
+    continue: "Continue learning",
+    continueTitle: "Talk about your hometown",
+    start: "Start",
+    progress: "Your progress",
+    coachInsight: "Your answers are getting longer and more fluent.",
+    focusNext: "Focus next:",
+    focusTopic: "Past Simple",
+    caption: "Illustrative preview of the product",
+  },
+  skillNames: {
+    speaking: "Speaking",
+    writing: "Writing",
+    reading: "Reading",
+    listening: "Listening",
+  },
+  how: {
+    eyebrow: "How Engora works",
+    title: "A learning loop that gets smarter every session",
+    description: "Each answer you give teaches Engora what to practise with you next.",
+    steps: [
+      { title: "Practice", text: "Speak, write, read and listen on real topics at your level." },
+      { title: "AI analysis", text: "Every answer is analysed for grammar, vocabulary, fluency and pronunciation." },
+      { title: "Feedback", text: "Clear corrections and explanations — not just a number." },
+      { title: "Weak spots", text: "Recurring mistakes are detected and turned into focus areas." },
+      { title: "Personal practice", text: "Your next exercises target exactly what holds you back." },
+      { title: "Progress", text: "Watch each skill improve, on the web today and on mobile next." },
+    ],
+  },
+  skills: {
+    eyebrow: "Four skills",
+    title: "Everything you need to use English with confidence",
+    learnMore: "Learn more",
+    descriptions: {
+      speaking: "Answer real questions out loud and see exactly what to improve in fluency, grammar, vocabulary and pronunciation.",
+      writing: "Essays, emails and exam tasks with feedback that explains the rule behind each change.",
+      reading: "Passages at your level with questions beside the text, so you never lose your place.",
+      listening: "Conversations and talks with focused questions. Transcripts appear only when they help.",
+    },
+  },
+  feedback: {
+    eyebrow: "AI feedback",
+    title: "Feedback you can act on",
+    description: "See what you did well, what to fix and why — with corrected sentences, not vague advice.",
+    example: "Example feedback",
+    context: "Speaking · B1",
+    fluency: "Fluency & coherence",
+    grammar: "Grammar",
+    category: "Present perfect",
+    severity: "High priority",
+    incorrect: "Incorrect",
+    correct: "Correct",
+    explanation: "After have/has, use the past participle: gone.",
+  },
+  personal: {
+    eyebrow: "Personalised learning",
+    title: "Practice built from your own mistakes",
+    description:
+      "Engora groups the errors you repeat and turns them into short, targeted exercises — so every session counts.",
+    items: [
+      { label: "Present perfect", reason: "Repeated in 3 of your last 5 answers" },
+      { label: "Talk about a memorable trip", reason: "Practise past tenses in context" },
+      { label: "Collocations with make / do", reason: "Common in your writing" },
+    ],
+  },
+  progress: {
+    eyebrow: "Progress",
+    title: "See every skill improve",
+    description: "Clear skill scores, streaks and history — synced across your devices.",
+    cardTitle: "Skill scores",
+    cardHint: "This month",
+    caption: "Illustrative progress",
+  },
+  ielts: {
+    eyebrow: "IELTS mode",
+    title: "Preparing for IELTS? There's a mode for that.",
+    description: "Exam-style tasks, estimated band scores and full mock exams — on the same engine you use every day.",
+    cta: "Explore IELTS preparation",
+    highlights: [
+      { title: "Speaking test practice", text: "Part 1, 2 and 3 style questions with timed answers." },
+      { title: "Writing Task 1 & 2", text: "Band-descriptor-based feedback on every essay." },
+      { title: "Full mock exams", text: "A focused exam mode with no hints and a real timer." },
+    ],
+  },
+  stories: {
+    title: "Learner stories",
+    text: "Engora is new. We'll share stories from real learners here — never invented reviews. Be one of the first.",
+    cta: "Join the first learners",
+  },
+  pricing: {
+    eyebrow: "Pricing",
+    title: "Start free. Upgrade when you're ready.",
+    mostPopular: "Most popular",
+    startFree: "Start free",
+    choose: (plan: string) => `Choose ${plan}`,
+    trial: (days: number) => `${days}-day free trial`,
+    free: "Free",
+    perMonth: "/ month",
+    perYear: "/ year",
+    unavailableTitle: "Plans are temporarily unavailable",
+    unavailableText: "You can start free today and see all plans inside the app.",
+    unlimited: (what: string) => `Unlimited ${what}`,
+    limit: (count: number, what: string, period: LimitPeriod) =>
+      `${count} ${what} ${{ day: "per day", week: "per week", month: "per month", lifetime: "in total" }[period]}`,
+    plans: {
+      free: "Start practising English with daily AI feedback.",
+      pro: "Unlimited-feeling practice with the AI Coach.",
+      ielts_pro: "Everything in Pro plus IELTS mode and mock exams.",
+    } as Record<string, string>,
+    entitlements: {
+      "speaking.practice": "Speaking practice sessions",
+      "writing.practice": "Writing practice",
+      "reading.practice": "Reading practice",
+      "listening.practice": "Listening practice",
+      "pronunciation.analysis": "Detailed pronunciation analysis",
+      "ai_coach.chat": "Chat with the AI Coach",
+      "ielts.mode": "IELTS preparation mode",
+      "speaking.evaluations": "AI speaking evaluations",
+      "writing.evaluations": "AI writing evaluations",
+      "ai_coach.messages": "AI Coach messages",
+      "ielts.mock_exams": "full IELTS mock exams",
+    } as Record<string, string>,
+  },
+  faq: {
+    eyebrow: "FAQ",
+    title: "Questions, answered",
+    items: [
+      {
+        question: "Who is Engora for?",
+        answer:
+          "Anyone improving their English — for work, study, travel or confidence. IELTS preparation is available as a dedicated mode, but you don't need an exam goal to use Engora.",
+      },
+      {
+        question: "How does the AI feedback work?",
+        answer:
+          "When you submit a spoken or written answer, Engora analyses it for grammar, vocabulary, fluency and pronunciation, then returns corrections, explanations and recommended next practice.",
+      },
+      {
+        question: "Are IELTS scores official?",
+        answer: "No. Engora shows estimated band scores to help you prepare. Only an official IELTS test provides an official score.",
+      },
+      {
+        question: "Can I use Engora on my phone?",
+        answer:
+          "The web app works on mobile browsers today. Native iOS and Android apps are planned and will use the same account, progress and subscription.",
+      },
+      {
+        question: "Is there a free plan?",
+        answer: "Yes. The free plan includes practice in every core skill with a daily allowance of AI evaluations.",
+      },
+      {
+        question: "What happens to my recordings?",
+        answer: "Recordings are stored securely and used to give you feedback. You stay in control of your data and can request its deletion.",
+      },
+    ],
+  },
+  cta: {
+    title: "Start improving your English today",
+    description: "Create a free account, answer four quick questions and get your first personalised plan.",
+    button: "Start learning",
+  },
+  footer: {
+    tagline: "Your AI English Coach. Practice, feedback and progress in one place.",
+    product: "Product",
+    company: "Company",
+    legal: "Legal",
+    links: {
+      features: "Features",
+      speaking: "Speaking",
+      writing: "Writing",
+      reading: "Reading",
+      listening: "Listening",
+      ielts: "IELTS",
+      pricing: "Pricing",
+      about: "About",
+      blog: "Blog",
+      contact: "Contact",
+      faq: "FAQ",
+      privacy: "Privacy",
+      terms: "Terms",
+    },
+    disclaimer:
+      "IELTS is a registered trademark of the University of Cambridge, the British Council and IDP Education. Engora is not affiliated with or endorsed by them. Scores shown in Engora are estimates.",
+    getTheApp: "Get the mobile app",
+    appStoreSmall: "Download on the",
+    appStore: "App Store",
+    googlePlaySmall: "Get it on",
+    googlePlay: "Google Play",
+    comingSoon: "Coming soon",
+    status: {
+      checking: "Checking API…",
+      degraded: "API unavailable",
+      operational: "All systems operational",
+    },
+  },
+};
+
+export type Messages = typeof en;
