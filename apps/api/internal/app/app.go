@@ -18,6 +18,7 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/auth"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
+	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/cache"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/observability"
@@ -36,6 +37,7 @@ type Container struct {
 	Reporter observability.ErrorReporter
 	Metrics  *observability.Metrics
 	Audit    audit.Recorder
+	Mailer   mail.Mailer
 
 	Users         *users.PostgresRepository
 	Tokens        *auth.TokenIssuer
@@ -79,10 +81,18 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		return nil, fmt.Errorf("ai gateway: %w", err)
 	}
 
+	c.Mailer = mail.New(cfg.Mail.Provider, log)
 	c.Users = users.NewPostgresRepository(c.DB)
 	c.Tokens = auth.NewTokenIssuer(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
-	c.Auth, err = auth.NewService(c.Users, auth.NewPostgresTokenRepository(c.DB), auth.DefaultArgon2id(),
-		c.Tokens, cfg.Auth.RefreshTokenTTL, c.Audit)
+	c.Auth, err = auth.NewService(auth.Deps{
+		Users:  c.Users,
+		Tokens: auth.NewPostgresTokenRepository(c.DB),
+		Resets: auth.NewPostgresResetStore(c.DB),
+		Hasher: auth.DefaultArgon2id(),
+		Issuer: c.Tokens,
+		Audit:  c.Audit,
+		Mailer: c.Mailer,
+	}, auth.Options{RefreshTTL: cfg.Auth.RefreshTokenTTL, ResetTTL: time.Hour, WebURL: cfg.App.WebURL})
 	if err != nil {
 		c.Close()
 		return nil, fmt.Errorf("auth: %w", err)

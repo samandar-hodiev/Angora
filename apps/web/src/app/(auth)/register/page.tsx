@@ -1,24 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AuthCard } from "@/features/auth/components/auth-card";
 import { RegisterForm } from "@/features/auth/components/register-form";
+import { SocialAuth } from "@/features/auth/components/social-auth";
 
-export const metadata: Metadata = { title: "Create account" };
+export const metadata: Metadata = { title: "Create account", robots: { index: false } };
 
 export default function RegisterPage() {
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-1 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome to Engora</h1>
-        <p className="text-sm text-muted-foreground">Create your account to start learning.</p>
-      </div>
+    <AuthCard
+      title="Welcome to Engora"
+      description="Create your free account in under a minute."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
+      <SocialAuth />
       <RegisterForm />
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
-        <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthCard>
   );
 }

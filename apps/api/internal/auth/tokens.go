@@ -101,17 +101,18 @@ func (t *TokenIssuer) Parse(token string) (authz.Principal, error) {
 	return authz.Principal{UserID: userID, Role: role, SessionID: sessionID}, nil
 }
 
-// newRefreshToken returns the raw token for the client and its hash for storage.
-func newRefreshToken() (raw, hash string, err error) {
+// newOpaqueToken returns a 256-bit random token for the client and its hash for storage.
+// Used for refresh tokens and password reset tokens.
+func newOpaqueToken() (raw, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		return "", "", fmt.Errorf("generate refresh token: %w", err)
+		return "", "", fmt.Errorf("generate token: %w", err)
 	}
 	raw = base64.RawURLEncoding.EncodeToString(b)
-	return raw, hashRefreshToken(raw), nil
+	return raw, hashToken(raw), nil
 }
 
-func hashRefreshToken(raw string) string {
+func hashToken(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
 }

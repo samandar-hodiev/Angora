@@ -1,21 +1,19 @@
 import {
   BookOpen,
   ChartLine,
-  CreditCard,
   GraduationCap,
-  History,
   House,
   ListChecks,
   Settings,
   Sparkles,
+  SpellCheck,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
 
 /**
- * App structure (not learning content). Learning skills are NOT listed here: they come
- * from GET /api/v1/learning/skills, so a new skill added in the database appears in the
- * app without a frontend change.
+ * App structure (not content). Skills under "Learn" come from GET /api/v1/learning/skills,
+ * so a skill added in the database appears without a frontend release.
  */
 
 export interface NavItem {
@@ -24,69 +22,50 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
+export const homeNav: NavItem = { href: "/app/dashboard", label: "Home", icon: House };
+export const learnNav: NavItem = { href: "/app/learn", label: "Learn", icon: BookOpen };
+
 export const primaryNav: NavItem[] = [
-  { href: "/app/dashboard", label: "Home", icon: House },
-  { href: "/app/learn", label: "Learn", icon: BookOpen },
   { href: "/app/ai-coach", label: "AI Coach", icon: Sparkles },
   { href: "/app/ielts", label: "IELTS", icon: GraduationCap },
   { href: "/app/progress", label: "Progress", icon: ChartLine },
+  { href: "/app/vocabulary", label: "Vocabulary", icon: SpellCheck },
   { href: "/app/mistakes", label: "Mistakes", icon: ListChecks },
-  { href: "/app/history", label: "History", icon: History },
 ];
 
-export const accountNav: NavItem[] = [
-  { href: "/app/subscription", label: "Subscription", icon: CreditCard },
+export const secondaryNav: NavItem[] = [
   { href: "/app/settings", label: "Settings", icon: Settings },
   { href: "/app/profile", label: "Profile", icon: UserRound },
 ];
 
-/** Bottom navigation on small screens: the five most-used destinations. */
+/** Bottom navigation on small screens (mirrors the planned mobile app tabs). */
 export const mobileNav: NavItem[] = [
-  { href: "/app/dashboard", label: "Home", icon: House },
-  { href: "/app/learn", label: "Learn", icon: BookOpen },
+  homeNav,
+  learnNav,
   { href: "/app/ai-coach", label: "Coach", icon: Sparkles },
   { href: "/app/progress", label: "Progress", icon: ChartLine },
   { href: "/app/profile", label: "Profile", icon: UserRound },
 ];
 
-export interface PlannedArea {
-  title: string;
-  description: string;
-  phase: string;
-  /** Entitlement required to use the area once it ships (from the subscriptions API). */
-  entitlement?: string;
+/** Skills with a dedicated practice page. Other API skills use /app/learn/[code]. */
+const skillRoutes: Record<string, string> = {
+  speaking: "/app/speaking",
+  writing: "/app/writing",
+  reading: "/app/reading",
+  listening: "/app/listening",
+  vocabulary: "/app/vocabulary",
+  grammar: "/app/grammar",
+  pronunciation: "/app/pronunciation",
+};
+
+export function skillHref(code: string): string {
+  return skillRoutes[code] ?? `/app/learn/${code}`;
 }
 
-/** Areas whose UI ships in later phases (docs/product/roadmap.md). */
-export const plannedAreas: Record<string, PlannedArea> = {
-  "ai-coach": {
-    title: "AI Coach",
-    description: "A coach that knows your mistakes, goals and progress and tells you what to practise next.",
-    phase: "Phase 7",
-    entitlement: "ai_coach.chat",
-  },
-  ielts: {
-    title: "IELTS",
-    description: "IELTS preparation and mock exams, built on the same practice engine.",
-    phase: "Phase 8",
-    entitlement: "ielts.mode",
-  },
-  progress: {
-    title: "Progress",
-    description: "Skill scores, trends and time spent, synced across web and mobile.",
-    phase: "Phase 6",
-  },
-  mistakes: {
-    title: "Mistakes",
-    description: "Your recurring mistakes, grouped and linked to targeted practice.",
-    phase: "Phase 6",
-  },
-  history: {
-    title: "History",
-    description: "Every session, submission and attempt in one timeline.",
-    phase: "Phase 6",
-  },
-};
+/** Content items open inside their skill's page. */
+export function contentHref(skill: string | null, contentId: string): string {
+  return `${skill ? skillHref(skill) : "/app/learn"}?content=${contentId}`;
+}
 
 export function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);

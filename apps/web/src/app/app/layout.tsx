@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { AppShell } from "@/components/layout/app-shell";
 import { AuthGuard } from "@/features/auth/components/guards";
 
 export const metadata: Metadata = {
@@ -9,9 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AuthenticatedLayout({ children }: { children: ReactNode }) {
-  return (
-    <AuthGuard>
-      <AppShell>{children}</AppShell>
-    </AuthGuard>
-  );
+  return <AuthGuard>{children}</AuthGuard>;
 }

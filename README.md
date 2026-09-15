@@ -85,6 +85,16 @@ curl -s localhost:8000/health | jq
 Then open http://localhost:3001, create an account and you land in the app dashboard, which loads
 your profile, plan and skills from `/api/v1`.
 
+### Sample data (development)
+
+```bash
+make seed-demo                          # sample content + demo learner with progress, mistakes, vocabulary
+                                        #   demo@engora.dev / engora-demo-2026
+make promote email=demo@engora.dev      # give an account the ADMIN role (then /admin)
+```
+
+`make seed` loads only the sample content. Seeding refuses to run with `APP_ENV=production`.
+
 ## Environment variables
 
 All configuration lives in one root `.env` (read by compose, the API and the web app). Every

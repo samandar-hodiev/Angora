@@ -18,6 +18,8 @@ const (
 	ActionLoginFailed    = "auth.login_failed"
 	ActionLoggedOut      = "auth.logged_out"
 	ActionTokenReuse     = "auth.refresh_token_reuse_detected"
+	ActionResetRequested = "auth.password_reset_requested"
+	ActionPasswordReset  = "auth.password_reset"
 	ActionProfileUpdated = "profile.updated"
 )
 

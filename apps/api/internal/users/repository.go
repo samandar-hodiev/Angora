@@ -87,6 +87,17 @@ func (r *PostgresRepository) TouchLastLogin(ctx context.Context, id uuid.UUID) e
 	return err
 }
 
+func (r *PostgresRepository) UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1 AND deleted_at IS NULL`, id, passwordHash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *PostgresRepository) List(ctx context.Context, offset, limit int) ([]User, int64, error) {
 	var total int64
 	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM users WHERE deleted_at IS NULL`).Scan(&total); err != nil {

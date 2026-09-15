@@ -36,6 +36,8 @@ type TokenRepository interface {
 	// was already revoked, which signals concurrent use or replay of the token.
 	Rotate(ctx context.Context, currentID uuid.UUID, next RefreshToken) (bool, error)
 	RevokeFamily(ctx context.Context, familyID uuid.UUID) error
+	// RevokeAllForUser ends every session of a user (e.g. after a password reset).
+	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
 }
 
 type PostgresTokenRepository struct {
@@ -72,6 +74,8 @@ func (r *PostgresTokenRepository) GetByHash(ctx context.Context, hash string) (R
 	return t, err
 }
 
+var errAlreadyRevoked = errors.New("token already revoked")
+
 func (r *PostgresTokenRepository) Rotate(ctx context.Context, currentID uuid.UUID, next RefreshToken) (bool, error) {
 	rotated := false
 	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
@@ -96,10 +100,59 @@ func (r *PostgresTokenRepository) Rotate(ctx context.Context, currentID uuid.UUI
 	return rotated, err
 }
 
-var errAlreadyRevoked = errors.New("token already revoked")
-
 func (r *PostgresTokenRepository) RevokeFamily(ctx context.Context, familyID uuid.UUID) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE refresh_tokens SET revoked_at = now() WHERE family_id = $1 AND revoked_at IS NULL`, familyID)
 	return err
+}
+
+func (r *PostgresTokenRepository) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, userID)
+	return err
+}
+
+// ---- password reset tokens ------------------------------------------------------
+
+type PasswordReset struct {
+	UserID    uuid.UUID
+	TokenHash string
+	ExpiresAt time.Time
+	IP        string
+}
+
+var ErrResetTokenInvalid = errors.New("password reset token is invalid or expired")
+
+type ResetStore interface {
+	Create(ctx context.Context, r PasswordReset) error
+	// Consume marks a valid, unused, unexpired token as used and returns its user. It is
+	// atomic, so a token can never be redeemed twice.
+	Consume(ctx context.Context, tokenHash string, now time.Time) (uuid.UUID, error)
+}
+
+type PostgresResetStore struct {
+	pool *pgxpool.Pool
+}
+
+func NewPostgresResetStore(pool *pgxpool.Pool) *PostgresResetStore {
+	return &PostgresResetStore{pool: pool}
+}
+
+func (s *PostgresResetStore) Create(ctx context.Context, r PasswordReset) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip)
+		VALUES ($1, $2, $3, $4)`, r.UserID, r.TokenHash, r.ExpiresAt, r.IP)
+	return err
+}
+
+func (s *PostgresResetStore) Consume(ctx context.Context, tokenHash string, now time.Time) (uuid.UUID, error) {
+	var userID uuid.UUID
+	err := s.pool.QueryRow(ctx, `
+		UPDATE password_reset_tokens SET used_at = now()
+		WHERE token_hash = $1 AND used_at IS NULL AND expires_at > $2
+		RETURNING user_id`, tokenHash, now).Scan(&userID)
+	if database.IsNotFound(err) {
+		return uuid.Nil, ErrResetTokenInvalid
+	}
+	return userID, err
 }

@@ -56,5 +56,6 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetCredentialsByEmail(ctx context.Context, email string) (Credentials, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
+	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	List(ctx context.Context, offset, limit int) ([]User, int64, error)
 }

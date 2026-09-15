@@ -2,7 +2,8 @@
 
 import { registerSchema, toRegisterPayload, type RegisterInput } from "@engora/validation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleAlert, Loader2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -38,7 +39,8 @@ export function RegisterForm() {
     setFormError(null);
     try {
       await registerMutation.mutateAsync(toRegisterPayload({ ...values, timezone: browserTimezone() }));
-      router.replace("/app/dashboard");
+      // New learners set up their goal, level and plan before seeing the dashboard.
+      router.replace("/onboarding");
     } catch (error) {
       setFormError(applyApiErrors(error, form.setError, ["display_name", "email", "password"]));
     }
@@ -61,12 +63,7 @@ export function RegisterForm() {
         <Input type="email" autoComplete="email" placeholder="you@example.com" {...form.register("email")} />
       </FormField>
 
-      <FormField
-        id="password"
-        label="Password"
-        description="At least 8 characters."
-        error={errors.password?.message}
-      >
+      <FormField id="password" label="Password" description="At least 8 characters." error={errors.password?.message}>
         <Input type="password" autoComplete="new-password" {...form.register("password")} />
       </FormField>
 
@@ -74,10 +71,21 @@ export function RegisterForm() {
         <Input type="password" autoComplete="new-password" {...form.register("confirm_password")} />
       </FormField>
 
-      <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>
-        {isSubmitting && <Loader2 className="animate-spin" aria-hidden />}
+      <Button type="submit" className="w-full" loading={isSubmitting}>
         Create account
       </Button>
+
+      <p className="text-center text-caption text-fg-muted">
+        By creating an account you agree to the{" "}
+        <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+          Privacy policy
+        </Link>
+        .
+      </p>
     </form>
   );
 }

@@ -20,7 +20,7 @@ describe("LoginForm", () => {
 
   it("validates on the client before calling the API", async () => {
     render(<LoginForm redirectTo="/app/dashboard" />);
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByText("Email is required")).toBeInTheDocument();
     expect(screen.getByText("Password is required")).toBeInTheDocument();
@@ -28,29 +28,32 @@ describe("LoginForm", () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
-  it("signs in and redirects", async () => {
+  it("logs in and redirects", async () => {
     mutateAsync.mockResolvedValueOnce({});
     render(<LoginForm redirectTo="/app/profile" />);
 
     await userEvent.type(screen.getByLabelText("Email"), "learner@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "correct-horse");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(mutateAsync).toHaveBeenCalledWith({ email: "learner@example.com", password: "correct-horse" });
     expect(replace).toHaveBeenCalledWith("/app/profile");
   });
 
   it("shows the API error without redirecting", async () => {
-    mutateAsync.mockRejectedValueOnce(
-      new ApiError(401, { code: "UNAUTHORIZED", message: "Invalid email or password" }),
-    );
+    mutateAsync.mockRejectedValueOnce(new ApiError(401, { code: "UNAUTHORIZED", message: "Invalid email or password" }));
     render(<LoginForm redirectTo="/app/dashboard" />);
 
     await userEvent.type(screen.getByLabelText("Email"), "learner@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "wrong-password");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("links to password recovery", () => {
+    render(<LoginForm redirectTo="/app/dashboard" />);
+    expect(screen.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/forgot-password");
   });
 });

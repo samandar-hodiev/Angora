@@ -82,15 +82,11 @@ API). Server validation errors are mapped onto fields with `applyApiErrors`. `Fo
 
 ## Design system
 
-- Tokens: `packages/ui/src/tokens.ts` (TS, shareable with React Native) and
-  `packages/ui/src/theme.css` (CSS variables + Tailwind v4 `@theme`). Light and dark palettes exist;
-  a theme switch is part of the UI/UX phase.
-- Components use semantic utilities only (`bg-primary`, `text-muted-foreground`, `border-border`).
-- Primitives: Button, Input, NativeSelect, Label, Card, Badge, Progress, Tabs, Dialog, Skeleton,
-  Alert, Separator. Patterns: `ErrorState`, `EmptyState`, `InlineLoader`, `FormField`, `PageHeader`.
-- Mobile-first responsive layout: bottom navigation below `md`, sidebar from `md`.
-- Accessibility: skip link, visible focus rings, labelled controls, `aria-current` navigation,
-  `role="status"`/`role="alert"` for async states, `prefers-reduced-motion` respected.
+See [design-system.md](design-system.md) for tokens, dark mode, typography, motion, the
+glass/liquid rules, components, patterns and the full route map.
+
+Route groups: `(marketing)` public site, `(auth)` guest pages, `onboarding`, `app/(shell)` with the
+app shell, `app/(focus)` for exam mode without navigation, `admin` for the owner console.
 
 ## Adding a feature
 

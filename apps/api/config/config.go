@@ -30,6 +30,7 @@ type Config struct {
 	Auth          AuthConfig
 	AI            AIConfig
 	Storage       StorageConfig
+	Mail          MailConfig
 	Observability ObservabilityConfig
 }
 
@@ -39,6 +40,13 @@ type AppConfig struct {
 	Version   string
 	LogLevel  string
 	LogFormat string
+	// WebURL is the public web app origin, used in links sent to users (password reset).
+	WebURL string
+}
+
+type MailConfig struct {
+	Provider string
+	From     string
 }
 
 func (a AppConfig) IsProduction() bool { return a.Env == EnvProduction }
@@ -117,6 +125,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			Version:   r.str("APP_VERSION", "dev"),
 			LogLevel:  r.str("LOG_LEVEL", "info"),
 			LogFormat: r.str("LOG_FORMAT", "json"),
+			WebURL:    r.str("WEB_APP_URL", "http://localhost:3001"),
 		},
 		HTTP: HTTPConfig{
 			CORSAllowedOrigins:     r.list("CORS_ALLOWED_ORIGINS"),
@@ -155,6 +164,10 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			AccessKey:      r.str("STORAGE_ACCESS_KEY", ""),
 			SecretKey:      r.str("STORAGE_SECRET_KEY", ""),
 			MaxUploadBytes: int64(r.int("STORAGE_MAX_UPLOAD_MB", 25)) << 20,
+		},
+		Mail: MailConfig{
+			Provider: strings.ToLower(r.str("MAIL_PROVIDER", "log")),
+			From:     r.str("MAIL_FROM", "Engora <no-reply@engora.local>"),
 		},
 		Observability: ObservabilityConfig{
 			ErrorTracker: strings.ToLower(r.str("ERROR_TRACKER", "log")),
@@ -217,6 +230,16 @@ func (c *Config) validate() []error {
 		}
 	default:
 		errs = append(errs, fmt.Errorf("STORAGE_PROVIDER %q is not supported", c.Storage.Provider))
+	}
+
+	switch c.Mail.Provider {
+	case "log":
+		if c.App.IsProduction() {
+			errs = append(errs, errors.New("MAIL_PROVIDER=log is not allowed in production (it logs reset links)"))
+		}
+	case "none":
+	default:
+		errs = append(errs, fmt.Errorf("MAIL_PROVIDER %q is not supported", c.Mail.Provider))
 	}
 
 	if c.App.IsProduction() && len(c.HTTP.CORSAllowedOrigins) == 0 {

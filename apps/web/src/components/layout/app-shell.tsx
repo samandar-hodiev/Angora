@@ -1,116 +1,257 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { Bell, CreditCard, LogOut, Menu, Monitor, Moon, Settings, Shield, Sun, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { Brand } from "@/components/common/brand";
-import { Button } from "@/components/ui/button";
-import { accountNav, isActivePath, mobileNav, primaryNav, type NavItem } from "@/config/navigation";
+import { OfflineBanner } from "@/components/common/offline-banner";
+import { IconButton } from "@/components/ui/button";
+import {
+  Avatar,
+  AvatarFallback,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  initials,
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/overlay";
+import { homeNav, isActivePath, learnNav, mobileNav, primaryNav, secondaryNav, skillHref, type NavItem } from "@/config/navigation";
+import { useIsAdmin } from "@/features/admin/api";
 import { useLogout, useSession } from "@/features/auth/hooks";
+import { useSkills } from "@/features/learning/hooks";
+import { useSaveAppearance, useSyncAppearance } from "@/features/profile/appearance";
+import { useProfile } from "@/features/profile/hooks";
+import { isThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/providers/theme-provider";
 
 /**
- * Authenticated layout. Mobile-first: bottom navigation below md, sidebar from md up.
+ * Authenticated layout. Desktop: sidebar. Mobile: top bar + floating glass bottom
+ * navigation (the same five destinations the native app will use).
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  useSyncAppearance();
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r bg-card/60 px-3 py-5 md:flex">
-        <Brand href="/app/dashboard" className="px-3" />
-        <nav aria-label="Main" className="flex flex-1 flex-col justify-between gap-6 overflow-y-auto">
-          <SidebarList items={primaryNav} pathname={pathname} />
-          <SidebarList items={accountNav} pathname={pathname} />
-        </nav>
+    <div className="min-h-dvh md:grid md:grid-cols-[15.5rem_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-surface/60 md:flex">
+        <div className="px-5 pt-5 pb-4">
+          <Brand href="/app/dashboard" />
+        </div>
+        <SidebarNav />
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background/85 px-4 backdrop-blur sm:px-6 md:justify-end">
+        <OfflineBanner />
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur sm:px-6">
+          <Sheet>
+            <SheetTrigger asChild>
+              <IconButton label="Open navigation" className="md:hidden">
+                <Menu />
+              </IconButton>
+            </SheetTrigger>
+            <SheetContent side="left" title="Navigation" className="p-0">
+              <div className="px-5 pt-5">
+                <Brand href="/app/dashboard" />
+              </div>
+              <SidebarNav inSheet />
+            </SheetContent>
+          </Sheet>
           <Brand href="/app/dashboard" className="md:hidden" />
-          <UserMenu />
+          <div className="ml-auto flex items-center gap-1">
+            <NotificationsMenu />
+            <UserMenu />
+          </div>
         </header>
-        <main id="main" className="flex-1 px-4 pt-6 pb-28 sm:px-6 md:pb-10 lg:px-10">
+        <main id="main" className="flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>
 
-      <nav
-        aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
-      >
-        <ul className="grid grid-cols-5">
-          {mobileNav.map((item) => {
-            const active = isActivePath(pathname, item.href);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
-                    active ? "text-primary" : "text-muted-foreground",
-                  )}
-                >
-                  <item.icon className="size-5" aria-hidden />
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
+      <nav aria-label="Primary" className="fixed inset-x-3 bottom-3 z-40 md:hidden">
+        <ul className="glass grid grid-cols-5 rounded-2xl p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+          {mobileNav.map((item) => (
+            <MobileNavLink key={item.href} item={item} />
+          ))}
         </ul>
       </nav>
     </div>
   );
 }
 
-function SidebarList({ items, pathname }: { items: NavItem[]; pathname: string }) {
+function MobileNavLink({ item }: { item: NavItem }) {
+  const pathname = usePathname();
+  const active = isActivePath(pathname, item.href);
   return (
-    <ul className="grid gap-1">
-      {items.map((item) => {
-        const active = isActivePath(pathname, item.href);
-        return (
-          <li key={item.href}>
-            <Link
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <item.icon className="size-4" aria-hidden />
-              {item.label}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <li>
+      <Link
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex flex-col items-center gap-0.5 rounded-xl py-2 text-[11px] font-medium transition-colors duration-micro",
+          active ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-muted",
+        )}
+      >
+        <item.icon className="size-5" aria-hidden />
+        {item.label}
+      </Link>
+    </li>
+  );
+}
+
+function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
+  const pathname = usePathname();
+  const skills = useSkills();
+  const isAdmin = useIsAdmin();
+  const learnSkills = (skills.data ?? []).slice(0, 4);
+
+  const link = (item: NavItem, nested = false) => {
+    const active = nested ? pathname === item.href || pathname.startsWith(`${item.href}/`) : isActivePath(pathname, item.href);
+    const node = (
+      <Link
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "relative flex items-center gap-3 rounded-md px-3 py-2 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+          nested && "py-1.5 pl-10",
+          active ? "bg-surface-active font-medium text-foreground" : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+        )}
+      >
+        {active && <span aria-hidden className="absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />}
+        {!nested && <item.icon className={cn("size-4", active ? "text-primary" : "text-fg-muted")} aria-hidden />}
+        {item.label}
+      </Link>
+    );
+    return inSheet ? <SheetClose asChild>{node}</SheetClose> : node;
+  };
+
+  return (
+    <nav aria-label="Main" className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
+      <ul className="grid gap-0.5">
+        <li>{link(homeNav)}</li>
+        <li>
+          {link(learnNav)}
+          <ul className="mt-0.5 grid gap-0.5">
+            {learnSkills.map((skill) => (
+              <li key={skill.id}>{link({ href: skillHref(skill.code), label: skill.name, icon: learnNav.icon }, true)}</li>
+            ))}
+          </ul>
+        </li>
+        {primaryNav.map((item) => (
+          <li key={item.href}>{link(item)}</li>
+        ))}
+      </ul>
+      <div className="mt-auto grid gap-0.5 border-t pt-4">
+        {isAdmin && link({ href: "/admin", label: "Admin console", icon: Shield })}
+        {secondaryNav.map((item) => (
+          <div key={item.href}>{link(item)}</div>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function NotificationsMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton label="Notifications">
+          <Bell />
+        </IconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+        <div className="grid justify-items-center gap-1 px-4 py-6 text-center">
+          <Bell className="size-5 text-fg-muted" aria-hidden />
+          <p className="text-label">You&apos;re all caught up</p>
+          <p className="text-caption text-fg-muted">Feedback results and reminders will appear here.</p>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function UserMenu() {
   const { user } = useSession();
+  const { data: profile } = useProfile();
+  const isAdmin = useIsAdmin();
   const logout = useLogout();
   const router = useRouter();
+  const { preference } = useTheme();
+  const { save } = useSaveAppearance();
+  const name = profile?.display_name || user?.email;
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline">{user?.email}</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={logout.isPending}
-        onClick={async () => {
-          await logout.mutateAsync().catch(() => undefined);
-          router.replace("/login");
-        }}
-      >
-        <LogOut aria-hidden />
-        Sign out
-      </Button>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40" aria-label="Account menu">
+          <Avatar className="size-8">
+            <AvatarFallback>{initials(profile?.display_name ?? user?.email)}</AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <div className="grid gap-0.5 px-2.5 py-2">
+          <p className="truncate text-label">{name}</p>
+          <p className="truncate text-caption text-fg-muted">{user?.email}</p>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/app/profile">
+            <UserRound /> Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/app/subscription">
+            <CreditCard /> Subscription
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/app/settings">
+            <Settings /> Settings
+          </Link>
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <Shield /> Admin console
+            </Link>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={preference} onValueChange={(v) => isThemePreference(v) && save(v)}>
+          <DropdownMenuRadioItem value="light">
+            <Sun /> Light
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark">
+            <Moon /> Dark
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="system">
+            <Monitor /> System
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={logout.isPending}
+          onSelect={async () => {
+            await logout.mutateAsync().catch(() => undefined);
+            router.replace("/login");
+          }}
+        >
+          <LogOut /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

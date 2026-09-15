@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/observability"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
@@ -69,6 +72,18 @@ func (f *fakeUsers) GetCredentialsByEmail(_ context.Context, email string) (user
 }
 
 func (f *fakeUsers) TouchLastLogin(context.Context, uuid.UUID) error { return nil }
+
+func (f *fakeUsers) UpdatePassword(_ context.Context, id uuid.UUID, hash string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, ok := f.byID[id]
+	if !ok {
+		return users.ErrNotFound
+	}
+	c.PasswordHash = hash
+	f.byID[id] = c
+	return nil
+}
 
 func (f *fakeUsers) setStatus(id uuid.UUID, s users.Status) {
 	f.mu.Lock()
@@ -131,19 +146,80 @@ func (f *fakeTokens) RevokeFamily(_ context.Context, familyID uuid.UUID) error {
 	return nil
 }
 
+func (f *fakeTokens) RevokeAllForUser(_ context.Context, userID uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	now := time.Now()
+	for _, t := range f.byHash {
+		if t.UserID == userID && t.RevokedAt == nil {
+			t.RevokedAt = &now
+		}
+	}
+	return nil
+}
+
+type fakeResets struct {
+	mu     sync.Mutex
+	byHash map[string]*PasswordReset
+	used   map[string]bool
+}
+
+func (f *fakeResets) Create(_ context.Context, r PasswordReset) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.byHash[r.TokenHash] = &r
+	return nil
+}
+
+func (f *fakeResets) Consume(_ context.Context, hash string, now time.Time) (uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.byHash[hash]
+	if !ok || f.used[hash] || !now.Before(r.ExpiresAt) {
+		return uuid.Nil, ErrResetTokenInvalid
+	}
+	f.used[hash] = true
+	return r.UserID, nil
+}
+
+type captureMailer struct {
+	mu   sync.Mutex
+	sent []mail.Message
+}
+
+func (m *captureMailer) Send(_ context.Context, msg mail.Message) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sent = append(m.sent, msg)
+	return nil
+}
+
 // fastHasher keeps Argon2id but with tiny parameters so tests stay fast.
 var fastHasher = Argon2idHasher{Memory: 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}
 
 const testSecret = "test-secret-that-is-long-enough-for-hs256"
 
 func newTestService(t *testing.T) (*Service, *fakeUsers, *fakeTokens) {
+	svc, us, ts, _ := newTestServiceWithMailer(t)
+	return svc, us, ts
+}
+
+func newTestServiceWithMailer(t *testing.T) (*Service, *fakeUsers, *fakeTokens, *captureMailer) {
 	t.Helper()
-	us, ts := newFakeUsers(), newFakeTokens()
-	svc, err := NewService(us, ts, fastHasher, NewTokenIssuer(testSecret, "engora", 15*time.Minute), 24*time.Hour, audit.Nop{})
+	us, ts, mailer := newFakeUsers(), newFakeTokens(), &captureMailer{}
+	svc, err := NewService(Deps{
+		Users:  us,
+		Tokens: ts,
+		Resets: &fakeResets{byHash: map[string]*PasswordReset{}, used: map[string]bool{}},
+		Hasher: fastHasher,
+		Issuer: NewTokenIssuer(testSecret, "engora", 15*time.Minute),
+		Audit:  audit.Nop{},
+		Mailer: mailer,
+	}, Options{RefreshTTL: 24 * time.Hour, ResetTTL: time.Hour, WebURL: "https://app.engora.test/"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return svc, us, ts
+	return svc, us, ts, mailer
 }
 
 var client = ClientInfo{Platform: "web", UserAgent: "test", IP: "127.0.0.1"}
@@ -338,6 +414,55 @@ func TestLogoutRevokesSession(t *testing.T) {
 	}
 	if err := svc.Logout(ctx, "unknown-token", client); err != nil {
 		t.Errorf("logout must be idempotent, got %v", err)
+	}
+}
+
+// ---- password reset -----------------------------------------------------------
+
+var resetLink = regexp.MustCompile(`https://app\.engora\.test/reset-password\?token=(\S+)`)
+
+func TestForgotPasswordDoesNotRevealAccounts(t *testing.T) {
+	svc, _, _, mailer := newTestServiceWithMailer(t)
+	if err := svc.ForgotPassword(context.Background(), ForgotPasswordInput{Email: "ghost@example.com"}, client); err != nil {
+		t.Fatalf("unknown email must succeed silently, got %v", err)
+	}
+	if len(mailer.sent) != 0 {
+		t.Errorf("no email may be sent for unknown accounts, sent %d", len(mailer.sent))
+	}
+}
+
+func TestPasswordResetFlow(t *testing.T) {
+	svc, _, _, mailer := newTestServiceWithMailer(t)
+	session := register(t, svc)
+	ctx := context.Background()
+
+	if err := svc.ForgotPassword(ctx, ForgotPasswordInput{Email: "LEARNER@example.com"}, client); err != nil {
+		t.Fatal(err)
+	}
+	if len(mailer.sent) != 1 || mailer.sent[0].To != "learner@example.com" {
+		t.Fatalf("expected one reset email to the account, got %+v", mailer.sent)
+	}
+	m := resetLink.FindStringSubmatch(mailer.sent[0].Text)
+	if m == nil {
+		t.Fatalf("reset link not found in %q", mailer.sent[0].Text)
+	}
+	token, _ := url.QueryUnescape(m[1])
+
+	if err := svc.ResetPassword(ctx, ResetPasswordInput{Token: token, Password: "brand-new-password"}, client); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+
+	if _, err := svc.Login(ctx, LoginInput{Email: "learner@example.com", Password: "correct-horse"}, client); !apperr.Is(err, apperr.CodeUnauthorized) {
+		t.Errorf("old password must stop working, err = %v", err)
+	}
+	if _, err := svc.Login(ctx, LoginInput{Email: "learner@example.com", Password: "brand-new-password"}, client); err != nil {
+		t.Errorf("new password must work: %v", err)
+	}
+	if _, err := svc.Refresh(ctx, session.RefreshToken, client); !apperr.Is(err, apperr.CodeUnauthorized) {
+		t.Errorf("existing sessions must be revoked after a reset, err = %v", err)
+	}
+	if err := svc.ResetPassword(ctx, ResetPasswordInput{Token: token, Password: "another-password"}, client); !apperr.Is(err, apperr.CodeValidation) {
+		t.Errorf("reset tokens must be single-use, err = %v", err)
 	}
 }
 

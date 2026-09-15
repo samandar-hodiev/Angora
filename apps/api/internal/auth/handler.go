@@ -26,6 +26,34 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup, rateLimit gin.HandlerFunc)
 	g.POST("/login", h.login)
 	g.POST("/refresh", h.refresh)
 	g.POST("/logout", h.logout)
+	g.POST("/password/forgot", h.forgotPassword)
+	g.POST("/password/reset", h.resetPassword)
+}
+
+func (h *Handler) forgotPassword(c *gin.Context) {
+	var in ForgotPasswordInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if err := h.svc.ForgotPassword(c.Request.Context(), in, clientInfo(c)); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Accepted(c, gin.H{"message": "If an account exists for this email, a reset link has been sent."})
+}
+
+func (h *Handler) resetPassword(c *gin.Context) {
+	var in ResetPasswordInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if err := h.svc.ResetPassword(c.Request.Context(), in, clientInfo(c)); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.NoContent(c)
 }
 
 type refreshRequest struct {

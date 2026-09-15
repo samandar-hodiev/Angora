@@ -135,6 +135,36 @@ place at a time.
 }
 ```
 
+### Password reset
+
+| Method | Path | Body | Response |
+| --- | --- | --- | --- |
+| POST | `/api/v1/auth/password/forgot` | `{ email }` | 202 — always, whether or not the account exists |
+| POST | `/api/v1/auth/password/reset` | `{ token, password }` | 204; single-use token (1 h); signs out every session |
+
+### Learner read models
+
+All require `learning:practice` (any learner).
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/v1/progress` | Levels, daily goal, overall score, streak, per-skill score/xp/sessions |
+| GET | `/api/v1/history` | Speaking, writing, reading and listening activity, newest first (paginated) |
+| GET | `/api/v1/mistakes` | Mistakes, optional `group` (grammar / vocabulary / pronunciation), paginated |
+| GET | `/api/v1/mistakes/summary` | Counts by group, repeated patterns, active weaknesses |
+| GET | `/api/v1/vocabulary/deck` | Deck summary and cards with server-computed `mastery`, ordered by due date |
+| GET | `/api/v1/grammar/topics` | Published topics with the learner's mastery |
+| GET | `/api/v1/recommendations` | Pending recommendations with linked content and `source` |
+| GET | `/api/v1/learning-plan` | `{ plan }` — active plan or `null` |
+
+### Admin
+
+| Method | Path | Permission | Description |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/overview` | `users:read` | Users, users per plan, MRR, 30-day AI cost, content by status |
+| GET | `/api/v1/admin/ai-usage?days=30` | `ai_usage:read` | Totals, by task, by provider/model (with avg latency), daily cost |
+| GET | `/api/v1/admin/content` | `content:manage` | All content in every status; filters `type`, `skill`, `level`, `status` |
+
 ### Jobs
 
 | Method | Path | Auth | Description |

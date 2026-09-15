@@ -66,6 +66,19 @@ migrate-create:
 	@test -n "$(name)" || (echo "usage: make migrate-create name=snake_case_name" && exit 1)
 	cd $(API_DIR) && go run ./cmd/migrate create $(name)
 
+## seed: load sample learning content (development only)
+seed:
+	cd $(API_DIR) && go run ./cmd/seed content
+
+## seed-demo: sample content + a demo learner (demo@engora.dev / engora-demo-2026)
+seed-demo:
+	cd $(API_DIR) && go run ./cmd/seed demo
+
+## promote: make an account ADMIN, e.g. make promote email=you@example.com
+promote:
+	@test -n "$(email)" || (echo "usage: make promote email=you@example.com" && exit 1)
+	cd $(API_DIR) && go run ./cmd/seed promote $(email)
+
 ## test: run all unit tests (API + web + packages)
 test: test-api test-web
 

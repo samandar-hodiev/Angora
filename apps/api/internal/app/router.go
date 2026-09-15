@@ -6,16 +6,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/admin"
 	"github.com/samandar-hodiev/engora/apps/api/internal/auth"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/grammar"
 	"github.com/samandar-hodiev/engora/apps/api/internal/health"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/learning"
+	"github.com/samandar-hodiev/engora/apps/api/internal/mistakes"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/ratelimit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/profiles"
+	"github.com/samandar-hodiev/engora/apps/api/internal/progress"
+	"github.com/samandar-hodiev/engora/apps/api/internal/recommendations"
 	"github.com/samandar-hodiev/engora/apps/api/internal/subscriptions"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
+	"github.com/samandar-hodiev/engora/apps/api/internal/vocabulary"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/httpx"
 )
 
@@ -65,6 +71,12 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	profiles.NewModule(c.DB, c.Audit, c.Log).RegisterRoutes(v1)
 	learning.NewModule(c.DB, c.Redis).RegisterRoutes(v1)
 	subscriptions.NewHandler(c.Subscriptions).RegisterRoutes(v1)
+	progress.NewModule(c.DB).RegisterRoutes(v1)
+	mistakes.NewModule(c.DB).RegisterRoutes(v1)
+	vocabulary.NewModule(c.DB).RegisterRoutes(v1)
+	grammar.NewModule(c.DB).RegisterRoutes(v1)
+	recommendations.NewModule(c.DB).RegisterRoutes(v1)
+	admin.NewModule(c.DB).RegisterRoutes(v1)
 	jobs.RegisterRoutes(v1, c.Jobs)
 
 	v1.GET("/admin/system/metrics", authz.RequirePermission(authz.PermSystemRead), func(ctx *gin.Context) {

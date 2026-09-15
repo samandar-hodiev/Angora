@@ -40,8 +40,27 @@ export const registerSchema = z
     message: "Passwords do not match",
   });
 
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(PASSWORD_MIN, `Password must be at least ${PASSWORD_MIN} characters`)
+      .max(PASSWORD_MAX, `Password must be at most ${PASSWORD_MAX} characters`),
+    confirm_password: z.string(),
+  })
+  .refine((v) => v.password === v.confirm_password, {
+    path: ["confirm_password"],
+    message: "Passwords do not match",
+  });
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 /** The payload actually sent to POST /api/v1/auth/register. */
 export function toRegisterPayload(input: RegisterInput) {

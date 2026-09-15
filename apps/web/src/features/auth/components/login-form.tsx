@@ -2,7 +2,8 @@
 
 import { loginSchema, type LoginInput } from "@engora/validation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleAlert, Loader2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -49,13 +50,17 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         <Input type="email" autoComplete="email" placeholder="you@example.com" {...form.register("email")} />
       </FormField>
 
-      <FormField id="password" label="Password" error={errors.password?.message}>
-        <Input type="password" autoComplete="current-password" {...form.register("password")} />
-      </FormField>
+      <div className="grid gap-2">
+        <FormField id="password" label="Password" error={errors.password?.message}>
+          <Input type="password" autoComplete="current-password" {...form.register("password")} />
+        </FormField>
+        <Link href="/forgot-password" className="justify-self-end text-caption text-fg-secondary underline-offset-4 hover:text-primary hover:underline">
+          Forgot password?
+        </Link>
+      </div>
 
-      <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>
-        {isSubmitting && <Loader2 className="animate-spin" aria-hidden />}
-        Sign in
+      <Button type="submit" className="w-full" loading={isSubmitting}>
+        Log in
       </Button>
     </form>
   );

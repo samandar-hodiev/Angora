@@ -1,17 +1,19 @@
-// Package auth implements registration, login, token refresh and logout, and the
-// middleware that authenticates API requests.
+// Package auth implements registration, login, token refresh, logout and password reset,
+// and the middleware that authenticates API requests.
 package auth
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
+	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 )
@@ -22,6 +24,7 @@ type UserStore interface {
 	GetByID(ctx context.Context, id uuid.UUID) (users.User, error)
 	GetCredentialsByEmail(ctx context.Context, email string) (users.Credentials, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
+	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 }
 
 // ClientInfo describes the calling device for session metadata only. It never changes
@@ -44,6 +47,15 @@ type LoginInput struct {
 	Password string `json:"password" binding:"required,max=128"`
 }
 
+type ForgotPasswordInput struct {
+	Email string `json:"email" binding:"required,email,max=254"`
+}
+
+type ResetPasswordInput struct {
+	Token    string `json:"token" binding:"required,max=256"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
+}
+
 type Session struct {
 	AccessToken           string     `json:"access_token"`
 	AccessTokenExpiresAt  time.Time  `json:"access_token_expires_at"`
@@ -53,28 +65,53 @@ type Session struct {
 	User                  users.User `json:"user"`
 }
 
+// Deps are the collaborators of the auth service.
+type Deps struct {
+	Users  UserStore
+	Tokens TokenRepository
+	Resets ResetStore
+	Hasher PasswordHasher
+	Issuer *TokenIssuer
+	Audit  audit.Recorder
+	Mailer mail.Mailer
+}
+
+type Options struct {
+	RefreshTTL time.Duration
+	ResetTTL   time.Duration
+	// WebURL is the origin used to build links in emails.
+	WebURL string
+}
+
 type Service struct {
 	users      UserStore
 	tokens     TokenRepository
+	resets     ResetStore
 	hasher     PasswordHasher
 	issuer     *TokenIssuer
-	refreshTTL time.Duration
 	audit      audit.Recorder
+	mailer     mail.Mailer
+	refreshTTL time.Duration
+	resetTTL   time.Duration
+	webURL     string
 	now        func() time.Time
 	// dummyHash is verified when an email is unknown so that "no such user" and
 	// "wrong password" take the same time and cannot be told apart.
 	dummyHash string
 }
 
-func NewService(us UserStore, tokens TokenRepository, hasher PasswordHasher, issuer *TokenIssuer,
-	refreshTTL time.Duration, recorder audit.Recorder) (*Service, error) {
-	dummy, err := hasher.Hash("engora-timing-equalizer")
+func NewService(d Deps, o Options) (*Service, error) {
+	dummy, err := d.Hasher.Hash("engora-timing-equalizer")
 	if err != nil {
 		return nil, err
 	}
+	if o.ResetTTL <= 0 {
+		o.ResetTTL = time.Hour
+	}
 	return &Service{
-		users: us, tokens: tokens, hasher: hasher, issuer: issuer,
-		refreshTTL: refreshTTL, audit: recorder, now: time.Now, dummyHash: dummy,
+		users: d.Users, tokens: d.Tokens, resets: d.Resets, hasher: d.Hasher, issuer: d.Issuer,
+		audit: d.Audit, mailer: d.Mailer, refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
+		webURL: strings.TrimRight(o.WebURL, "/"), now: time.Now, dummyHash: dummy,
 	}, nil
 }
 
@@ -154,7 +191,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput, client ClientInfo) (
 
 // Refresh exchanges a refresh token for a new access token and a rotated refresh token.
 func (s *Service) Refresh(ctx context.Context, rawToken string, client ClientInfo) (Session, error) {
-	current, err := s.tokens.GetByHash(ctx, hashRefreshToken(rawToken))
+	current, err := s.tokens.GetByHash(ctx, hashToken(rawToken))
 	if errors.Is(err, ErrTokenNotFound) {
 		return Session{}, errInvalidSession
 	}
@@ -201,7 +238,7 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, client ClientInf
 
 // Logout revokes the session the refresh token belongs to. It is idempotent.
 func (s *Service) Logout(ctx context.Context, rawToken string, client ClientInfo) error {
-	current, err := s.tokens.GetByHash(ctx, hashRefreshToken(rawToken))
+	current, err := s.tokens.GetByHash(ctx, hashToken(rawToken))
 	if errors.Is(err, ErrTokenNotFound) {
 		return nil
 	}
@@ -213,6 +250,75 @@ func (s *Service) Logout(ctx context.Context, rawToken string, client ClientInfo
 	}
 	s.audit.Record(ctx, audit.Entry{ActorID: &current.UserID, Action: audit.ActionLoggedOut,
 		EntityType: "session", EntityID: current.FamilyID.String(), IP: client.IP, UserAgent: client.UserAgent})
+	return nil
+}
+
+// ForgotPassword emails a single-use reset link. It succeeds whether or not the email
+// belongs to an account, so the endpoint cannot be used to discover registered emails.
+func (s *Service) ForgotPassword(ctx context.Context, in ForgotPasswordInput, client ClientInfo) error {
+	creds, err := s.users.GetCredentialsByEmail(ctx, normalizeEmail(in.Email))
+	if errors.Is(err, users.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load account: %w", err)
+	}
+	if creds.Status != users.StatusActive {
+		return nil
+	}
+
+	raw, hash, err := newOpaqueToken()
+	if err != nil {
+		return err
+	}
+	if err := s.resets.Create(ctx, PasswordReset{
+		UserID: creds.ID, TokenHash: hash, ExpiresAt: s.now().Add(s.resetTTL), IP: client.IP,
+	}); err != nil {
+		return fmt.Errorf("store reset token: %w", err)
+	}
+
+	link := s.webURL + "/reset-password?token=" + url.QueryEscape(raw)
+	delivery := "sent"
+	if err := s.mailer.Send(ctx, mail.Message{
+		To:      creds.Email,
+		Subject: "Reset your Engora password",
+		Text: fmt.Sprintf("We received a request to reset your Engora password.\n\n"+
+			"Reset it here: %s\n\nThis link expires in %d minutes and can be used once. "+
+			"If you didn't ask for this, you can ignore this email.", link, int(s.resetTTL.Minutes())),
+	}); err != nil {
+		// Not returned: an error only for existing accounts would reveal which emails exist.
+		delivery = "failed"
+	}
+	s.audit.Record(ctx, audit.Entry{ActorID: &creds.ID, Action: audit.ActionResetRequested,
+		EntityType: "user", EntityID: creds.ID.String(), IP: client.IP, UserAgent: client.UserAgent,
+		Metadata: map[string]any{"delivery": delivery}})
+	return nil
+}
+
+// ResetPassword sets a new password using a reset token and signs the user out everywhere.
+func (s *Service) ResetPassword(ctx context.Context, in ResetPasswordInput, client ClientInfo) error {
+	userID, err := s.resets.Consume(ctx, hashToken(in.Token), s.now())
+	if errors.Is(err, ErrResetTokenInvalid) {
+		return apperr.Validation(map[string]any{
+			"fields": map[string]any{"token": "is invalid or has expired"},
+		})
+	}
+	if err != nil {
+		return fmt.Errorf("consume reset token: %w", err)
+	}
+
+	hash, err := s.hasher.Hash(in.Password)
+	if err != nil {
+		return err
+	}
+	if err := s.users.UpdatePassword(ctx, userID, hash); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	if err := s.tokens.RevokeAllForUser(ctx, userID); err != nil {
+		return fmt.Errorf("revoke sessions: %w", err)
+	}
+	s.audit.Record(ctx, audit.Entry{ActorID: &userID, Action: audit.ActionPasswordReset,
+		EntityType: "user", EntityID: userID.String(), IP: client.IP, UserAgent: client.UserAgent})
 	return nil
 }
 
@@ -228,7 +334,7 @@ func (s *Service) startSession(ctx context.Context, user users.User, familyID uu
 }
 
 func (s *Service) newRefreshRecord(userID, familyID uuid.UUID, client ClientInfo) (RefreshToken, string, error) {
-	raw, hash, err := newRefreshToken()
+	raw, hash, err := newOpaqueToken()
 	if err != nil {
 		return RefreshToken{}, "", err
 	}
