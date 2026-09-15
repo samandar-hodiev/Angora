@@ -11,6 +11,7 @@ import { IconButton } from "@/components/ui/button";
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -31,6 +32,7 @@ import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
 import { useSaveAppearance, useSyncAppearance } from "@/features/profile/appearance";
 import { useProfile } from "@/features/profile/hooks";
+import { apiAssetUrl } from "@/lib/media";
 import { isThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/providers/theme-provider";
@@ -189,14 +191,16 @@ function UserMenu() {
   const router = useRouter();
   const { preference } = useTheme();
   const { save } = useSaveAppearance();
-  const name = profile?.display_name || user?.email;
+  const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.display_name || user?.email;
+  const avatar = apiAssetUrl(profile?.avatar_url);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40" aria-label="Account menu">
           <Avatar className="size-8">
-            <AvatarFallback>{initials(profile?.display_name ?? user?.email)}</AvatarFallback>
+            {avatar && <AvatarImage src={avatar} alt="" className="object-cover" />}
+            <AvatarFallback>{initials(name)}</AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>

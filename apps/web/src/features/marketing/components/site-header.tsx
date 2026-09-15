@@ -10,6 +10,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/overlay";
 
 import { useI18n } from "../i18n";
+import { HeaderAccount, MenuAccount } from "./account-menu";
 import { LanguageOptions, LanguageSelector, ThemeOptions, ThemeToggle } from "./preferences";
 
 /** Landing page sections the navigation scrolls to. */
@@ -79,12 +80,18 @@ export function SiteHeader() {
         <div className="relative ml-auto hidden items-center gap-2 lg:flex">
           <LanguageSelector />
           <ThemeToggle />
-          <Button variant="ghost" size="sm" className="h-9" asChild>
-            <Link href="/login">{t.nav.signIn}</Link>
-          </Button>
-          <Button variant="liquid" size="sm" className="h-9 px-4" asChild>
-            <Link href="/register">{t.nav.createAccount}</Link>
-          </Button>
+          <HeaderAccount
+            guest={
+              <>
+                <Button variant="ghost" size="sm" className="h-9" asChild>
+                  <Link href="/login">{t.nav.signIn}</Link>
+                </Button>
+                <Button variant="liquid" size="sm" className="h-9 px-4" asChild>
+                  <Link href="/register">{t.nav.createAccount}</Link>
+                </Button>
+              </>
+            }
+          />
         </div>
 
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -115,13 +122,20 @@ export function SiteHeader() {
               <p className="text-label text-fg-muted">{t.nav.theme}</p>
               <ThemeOptions />
             </div>
-            <div className="mt-auto grid gap-2">
-              <Button asChild size="lg" variant="liquid">
-                <Link href="/register">{t.nav.createAccount}</Link>
-              </Button>
-              <Button asChild size="lg" variant="glass">
-                <Link href="/login">{t.nav.signIn}</Link>
-              </Button>
+            <div className="mt-auto">
+              <MenuAccount
+                onNavigate={() => setMenuOpen(false)}
+                guest={
+                  <div className="grid gap-2">
+                    <Button asChild size="lg" variant="liquid">
+                      <Link href="/register">{t.nav.createAccount}</Link>
+                    </Button>
+                    <Button asChild size="lg" variant="glass">
+                      <Link href="/login">{t.nav.signIn}</Link>
+                    </Button>
+                  </div>
+                }
+              />
             </div>
           </SheetContent>
         </Sheet>

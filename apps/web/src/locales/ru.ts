@@ -17,6 +17,11 @@ export const ru: Messages = {
     dark: "Тёмная",
     switchToLight: "Включить светлую тему",
     switchToDark: "Включить тёмную тему",
+    account: "Меню аккаунта",
+    dashboard: "Перейти в дашборд",
+    profile: "Профиль",
+    settings: "Настройки",
+    signOut: "Выйти",
   },
   hero: {
     badge: "Ваш AI-коуч по английскому",

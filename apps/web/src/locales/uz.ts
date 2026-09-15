@@ -17,6 +17,11 @@ export const uz: Messages = {
     dark: "Qorong‘i",
     switchToLight: "Yorug‘ mavzuga o‘tish",
     switchToDark: "Qorong‘i mavzuga o‘tish",
+    account: "Akkaunt menyusi",
+    dashboard: "Dashboardga o‘tish",
+    profile: "Profil",
+    settings: "Sozlamalar",
+    signOut: "Chiqish",
   },
   hero: {
     badge: "Sizning AI ingliz tili murabbiyingiz",

@@ -23,6 +23,11 @@ export const en = {
     dark: "Dark",
     switchToLight: "Switch to light theme",
     switchToDark: "Switch to dark theme",
+    account: "Account menu",
+    dashboard: "Go to dashboard",
+    profile: "Profile",
+    settings: "Settings",
+    signOut: "Sign out",
   },
   hero: {
     badge: "Your AI English Coach",
