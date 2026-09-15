@@ -44,6 +44,27 @@ type LearningPlan struct {
 	Plan        map[string]any `json:"plan"`
 	GeneratedBy string         `json:"generated_by"`
 	UpdatedAt   time.Time      `json:"updated_at"`
+	// SourceAssessmentID is the assessment whose results shaped the plan, if any.
+	SourceAssessmentID *uuid.UUID `json:"source_assessment_id"`
+	DailyMinutes       *int       `json:"daily_minutes"`
+	Level              *string    `json:"level"`
+	Items              []PlanItem `json:"items"`
+}
+
+// PlanItem is one structured activity of today's plan.
+type PlanItem struct {
+	ID           uuid.UUID   `json:"id"`
+	Position     int         `json:"position"`
+	Skill        string      `json:"skill"`
+	Focus        string      `json:"focus"`
+	ActivityCode string      `json:"activity_code"`
+	Title        string      `json:"title"`
+	Description  string      `json:"description"`
+	Minutes      int         `json:"minutes"`
+	Level        *string     `json:"level"`
+	ReasonCode   string      `json:"reason_code"`
+	Status       string      `json:"status"`
+	Content      *ContentRef `json:"content"`
 }
 
 type Module struct {
@@ -101,16 +122,50 @@ func (m *Module) plan(c *gin.Context) {
 	p, _ := authz.PrincipalFrom(c)
 	var lp LearningPlan
 	err := m.pool.QueryRow(c.Request.Context(), `
-		SELECT lp.id, lp.goal, l.code, lp.starts_on, lp.ends_on, lp.plan, lp.generated_by, lp.updated_at
+		SELECT lp.id, lp.goal, l.code, lp.starts_on, lp.ends_on, lp.plan, lp.generated_by, lp.updated_at,
+		       lp.source_assessment_id, lp.daily_minutes, lp.level
 		FROM learning_plans lp
 		LEFT JOIN levels l ON l.id = lp.target_level_id
 		WHERE lp.user_id = $1 AND lp.status = 'active'`, p.UserID,
-	).Scan(&lp.ID, &lp.Goal, &lp.TargetLevel, &lp.StartsOn, &lp.EndsOn, &lp.Plan, &lp.GeneratedBy, &lp.UpdatedAt)
+	).Scan(&lp.ID, &lp.Goal, &lp.TargetLevel, &lp.StartsOn, &lp.EndsOn, &lp.Plan, &lp.GeneratedBy, &lp.UpdatedAt,
+		&lp.SourceAssessmentID, &lp.DailyMinutes, &lp.Level)
 	if database.IsNotFound(err) {
 		httpx.OK(c, gin.H{"plan": nil})
 		return
 	}
 	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
+	rows, err := m.pool.Query(c.Request.Context(), `
+		SELECT i.id, i.position, i.skill, i.focus, i.activity_code, i.title, i.description, i.minutes, i.level,
+		       i.reason_code, i.status, ci.id, ci.type, ci.title, s.code
+		FROM learning_plan_items i
+		LEFT JOIN content_items ci ON ci.id = i.content_item_id
+		LEFT JOIN skills s ON s.id = ci.skill_id
+		WHERE i.learning_plan_id = $1 ORDER BY i.position`, lp.ID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	defer rows.Close()
+	lp.Items = []PlanItem{}
+	for rows.Next() {
+		var it PlanItem
+		var contentID *uuid.UUID
+		var contentType, contentTitle, contentSkill *string
+		if err := rows.Scan(&it.ID, &it.Position, &it.Skill, &it.Focus, &it.ActivityCode, &it.Title, &it.Description,
+			&it.Minutes, &it.Level, &it.ReasonCode, &it.Status, &contentID, &contentType, &contentTitle, &contentSkill); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		if contentID != nil {
+			it.Content = &ContentRef{ID: *contentID, Type: deref(contentType), Title: deref(contentTitle), Skill: contentSkill}
+		}
+		lp.Items = append(lp.Items, it)
+	}
+	if err := rows.Err(); err != nil {
 		httpx.Fail(c, err)
 		return
 	}

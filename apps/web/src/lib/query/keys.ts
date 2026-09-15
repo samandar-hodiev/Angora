@@ -40,6 +40,20 @@ export const queryKeys = {
     list: ["recommendations"] as const,
     plan: ["learning-plan"] as const,
   },
+  onboarding: {
+    state: ["onboarding"] as const,
+  },
+  levels: {
+    me: ["levels", "me"] as const,
+  },
+  assessments: {
+    all: ["assessments"] as const,
+    history: ["assessments", "history"] as const,
+    config: ["assessments", "config"] as const,
+    detail: (id: string) => ["assessments", id] as const,
+    section: (id: string, skill: string) => ["assessments", id, "section", skill] as const,
+    result: (id: string) => ["assessments", id, "result"] as const,
+  },
   admin: {
     overview: ["admin", "overview"] as const,
     aiUsage: (days: number) => ["admin", "ai-usage", days] as const,

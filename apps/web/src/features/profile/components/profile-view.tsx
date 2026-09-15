@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, initials } from "@/components/ui/overlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/features/auth/hooks";
 import { useProgress } from "@/features/learner/hooks";
-import { goalLabel } from "@/features/onboarding/model";
+import { goalLabel } from "@/features/onboarding/labels";
 import { useCurrentSubscription } from "@/features/subscription/hooks";
 
 import { useProfile } from "../hooks";

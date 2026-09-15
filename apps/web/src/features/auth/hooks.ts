@@ -3,7 +3,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
-import { login, loginWithGoogle, logout, register, sessionStore } from "./session";
+import { login, loginWithGoogle, logout, register, sessionStore, verifyEmailCode } from "./session";
+
+export function useVerifyEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: verifyEmailCode,
+    onSuccess: () => queryClient.clear(),
+  });
+}
 
 export function useSession() {
   return useSyncExternalStore(sessionStore.subscribe, sessionStore.getState, sessionStore.getState);

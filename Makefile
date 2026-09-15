@@ -87,8 +87,11 @@ test-api:
 	cd $(API_DIR) && go test ./...
 
 ## test-api-integration: run Go tests including PostgreSQL/Redis integration (uses a disposable test DB)
+## WARNING: the migration test migrates the database down and up, erasing its data. Never point
+## TEST_DATABASE_URL at your development database. Seed the test DB first (DATABASE_URL=... seed content)
+## so the placement flow test runs. Packages run one at a time (-p 1) because they share the database.
 test-api-integration:
-	cd $(API_DIR) && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" TEST_REDIS_URL="$(TEST_REDIS_URL)" go test -count=1 ./...
+	cd $(API_DIR) && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" TEST_REDIS_URL="$(TEST_REDIS_URL)" go test -p 1 -count=1 ./...
 
 ## test-web: run web and package tests
 test-web:

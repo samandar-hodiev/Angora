@@ -42,15 +42,10 @@ func run() error {
 	defer container.Close()
 
 	worker := jobs.NewWorker(container.Jobs, log, container.Reporter)
-	registerHandlers(worker, container)
+	app.RegisterJobHandlers(worker, container)
 
 	log.Info("worker started", slog.Any("job_types", worker.Types()), slog.Int("concurrency", worker.Concurrency))
 	worker.Run(ctx)
 	log.Info("worker stopped")
 	return nil
 }
-
-// registerHandlers is where feature modules plug in their job handlers, e.g. in Phase 2:
-//
-//	worker.Handle(jobs.TypeSpeakingEvaluate, speaking.NewEvaluationHandler(c.AI, c.Storage, c.DB).Handle)
-func registerHandlers(_ *jobs.Worker, _ *app.Container) {}

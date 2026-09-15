@@ -12,25 +12,28 @@ import { FormField } from "@/components/common/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { track } from "@/lib/analytics";
 import { applyApiErrors } from "@/lib/forms/apply-api-errors";
 
 import { useLogin } from "../hooks";
 
-export function LoginForm({ redirectTo }: { redirectTo: string }) {
+export function LoginForm({ redirectTo, defaultEmail = "" }: { redirectTo: string; defaultEmail?: string }) {
   const router = useRouter();
   const loginMutation = useLogin(redirectTo);
   const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: defaultEmail, password: "" },
   });
   const { errors, isSubmitting } = form.formState;
 
   const onSubmit = form.handleSubmit(async (values) => {
     setFormError(null);
+    track("login_started", { method: "password" });
     try {
       await loginMutation.mutateAsync(values);
+      track("login_completed", { method: "password" });
       router.replace(redirectTo);
     } catch (error) {
       setFormError(applyApiErrors(error, form.setError, ["email", "password"]));
@@ -59,8 +62,8 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         </Link>
       </div>
 
-      <Button type="submit" className="w-full" loading={isSubmitting}>
-        Log in
+      <Button type="submit" variant="liquid" size="lg" className="w-full" loading={isSubmitting}>
+        Sign in
       </Button>
     </form>
   );

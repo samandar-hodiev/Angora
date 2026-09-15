@@ -32,6 +32,12 @@ type Config struct {
 	Storage       StorageConfig
 	Mail          MailConfig
 	Observability ObservabilityConfig
+	Jobs          JobsConfig
+}
+
+type JobsConfig struct {
+	// EmbeddedWorker runs a job worker inside the API process (default: on in development).
+	EmbeddedWorker bool
 }
 
 type AppConfig struct {
@@ -177,6 +183,9 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			ErrorTracker: strings.ToLower(r.str("ERROR_TRACKER", "log")),
 		},
 	}
+
+	embedded := strings.ToLower(r.str("JOBS_EMBEDDED_WORKER", map[bool]string{true: "true", false: "false"}[cfg.App.Env == EnvDevelopment]))
+	cfg.Jobs.EmbeddedWorker = embedded == "true" || embedded == "1"
 
 	if err := errors.Join(append(r.errs, cfg.validate()...)...); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)

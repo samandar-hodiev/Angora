@@ -189,7 +189,18 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 
 // BodyLimit caps request bodies. Upload endpoints install their own, larger limit.
 func BodyLimit(maxBytes int64) gin.HandlerFunc {
+	return BodyLimitWithOverrides(maxBytes, nil)
+}
+
+// BodyLimitWithOverrides applies maxBytes to every request except routes listed in
+// overrides (keyed by the registered route path, e.g. "/api/v1/uploads/:id"), which get
+// their own limit — audio uploads are far larger than JSON bodies.
+func BodyLimitWithOverrides(defaultMax int64, overrides map[string]int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		maxBytes := defaultMax
+		if limit, ok := overrides[c.FullPath()]; ok {
+			maxBytes = limit
+		}
 		if c.Request.ContentLength > maxBytes {
 			httpx.WriteError(c, apperr.New(apperr.CodePayloadTooLarge,
 				"Request body must be at most "+strconv.FormatInt(maxBytes, 10)+" bytes"))

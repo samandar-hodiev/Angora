@@ -21,6 +21,7 @@ const upstreamPaths = {
   login: "/auth/login",
   register: "/auth/register",
   google: "/auth/google",
+  "email-verify": "/auth/email/verify",
   refresh: "/auth/refresh",
   logout: "/auth/logout",
 } as const;
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
   }
 
   let payload: unknown;
-  if (action === "login" || action === "register" || action === "google") {
+  if (action === "login" || action === "register" || action === "google" || action === "email-verify") {
     payload = await request.json().catch(() => null);
     if (!payload || typeof payload !== "object") {
       return errorResponse(400, "BAD_REQUEST", "Request body is not valid JSON");

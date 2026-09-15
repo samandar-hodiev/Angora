@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/analytics"
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
@@ -26,6 +27,8 @@ type UserStore interface {
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
+	HasPassword(ctx context.Context, id uuid.UUID) (bool, error)
+	AuthStatus(ctx context.Context, id uuid.UUID) (provider string, hasPassword bool, err error)
 }
 
 // ClientInfo describes the calling device for session metadata only. It never changes
@@ -80,6 +83,10 @@ type Deps struct {
 	// Identities and Google are optional; without them Google sign-in reports NOT_IMPLEMENTED.
 	Identities IdentityStore
 	Google     GoogleVerifier
+	// EmailCodes enables passwordless email sign-up with verification codes.
+	EmailCodes EmailCodeStore
+	// Tracker receives product analytics events; nil disables them.
+	Tracker analytics.Tracker
 }
 
 type Options struct {
@@ -99,6 +106,8 @@ type Service struct {
 	mailer     mail.Mailer
 	identities IdentityStore
 	google     GoogleVerifier
+	emailCodes EmailCodeStore
+	tracker    analytics.Tracker
 	refreshTTL time.Duration
 	resetTTL   time.Duration
 	webURL     string
@@ -118,7 +127,8 @@ func NewService(d Deps, o Options) (*Service, error) {
 	}
 	return &Service{
 		users: d.Users, tokens: d.Tokens, resets: d.Resets, hasher: d.Hasher, issuer: d.Issuer,
-		audit: d.Audit, mailer: d.Mailer, identities: d.Identities, google: d.Google,
+		audit: d.Audit, mailer: d.Mailer, identities: d.Identities, google: d.Google, emailCodes: d.EmailCodes,
+		tracker:    trackerOrNop(d.Tracker),
 		refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
 		webURL: strings.TrimRight(o.WebURL, "/"), now: time.Now, dummyHash: dummy,
 	}, nil

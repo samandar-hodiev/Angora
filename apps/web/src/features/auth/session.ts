@@ -76,7 +76,10 @@ function completeSignIn(session: WebSession, landing: string) {
 
 const SESSION_ROUTE = "/api/session";
 
-async function callSessionRoute(action: "login" | "register" | "google" | "refresh" | "logout", body?: unknown) {
+async function callSessionRoute(
+  action: "login" | "register" | "google" | "email-verify" | "refresh" | "logout",
+  body?: unknown,
+) {
   let response: Response;
   try {
     response = await fetch(`${SESSION_ROUTE}/${action}`, {
@@ -105,6 +108,7 @@ async function callSessionRoute(action: "login" | "register" | "google" | "refre
 }
 
 export const ONBOARDING_PATH = "/onboarding";
+export const SETUP_PROFILE_PATH = "/setup-profile";
 export const DEFAULT_LANDING_PATH = "/app/dashboard";
 
 export async function login(
@@ -132,7 +136,15 @@ export async function loginWithGoogle(
   landing: string = DEFAULT_LANDING_PATH,
 ): Promise<WebSession> {
   const session = await callSessionRoute("google", input);
-  return completeSignIn(session!, session!.is_new_user ? ONBOARDING_PATH : landing);
+  // New accounts complete their profile first; returning learners are routed by the
+  // journey guard (dashboard, or wherever they stopped).
+  return completeSignIn(session!, session!.is_new_user ? SETUP_PROFILE_PATH : landing);
+}
+
+/** Verifies an emailed sign-up code on the server; creates the account and signs in. */
+export async function verifyEmailCode(input: { email: string; code: string; timezone?: string }): Promise<WebSession> {
+  const session = await callSessionRoute("email-verify", input);
+  return completeSignIn(session!, SETUP_PROFILE_PATH);
 }
 
 export function browserTimezone(): string | undefined {

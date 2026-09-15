@@ -241,6 +241,7 @@ func (s *Service) LoginWithGoogle(ctx context.Context, in GoogleLoginInput, clie
 				DisplayName:   googleDisplayName(identity),
 				Timezone:      tz,
 				EmailVerified: true,
+				AuthProvider:  ProviderGoogle,
 			})
 			if errors.Is(err, users.ErrEmailTaken) {
 				return Session{}, apperr.Conflict("An account with this email was just created. Please try again.")

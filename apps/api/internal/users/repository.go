@@ -34,10 +34,10 @@ func (r *PostgresRepository) CreateAccount(ctx context.Context, in NewAccount) (
 	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
 		var err error
 		user, err = scanUser(tx.QueryRow(ctx,
-			`INSERT INTO users (email, password_hash, email_verified_at)
-			 VALUES ($1, NULLIF($2, ''), CASE WHEN $3::boolean THEN now() END)
+			`INSERT INTO users (email, password_hash, email_verified_at, auth_provider)
+			 VALUES ($1, NULLIF($2, ''), CASE WHEN $3::boolean THEN now() END, COALESCE(NULLIF($4, ''), 'email'))
 			 RETURNING `+userColumns,
-			in.Email, in.PasswordHash, in.EmailVerified,
+			in.Email, in.PasswordHash, in.EmailVerified, in.AuthProvider,
 		))
 		if err != nil {
 			if database.IsUniqueViolation(err) {
@@ -98,6 +98,25 @@ func (r *PostgresRepository) UpdatePassword(ctx context.Context, id uuid.UUID, p
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (r *PostgresRepository) AuthStatus(ctx context.Context, id uuid.UUID) (string, bool, error) {
+	var provider string
+	var has bool
+	err := r.pool.QueryRow(ctx, `SELECT auth_provider, password_hash IS NOT NULL FROM users WHERE id = $1`, id).Scan(&provider, &has)
+	if database.IsNotFound(err) {
+		return "", false, ErrNotFound
+	}
+	return provider, has, err
+}
+
+func (r *PostgresRepository) HasPassword(ctx context.Context, id uuid.UUID) (bool, error) {
+	var has bool
+	err := r.pool.QueryRow(ctx, `SELECT password_hash IS NOT NULL FROM users WHERE id = $1`, id).Scan(&has)
+	if database.IsNotFound(err) {
+		return false, ErrNotFound
+	}
+	return has, err
 }
 
 func (r *PostgresRepository) MarkEmailVerified(ctx context.Context, id uuid.UUID) error {

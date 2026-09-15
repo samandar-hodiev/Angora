@@ -1,0 +1,202 @@
+{
+  "reading": [
+    {
+      "slug": "placement-reading-a1-annas-saturday",
+      "level": "A1",
+      "title": "Anna's Saturday",
+      "topic": "daily-life",
+      "difficulty": 2,
+      "passage": "My name is Anna. I am twenty-five years old and I live in a small flat in the city centre.\n\nOn Saturdays I get up at nine o'clock. I have coffee and bread for breakfast. Then I go to the park with my dog, Max. Max loves the park!\n\nAt one o'clock I meet my sister at a café. We have lunch and talk a lot. In the evening I stay at home. I cook dinner and watch a film. I go to bed at eleven.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 2, "prompt": "What time does Anna get up on Saturdays?", "options": ["At eight o'clock", "At nine o'clock", "At one o'clock", "At eleven o'clock"], "answer": 1, "explanation": "The text says: \"On Saturdays I get up at nine o'clock.\""},
+        {"key": "q2", "type": "true_false_not_given", "difficulty": 2, "prompt": "Anna lives in a big house.", "answer": 1, "explanation": "She lives in a small flat, not a big house."},
+        {"key": "q3", "type": "multiple_choice", "difficulty": 2, "prompt": "Who does Anna meet at the café?", "options": ["Her friend", "Her mother", "Her dog", "Her sister"], "answer": 3, "explanation": "\"At one o'clock I meet my sister at a café.\""},
+        {"key": "q4", "type": "vocabulary_in_context", "difficulty": 3, "prompt": "In the text, the word \"flat\" means…", "options": ["a place to live", "a type of food", "a big park", "a kind of car"], "answer": 0, "explanation": "A flat is a home on one floor of a building."}
+      ]
+    },
+    {
+      "slug": "placement-reading-a2-new-neighbourhood",
+      "level": "A2",
+      "title": "A new neighbourhood",
+      "topic": "daily-life",
+      "difficulty": 3,
+      "passage": "Last month, Tom and his family moved to a new neighbourhood on the other side of the city. At first, Tom was not happy. His old school was near his house, but now he has to take a bus for twenty minutes every morning. He also missed his best friend, Sam.\n\nAfter two weeks, things started to change. Tom joined the football club at his new school, and he met a boy called Leo who lives on the same street. Now they go to school together and play football every Tuesday and Thursday.\n\nTom still calls Sam every weekend, and next month Sam is going to stay with him for the whole weekend.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 3, "prompt": "Why was Tom unhappy at first?", "options": ["He didn't like his new house.", "His journey to school was longer and he missed his friend.", "There was no bus to his school.", "His football club closed."], "answer": 1, "explanation": "He now takes a bus for twenty minutes and he missed Sam."},
+        {"key": "q2", "type": "true_false_not_given", "difficulty": 3, "prompt": "Leo and Tom live on the same street.", "answer": 0, "explanation": "Leo \"lives on the same street\"."},
+        {"key": "q3", "type": "true_false_not_given", "difficulty": 4, "prompt": "Tom's new school is bigger than his old school.", "answer": 2, "explanation": "The text does not compare the size of the schools."},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 4, "prompt": "What will happen next month?", "options": ["Tom will move again.", "Sam will stay with Tom for a weekend.", "Tom will visit Sam.", "Leo will join the football club."], "answer": 1, "explanation": "\"Next month Sam is going to stay with him for the whole weekend.\""}
+      ]
+    },
+    {
+      "slug": "placement-reading-b1-learning-to-cook",
+      "level": "B1",
+      "title": "Learning to cook online",
+      "topic": "daily-life",
+      "difficulty": 5,
+      "passage": "When Maria started university, she could only make toast and instant noodles. Living away from her parents for the first time, she soon got tired of eating the same things, and takeaway food was too expensive for a student budget. So she decided to learn to cook using online videos.\n\nAt first, she chose recipes that looked impressive, but they often went wrong because they needed skills she didn't have yet. A friend suggested a different approach: start with a few simple dishes and cook each one several times until it becomes easy. Maria followed this advice, and after a couple of months she could prepare five or six meals without looking at a recipe.\n\nNow, two years later, Maria regularly invites friends for dinner. She says the most useful thing she learned was not a particular recipe, but how to plan her meals for the week, which saves her both time and money.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 4, "prompt": "Why did Maria decide to learn to cook?", "options": ["Her parents asked her to.", "She wanted to become a chef.", "She was tired of her food and takeaways cost too much.", "Her university offered a free course."], "answer": 2, "explanation": "She got tired of eating the same things and takeaway food was too expensive."},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 5, "prompt": "Why did her first attempts often go wrong?", "options": ["The recipes needed skills she didn't have yet.", "The videos were in another language.", "She didn't have the right equipment.", "She didn't follow the instructions."], "answer": 0, "explanation": "\"They needed skills she didn't have yet.\""},
+        {"key": "q3", "type": "vocabulary_in_context", "difficulty": 5, "prompt": "In paragraph 2, the word \"approach\" is closest in meaning to…", "options": ["a difficult problem", "a type of recipe", "a way of doing something", "a place to study"], "answer": 2, "explanation": "Here \"approach\" means a method or way of doing something."},
+        {"key": "q4", "type": "true_false_not_given", "difficulty": 6, "prompt": "Maria thinks learning to plan her meals was more useful than learning any single recipe.", "answer": 0, "explanation": "She says the most useful thing was not a particular recipe but how to plan her meals."}
+      ]
+    },
+    {
+      "slug": "placement-reading-b2-free-apps",
+      "level": "B2",
+      "title": "The hidden cost of free apps",
+      "topic": "technology",
+      "difficulty": 7,
+      "passage": "Most people now take it for granted that apps on their phones are free to download. Yet as the saying goes, if you are not paying for the product, you are probably the product. Many free apps earn money by collecting information about how people use them and selling access to that data, usually in the form of targeted advertising.\n\nSupporters of this model argue that it has made technology available to billions of people who could never afford subscription fees. Without advertising, they say, services such as maps, email and social networks would be a luxury for the wealthy. Critics, however, point out that users rarely understand what they have agreed to. Privacy policies are often long and deliberately vague, and few people read them before clicking \"accept\".\n\nIn response to growing public concern, some governments have introduced stricter rules that require companies to explain clearly what data they collect and to obtain users' consent. Whether these measures will genuinely change how companies behave, or simply lead to more pop-up windows that people ignore, remains to be seen.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 6, "prompt": "What does the saying in paragraph 1 suggest?", "options": ["Free apps are usually of low quality.", "Paying for apps completely protects your data.", "Most apps are no longer free.", "Users of free apps are themselves a source of profit."], "answer": 3, "explanation": "\"You are probably the product\": companies make money from users' data."},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 6, "prompt": "According to supporters, what is the main benefit of the advertising model?", "options": ["It keeps data more secure.", "It makes services available to people who cannot pay.", "It improves the design of apps.", "It reduces the number of adverts."], "answer": 1, "explanation": "It made technology available to people who could never afford subscription fees."},
+        {"key": "q3", "type": "vocabulary_in_context", "difficulty": 7, "prompt": "The word \"deliberately\" in paragraph 2 means…", "options": ["by accident", "on purpose", "very quickly", "in a friendly way"], "answer": 1, "explanation": "\"Deliberately vague\" means vague on purpose."},
+        {"key": "q4", "type": "true_false_not_given", "difficulty": 8, "prompt": "The writer is confident that the new government rules will change how companies behave.", "answer": 1, "explanation": "The writer says it \"remains to be seen\", so they are not confident."}
+      ]
+    },
+    {
+      "slug": "placement-reading-c1-procrastination",
+      "level": "C1",
+      "title": "Why we procrastinate",
+      "topic": "health",
+      "difficulty": 8,
+      "passage": "For decades, procrastination was treated as a problem of time management: people who put off important tasks, the thinking went, simply needed better calendars and more discipline. More recent research paints a rather different picture. Psychologists increasingly describe procrastination as a strategy for regulating emotions rather than a failure to organise one's time.\n\nAccording to this view, we delay tasks not because we are unaware of deadlines, but because the task itself triggers unpleasant feelings (boredom, anxiety, self-doubt), and avoiding it offers immediate relief. The trouble is that this relief is short-lived. The task remains, the deadline draws closer, and the original negative emotions are compounded by guilt.\n\nThis reframing has practical implications. If procrastination is fundamentally emotional, then productivity apps and elaborate planning systems may address the symptoms while leaving the cause untouched. Some researchers therefore recommend techniques such as self-compassion: people who forgive themselves for past procrastination, studies suggest, are less likely to procrastinate again, presumably because the task no longer carries the same emotional weight.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 7, "prompt": "How has the understanding of procrastination changed?", "options": ["It is now seen mainly as a way of managing feelings.", "It is now seen as a lack of intelligence.", "It is now considered purely a time-management issue.", "It is now thought to be caused by technology."], "answer": 0, "explanation": "It is described as \"a strategy for regulating emotions\"."},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 8, "prompt": "According to the passage, why does avoiding a task feel good?", "options": ["It helps people meet their deadlines.", "It reduces guilt in the long term.", "It gives immediate relief from unpleasant feelings.", "It allows more time for planning."], "answer": 2, "explanation": "\"Avoiding it offers immediate relief.\""},
+        {"key": "q3", "type": "vocabulary_in_context", "difficulty": 8, "prompt": "In paragraph 2, \"compounded\" is closest in meaning to…", "options": ["replaced", "explained", "reduced", "made worse"], "answer": 3, "explanation": "The negative emotions are made worse by guilt."},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 9, "prompt": "What does the writer imply about productivity apps?", "options": ["They are the most effective solution.", "They may not tackle the underlying cause.", "They increase feelings of guilt.", "They were designed by psychologists."], "answer": 1, "explanation": "They \"may address the symptoms while leaving the cause untouched\"."}
+      ]
+    },
+    {
+      "slug": "placement-reading-c2-paradox-of-choice",
+      "level": "C2",
+      "title": "The paradox of choice revisited",
+      "topic": "culture",
+      "difficulty": 9,
+      "passage": "The notion that an abundance of options can be paralysing, rather than liberating, entered popular culture through a much-cited experiment in which shoppers presented with twenty-four varieties of jam were markedly less likely to buy any than those offered only six. The finding seemed to capture something intuitively true about modern consumer life, and it was swiftly enlisted in arguments against everything from sprawling restaurant menus to complex pension schemes.\n\nSubsequent attempts to replicate the effect, however, have yielded decidedly inconsistent results. A large-scale analysis of dozens of studies concluded that, on average, the size of the choice set had a negligible impact on satisfaction or on the likelihood of choosing at all. Crucially, though, the same analysis identified circumstances under which choice overload did materialise: when options were difficult to compare, when people lacked clear preferences, or when they were under pressure to decide quickly.\n\nWhat emerges, then, is not a refutation of the original insight so much as a qualification of it. The problem is seldom the number of options per se, but the cognitive effort that a particular decision demands. Designers who indiscriminately cut choices may therefore be solving the wrong problem, whereas those who make options easier to evaluate may preserve the benefits of variety without its costs.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 8, "prompt": "What was the result of the original jam experiment?", "options": ["Shoppers bought more when offered more varieties.", "The number of varieties made no difference.", "Shoppers offered fewer varieties were more likely to buy.", "Shoppers preferred the most expensive jam."], "answer": 2, "explanation": "Shoppers offered 24 varieties were \"markedly less likely to buy any\" than those offered six."},
+        {"key": "q2", "type": "true_false_not_given", "difficulty": 9, "prompt": "Later studies consistently confirmed the original finding.", "answer": 1, "explanation": "Replications \"yielded decidedly inconsistent results\"."},
+        {"key": "q3", "type": "vocabulary_in_context", "difficulty": 10, "prompt": "In paragraph 3, \"a qualification of it\" means…", "options": ["a certificate proving it", "a complete rejection of it", "a practical application of it", "a limitation or refinement of it"], "answer": 3, "explanation": "The insight is refined (true only under certain conditions), not rejected."},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 9, "prompt": "What does the writer suggest designers should do?", "options": ["Make options easier to compare and evaluate.", "Reduce the number of choices as much as possible.", "Offer more choices to satisfy everyone.", "Encourage users to decide more quickly."], "answer": 0, "explanation": "Designers \"who make options easier to evaluate may preserve the benefits of variety\"."}
+      ]
+    }
+  ],
+  "listening": [
+    {
+      "slug": "placement-listening-a1-message-from-jack",
+      "level": "A1",
+      "title": "A message from Jack",
+      "topic": "daily-life",
+      "difficulty": 2,
+      "voice": "Samantha",
+      "rate": 140,
+      "transcript": "Hi Emma, it's Jack. I'm calling about tomorrow. The film starts at seven o'clock, not at eight. Can we meet at the cinema at half past six? I have the tickets. Oh, and my brother Ben is coming too. Call me back, please. Bye!",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 2, "prompt": "What time does the film start?", "options": ["At six o'clock", "At half past six", "At seven o'clock", "At eight o'clock"], "answer": 2, "explanation": "\"The film starts at seven o'clock, not at eight.\""},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 2, "prompt": "Where will they meet?", "options": ["At the cinema", "At Jack's house", "At a café", "At the station"], "answer": 0, "explanation": "\"Can we meet at the cinema at half past six?\""},
+        {"key": "q3", "type": "multiple_choice", "difficulty": 3, "prompt": "Who is coming with them?", "options": ["Jack's sister", "Emma's brother", "Emma's friend", "Jack's brother"], "answer": 3, "explanation": "\"My brother Ben is coming too.\""},
+        {"key": "q4", "type": "true_false_not_given", "difficulty": 3, "prompt": "Emma has the tickets.", "answer": 1, "explanation": "Jack says \"I have the tickets.\""}
+      ]
+    },
+    {
+      "slug": "placement-listening-a2-station-announcement",
+      "level": "A2",
+      "title": "A station announcement",
+      "topic": "travel",
+      "difficulty": 3,
+      "voice": "Daniel",
+      "rate": 150,
+      "transcript": "Good afternoon. This is an announcement for passengers travelling to Manchester. The two fifteen train to Manchester is delayed by about twenty minutes because of a problem with the signals. This train will now leave from platform four, not platform two. Passengers for Leeds, please note that your train is on time and will leave from platform two as normal. Hot drinks and snacks are available in the café next to the ticket office. We apologise for the delay.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 3, "prompt": "Why is the Manchester train delayed?", "options": ["Because of bad weather", "Because of a problem with the signals", "Because the driver is late", "Because there are too many passengers"], "answer": 1, "explanation": "\"Because of a problem with the signals.\""},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 3, "prompt": "Which platform will the Manchester train leave from?", "options": ["Platform two", "Platform one", "Platform four", "Platform fourteen"], "answer": 2, "explanation": "\"This train will now leave from platform four.\""},
+        {"key": "q3", "type": "multiple_choice", "difficulty": 4, "prompt": "What does the speaker say about the Leeds train?", "options": ["It is cancelled.", "It is delayed.", "It leaves from platform four.", "It is on time."], "answer": 3, "explanation": "\"Your train is on time.\""},
+        {"key": "q4", "type": "true_false_not_given", "difficulty": 4, "prompt": "The café is next to the ticket office.", "answer": 0, "explanation": "\"In the café next to the ticket office.\""}
+      ]
+    },
+    {
+      "slug": "placement-listening-b1-travel-tips",
+      "level": "B1",
+      "title": "Travel tips on a budget",
+      "topic": "travel",
+      "difficulty": 5,
+      "voice": "Samantha",
+      "rate": 165,
+      "transcript": "Welcome back to Travel Tips. This week, we have a question from a listener who wants to travel around Europe on a small budget. My first piece of advice is to be flexible with your dates. Flights and trains are usually much cheaper in the middle of the week than at weekends, so if you can leave on a Tuesday or a Wednesday, you'll save quite a lot. Second, think about staying in hostels. Many people imagine they're only for teenagers, but these days lots of hostels have private rooms, and they're a great way to meet other travellers. Finally, don't eat in the restaurants in the main tourist squares. Walk just two or three streets away, and you'll often find better food at half the price.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 4, "prompt": "Who asked this week's question?", "options": ["A listener", "The presenter's friend", "A hotel owner", "A tour guide"], "answer": 0, "explanation": "\"A question from a listener.\""},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 5, "prompt": "When are flights and trains usually cheaper?", "options": ["At weekends", "Early in the morning", "In the middle of the week", "During school holidays"], "answer": 2, "explanation": "\"Much cheaper in the middle of the week than at weekends.\""},
+        {"key": "q3", "type": "multiple_choice", "difficulty": 5, "prompt": "What does the speaker say about hostels?", "options": ["They are only suitable for teenagers.", "They are a good way to meet other travellers.", "They never have private rooms.", "They cost more than hotels."], "answer": 1, "explanation": "\"They're a great way to meet other travellers.\""},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 6, "prompt": "What is the speaker's advice about restaurants?", "options": ["Book a table in advance.", "Eat in the main tourist squares.", "Only eat in your hostel.", "Look for places a short walk from the tourist areas."], "answer": 3, "explanation": "\"Walk just two or three streets away.\""}
+      ]
+    },
+    {
+      "slug": "placement-listening-b2-science-of-sleep",
+      "level": "B2",
+      "title": "The science of sleep",
+      "topic": "health",
+      "difficulty": 7,
+      "voice": "Daniel",
+      "rate": 175,
+      "transcript": "It's often said that we need eight hours of sleep a night, but the reality is a little more complicated. Sleep researchers generally agree that most adults need somewhere between seven and nine hours, and that individual needs vary considerably. What's perhaps more surprising is how much the timing of sleep matters, not just the quantity. People whose bedtimes change dramatically from one day to the next, for instance by staying up very late at weekends, tend to report feeling more tired, even if they sleep the same number of hours overall. Researchers sometimes call this social jet lag. Another common misconception is that you can fully catch up on lost sleep at the weekend. A long lie-in may help you feel better for a while, but studies suggest it doesn't completely reverse the effects of a week of poor sleep on concentration and mood.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 6, "prompt": "What do researchers say about the idea of eight hours a night?", "options": ["It applies to everyone.", "It is roughly right, but needs vary between people.", "It is completely wrong.", "It only applies to children."], "answer": 1, "explanation": "Most adults need between seven and nine hours, and needs vary considerably."},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 7, "prompt": "What does \"social jet lag\" refer to?", "options": ["Feeling tired because of irregular sleep times", "Tiredness after a long flight", "Sleeping too much at weekends", "Using social media late at night"], "answer": 0, "explanation": "Tiredness when bedtimes change dramatically from day to day."},
+        {"key": "q3", "type": "true_false_not_given", "difficulty": 7, "prompt": "According to the speaker, a lie-in at the weekend completely reverses a week of poor sleep.", "answer": 1, "explanation": "\"It doesn't completely reverse the effects.\""},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 8, "prompt": "What is the speaker's main point?", "options": ["Only the amount of sleep matters.", "Adults should always sleep nine hours.", "Both the timing and the amount of sleep are important.", "Sleeping at weekends is harmful."], "answer": 2, "explanation": "\"How much the timing of sleep matters, not just the quantity.\""}
+      ]
+    },
+    {
+      "slug": "placement-listening-c1-green-spaces",
+      "level": "C1",
+      "title": "Green spaces in cities",
+      "topic": "environment",
+      "difficulty": 8,
+      "voice": "Samantha",
+      "rate": 180,
+      "transcript": "In today's session, I want to look at the role of urban green spaces, and in particular at a tension that planners increasingly have to confront. On the one hand, there's now a substantial body of evidence linking access to parks with better physical and mental health, and cities are under pressure to create more of them. On the other hand, new parks can have an unintended consequence, sometimes described as green gentrification. When a neglected area is transformed by an attractive new park, property values tend to rise, and long-term residents on lower incomes may eventually be priced out of the very neighbourhood the project was meant to benefit. Now, that's not an argument against building parks. Rather, it suggests that green infrastructure needs to be planned alongside housing policy, for example by protecting affordable housing before the improvements are made.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 7, "prompt": "What is the main focus of the lecture?", "options": ["The history of city parks", "How to design attractive parks", "A conflict between the benefits of parks and their effect on housing", "Why cities should stop building parks"], "answer": 2, "explanation": "The lecturer discusses a tension between health benefits and rising property values."},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 8, "prompt": "What does \"green gentrification\" describe?", "options": ["Rising property prices pushing out lower-income residents after a park is created", "Parks becoming polluted over time", "Planting trees only in wealthy areas", "Replacing housing with parks"], "answer": 0, "explanation": "Residents on lower incomes may be priced out after an area is improved."},
+        {"key": "q3", "type": "true_false_not_given", "difficulty": 8, "prompt": "The lecturer argues that cities should build fewer parks.", "answer": 1, "explanation": "\"That's not an argument against building parks.\""},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 9, "prompt": "What solution does the lecturer suggest?", "options": ["Building parks only in wealthy areas", "Letting property prices rise naturally", "Asking residents to pay for parks", "Planning parks together with housing policy"], "answer": 3, "explanation": "Green infrastructure should be \"planned alongside housing policy\"."}
+      ]
+    },
+    {
+      "slug": "placement-listening-c2-economics-of-attention",
+      "level": "C2",
+      "title": "The economics of attention",
+      "topic": "technology",
+      "difficulty": 9,
+      "voice": "Daniel",
+      "rate": 185,
+      "transcript": "Economists have long been preoccupied with scarcity, and the conventional assumption has been that what is scarce is material: land, labour, capital. But as the political scientist Herbert Simon observed decades ago, a wealth of information creates a poverty of attention. If we take that observation seriously, a number of rather uncomfortable conclusions follow. For one thing, many digital services that appear to be free are, in effect, competing for a finite resource, and their business models reward whichever product proves most adept at capturing and holding it, irrespective of whether users are better off as a result. For another, the familiar remedy of simply giving consumers more information may, paradoxically, exacerbate the very problem it's intended to solve. None of this is to suggest that individuals are powerless, but it does imply that calls to exercise more self-control somewhat miss the point, since they locate the problem in personal failings rather than in the design of the environment.",
+      "questions": [
+        {"key": "q1", "type": "multiple_choice", "difficulty": 8, "prompt": "What did Herbert Simon observe?", "options": ["Information is becoming scarce.", "An abundance of information makes attention scarce.", "Attention is more valuable than land.", "People have more attention than in the past."], "answer": 1, "explanation": "\"A wealth of information creates a poverty of attention.\""},
+        {"key": "q2", "type": "multiple_choice", "difficulty": 9, "prompt": "What does the speaker say about apparently free digital services?", "options": ["They benefit users above all.", "They do not need business models.", "They reduce information overload.", "They compete for users' limited attention."], "answer": 3, "explanation": "They are \"competing for a finite resource\": attention."},
+        {"key": "q3", "type": "multiple_choice", "difficulty": 9, "prompt": "Why might giving consumers more information backfire?", "options": ["It demands even more of their limited attention.", "It is usually inaccurate.", "It is too expensive to produce.", "Consumers ignore all information."], "answer": 0, "explanation": "More information may \"exacerbate the very problem it's intended to solve\"."},
+        {"key": "q4", "type": "multiple_choice", "difficulty": 10, "prompt": "What is the speaker's view of calls for more self-control?", "options": ["They are the most effective solution.", "They should be required by law.", "They overlook the role of how environments are designed.", "They are completely irrelevant."], "answer": 2, "explanation": "They \"locate the problem in personal failings rather than in the design of the environment\"."}
+      ]
+    }
+  ],
+  "writing": [
+    {"slug": "placement-writing-a1-about-yourself", "level": "A1", "topic": "daily-life", "difficulty": 2, "prompt": "Write a short message to a new friend. Tell them about yourself: your name, where you live, your family and what you like doing.", "instructions": ["Use simple, complete sentences", "Include at least three facts about yourself"], "min_words": 30, "max_words": 70},
+    {"slug": "placement-writing-a2-last-weekend", "level": "A2", "topic": "daily-life", "difficulty": 3, "prompt": "Write an email to a friend about your last weekend. Say where you went, what you did and what you enjoyed most.", "instructions": ["Start with a greeting", "Describe what you did in the past", "End by asking your friend a question"], "min_words": 60, "max_words": 110},
+    {"slug": "placement-writing-b1-memorable-trip", "level": "B1", "topic": "travel", "difficulty": 5, "prompt": "Write about a memorable trip you have taken. Describe where you went, what happened, and why it was memorable.", "instructions": ["Organise your ideas into paragraphs", "Describe events in the order they happened", "Explain why the trip was special to you"], "min_words": 100, "max_words": 170},
+    {"slug": "placement-writing-b2-home-or-office", "level": "B2", "topic": "work", "difficulty": 7, "prompt": "Some people prefer to work from home, while others prefer to work in an office. Write an essay discussing the advantages of each and give your own opinion.", "instructions": ["Discuss both sides", "Give a clear opinion", "Support your points with reasons and examples"], "min_words": 150, "max_words": 230},
+    {"slug": "placement-writing-c1-technology-connection", "level": "C1", "topic": "technology", "difficulty": 8, "prompt": "Write an article for a website discussing whether technology has made people more or less connected to each other. Support your view with specific examples.", "instructions": ["Engage the reader with a clear introduction", "Develop a well-supported argument", "Reach a conclusion that follows from your points"], "min_words": 200, "max_words": 290},
+    {"slug": "placement-writing-c2-skills-schools", "level": "C2", "topic": "education", "difficulty": 9, "prompt": "Write an essay evaluating the claim that \"the most important skills cannot be taught in schools\". Consider different perspectives and reach a reasoned conclusion.", "instructions": ["Evaluate, rather than simply describe, different perspectives", "Use precise and varied language", "Reach a nuanced, reasoned conclusion"], "min_words": 220, "max_words": 330}
+  ],
+  "speaking": [
+    {"slug": "placement-speaking-a1-your-family", "level": "A1", "topic": "daily-life", "difficulty": 2, "prompt": "Talk about your family. Who is in your family, what do they do, and what do you like doing together?", "guidance": ["Who is in your family", "What they do", "What you do together"], "prep_seconds": 20, "response_seconds": 45},
+    {"slug": "placement-speaking-a2-daily-routine", "level": "A2", "topic": "daily-life", "difficulty": 3, "prompt": "Describe your daily routine. What do you usually do in the morning, in the afternoon and in the evening?", "guidance": ["Your morning", "Your afternoon", "Your evening", "Your favourite part of the day"], "prep_seconds": 20, "response_seconds": 60},
+    {"slug": "placement-speaking-b1-hometown", "level": "B1", "topic": "daily-life", "difficulty": 5, "prompt": "Talk about your hometown. Where is it, what is it like, and what would you recommend a visitor to do there?", "guidance": ["Where it is and how big it is", "What life is like there", "What a visitor should see or do"], "prep_seconds": 30, "response_seconds": 75},
+    {"slug": "placement-speaking-b2-social-media", "level": "B2", "topic": "technology", "difficulty": 7, "prompt": "Some people say social media does more harm than good. Do you agree? Give reasons and examples from your own experience.", "guidance": ["Your opinion", "Reasons for your view", "An example", "The other side of the argument"], "prep_seconds": 30, "response_seconds": 90},
+    {"slug": "placement-speaking-c1-important-decision", "level": "C1", "topic": "education", "difficulty": 8, "prompt": "Describe a decision that changed the direction of your life, studies or career. Explain what you considered at the time and how you feel about it now.", "guidance": ["The situation and the options", "What you considered", "The consequences", "How you see it now"], "prep_seconds": 30, "response_seconds": 90},
+    {"slug": "placement-speaking-c2-government-choices", "level": "C2", "topic": "culture", "difficulty": 9, "prompt": "To what extent should governments try to influence people's personal choices, such as what they eat or how much they save? Discuss different views and give your own.", "guidance": ["Arguments for intervention", "Arguments for personal freedom", "Where you draw the line, and why"], "prep_seconds": 30, "response_seconds": 90}
+  ]
+}

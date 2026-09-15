@@ -6,11 +6,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics";
 import { ApiError } from "@/lib/api/errors";
 import { useTheme } from "@/providers/theme-provider";
 
 import { useGoogleLogin } from "../hooks";
-import { browserTimezone, ONBOARDING_PATH } from "../session";
+import { browserTimezone, SETUP_PROFILE_PATH } from "../session";
+
+import { AuthDivider } from "./auth-parts";
 
 /**
  * "Continue with Google" via Google Identity Services.
@@ -18,8 +21,8 @@ import { browserTimezone, ONBOARDING_PATH } from "../session";
  * Google renders its own button and returns a signed ID token; the token goes through the
  * session route to POST /api/v1/auth/google, where the API verifies it. The same endpoint
  * serves the mobile apps (native Google Sign-In SDKs), so nothing here is web-only logic.
- *
- * Phone-number sign-in (SMS OTP) is planned and will sit next to this button.
+ * New accounts continue to profile setup; returning learners go where the journey guard sends
+ * them (the dashboard, or the step where they stopped).
  */
 
 const GIS_SRC = "https://accounts.google.com/gsi/client";
@@ -84,7 +87,7 @@ function loadGoogleIdentityServices(): Promise<GoogleIdentityServices> {
 
 type GoogleButtonState = "loading" | "ready" | "unavailable";
 
-function GoogleButton({
+export function GoogleAuthButton({
   clientId,
   mode,
   redirectTo,
@@ -106,14 +109,14 @@ function GoogleButton({
   useEffect(() => {
     handleCredential.current = async ({ credential }) => {
       onError(null);
+      track(mode === "signup" ? "signup_google_clicked" : "login_started", { method: "google" });
       try {
         const session = await googleLogin.mutateAsync({ id_token: credential, timezone: browserTimezone() });
-        router.replace(session.is_new_user ? ONBOARDING_PATH : redirectTo);
+        if (mode === "signin") track("login_completed", { method: "google" });
+        router.replace(session.is_new_user ? SETUP_PROFILE_PATH : redirectTo);
       } catch (error) {
         onError(
-          error instanceof ApiError && error.code !== "INTERNAL_ERROR"
-            ? error.message
-            : "Google sign-in failed. Please try again.",
+          error instanceof ApiError && error.code !== "INTERNAL_ERROR" ? error.message : "Google sign-in failed. Please try again.",
         );
       }
     };
@@ -166,12 +169,12 @@ function GoogleButton({
         className={state === "ready" ? "flex min-h-11 justify-center scheme-normal" : "hidden"}
       />
       {state === "loading" && (
-        <Button variant="outline" className="w-full" loading disabled>
+        <Button variant="outline" size="lg" className="w-full" loading disabled>
           Loading Google sign-in
         </Button>
       )}
       {state === "unavailable" && (
-        <Button variant="outline" className="w-full" disabled>
+        <Button variant="outline" size="lg" className="w-full" disabled>
           <GoogleMark />
           Google sign-in is unavailable
         </Button>
@@ -185,7 +188,7 @@ function GoogleButton({
   );
 }
 
-function GoogleMark() {
+export function GoogleMark() {
   return (
     <svg viewBox="0 0 48 48" aria-hidden className="size-4">
       <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
@@ -196,12 +199,15 @@ function GoogleMark() {
   );
 }
 
+/** Google sign-in plus the divider to the email option. */
 export function SocialAuth({
   mode = "signin",
   redirectTo = "/app/dashboard",
+  dividerLabel = "or",
 }: {
   mode?: "signin" | "signup";
   redirectTo?: string;
+  dividerLabel?: string | null;
 }) {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const [error, setError] = useState<string | null>(null);
@@ -216,10 +222,10 @@ export function SocialAuth({
       )}
 
       {clientId ? (
-        <GoogleButton clientId={clientId} mode={mode} redirectTo={redirectTo} onError={setError} />
+        <GoogleAuthButton clientId={clientId} mode={mode} redirectTo={redirectTo} onError={setError} />
       ) : (
         <div className="grid gap-2">
-          <Button variant="outline" className="w-full" disabled aria-describedby="google-not-configured">
+          <Button variant="outline" size="lg" className="w-full" disabled aria-describedby="google-not-configured">
             <GoogleMark />
             Continue with Google
           </Button>
@@ -229,11 +235,7 @@ export function SocialAuth({
         </div>
       )}
 
-      <div className="flex items-center gap-3 text-caption text-fg-muted" aria-hidden>
-        <span className="h-px flex-1 bg-border" />
-        or continue with email
-        <span className="h-px flex-1 bg-border" />
-      </div>
+      {dividerLabel && <AuthDivider label={dividerLabel} />}
     </div>
   );
 }

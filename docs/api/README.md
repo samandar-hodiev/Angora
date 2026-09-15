@@ -93,6 +93,48 @@ onboarding). Without `GOOGLE_CLIENT_IDS` the endpoint returns `501 NOT_IMPLEMENT
 Identities live in `user_identities (provider, provider_subject)`; phone sign-in (SMS OTP)
 will be added as another provider.
 
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/v1/auth/email/start` | `{ email }` | 200 `{ email, code_length, expires_at, resend_available_at }`; 409 `reason: email_registered` |
+| POST | `/api/v1/auth/email/resend` | `{ email }` | 200 challenge; 429 `reason: resend_cooldown \| resend_limit`, `retry_after_seconds` |
+| POST | `/api/v1/auth/email/verify` | `{ email, code, timezone? }` | 201 `Session` (`is_new_user: true`); 422 `reason: code_invalid \| code_expired`; 429 `attempts_exceeded` |
+| GET | `/api/v1/auth/password/status` | — | `{ has_password, auth_provider }` |
+| POST | `/api/v1/auth/password/set` | `{ password }` (8+ chars, letter + number) | 204; 409 `password_exists` |
+
+### New-learner journey
+
+See [docs/architecture/learner-journey.md](../architecture/learner-journey.md) for the flow.
+
+| Method | Path | Notes |
+|---|---|---|
+| PUT | `/api/v1/profile/setup` | `{ first_name, last_name?, phone_country?, phone_number? (E.164) }` |
+| POST / DELETE | `/api/v1/profile/avatar` | multipart `file` (JPG/PNG/WebP ≤ 5 MB, content-sniffed) |
+| GET | `/api/v1/avatars/*key` | public, immutable |
+| GET | `/api/v1/onboarding` | full state: `step`, `profile_completed`, goals, daily minutes, levels, `options` |
+| POST | `/api/v1/onboarding/start` | welcome → goals (requires completed profile) |
+| PUT | `/api/v1/onboarding/goals` | `{ goals: [...] }` from `options.goals` |
+| PUT | `/api/v1/onboarding/daily-time` | `{ minutes }` from `options.daily_minutes` |
+| PUT | `/api/v1/onboarding/level` | `{ level }` self-reported → plan |
+| POST | `/api/v1/onboarding/placement` | "Find my level" |
+| PUT | `/api/v1/onboarding/step` | `{ step }` back navigation / intro → start level |
+| PUT | `/api/v1/onboarding/placement/start-level` | `{ level }` creates the placement test |
+| POST | `/api/v1/onboarding/placement/abandon` | leave the test, back to level choice |
+| POST | `/api/v1/onboarding/results-viewed` · `/plan` · `/complete` | results → plan → completed |
+| GET | `/api/v1/levels/me` | `self_reported`, `placement_start`, `assessed`, `current_estimated`, `history` |
+| GET | `/api/v1/assessments/config` | active section times, item counts, limits |
+| GET / POST | `/api/v1/assessments` | history / start a retake `{ start_level }` |
+| GET | `/api/v1/assessments/:id` | status, sections (status, limits, deadlines), `server_time` |
+| GET | `/api/v1/assessments/:id/sections/:skill` | stimuli, items (no answer keys), saved answers, attempts |
+| POST | `/api/v1/assessments/:id/sections/:skill/start` | sets the server deadline |
+| PUT | `/api/v1/assessments/:id/sections/:skill/answers/:item_id` | `{ response: { option_id } \| { text }, time_spent_ms }` |
+| POST | `/api/v1/assessments/:id/sections/speaking/recordings` | multipart `item_id`, `duration_ms`, `file` |
+| POST | `/api/v1/assessments/:id/sections/:skill/submit` · `/retry` | idempotent submit; retry failed evaluation |
+| GET | `/api/v1/assessments/:id/stimuli/:stimulus_id/audio` | listening clip (after the section starts) |
+| POST | `/api/v1/assessments/:id/abandon` | |
+| GET | `/api/v1/assessments/:id/result` | overall estimate, four skills, strengths, focus areas, summary |
+| GET | `/api/v1/learning-plan` | active plan with structured `items` |
+| POST | `/api/v1/analytics/events` | `{ events: [{ name, properties?, occurred_at?, anonymous_id? }] }` (client events only) |
+
 Rate limited per IP (`RATE_LIMIT_AUTH_PER_MINUTE`).
 
 ```json

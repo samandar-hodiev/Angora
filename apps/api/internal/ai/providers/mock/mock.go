@@ -41,6 +41,13 @@ func (*Provider) GenerateText(_ context.Context, req ai.TextRequest) (*ai.TextRe
 }
 
 func (*Provider) AnalyzeText(_ context.Context, req ai.AnalysisRequest) (*ai.AnalysisResponse, error) {
+	if out, ok := placementAssessment(req); ok {
+		return &ai.AnalysisResponse{
+			Output: out,
+			Model:  model(req.Model),
+			Usage:  ai.Usage{InputTokens: tokens(req.Instructions + req.Input), OutputTokens: tokens(string(out))},
+		}, nil
+	}
 	score := 6.5
 	out, err := json.Marshal(ai.EvaluationResult{
 		Versions: ai.Versions{

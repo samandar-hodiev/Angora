@@ -27,6 +27,11 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup, rateLimit gin.HandlerFunc)
 	g.POST("/refresh", h.refresh)
 	g.POST("/logout", h.logout)
 	g.POST("/google", h.google)
+	g.POST("/email/start", h.emailStart)
+	g.POST("/email/resend", h.emailResend)
+	g.POST("/email/verify", h.emailVerify)
+	g.POST("/password/set", authz.RequireAuthenticated(), h.setPassword)
+	g.GET("/password/status", authz.RequireAuthenticated(), h.passwordStatus)
 	g.POST("/password/forgot", h.forgotPassword)
 	g.POST("/password/reset", h.resetPassword)
 }
@@ -43,6 +48,80 @@ func (h *Handler) google(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, session)
+}
+
+func (h *Handler) emailStart(c *gin.Context) {
+	var in EmailStartInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	ch, err := h.svc.StartEmailSignup(c.Request.Context(), in, clientInfo(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, ch)
+}
+
+func (h *Handler) emailResend(c *gin.Context) {
+	var in EmailStartInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	ch, err := h.svc.ResendEmailSignup(c.Request.Context(), in, clientInfo(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, ch)
+}
+
+func (h *Handler) emailVerify(c *gin.Context) {
+	var in EmailVerifyInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	session, err := h.svc.VerifyEmailSignup(c.Request.Context(), in, clientInfo(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.Created(c, session)
+}
+
+func (h *Handler) passwordStatus(c *gin.Context) {
+	p, err := authz.CurrentPrincipal(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	status, err := h.svc.PasswordStatus(c.Request.Context(), p.UserID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, status)
+}
+
+func (h *Handler) setPassword(c *gin.Context) {
+	p, err := authz.CurrentPrincipal(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	var in SetPasswordInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if err := h.svc.SetPassword(c.Request.Context(), p.UserID, in, clientInfo(c)); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.NoContent(c)
 }
 
 func (h *Handler) forgotPassword(c *gin.Context) {

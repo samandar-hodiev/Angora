@@ -53,7 +53,12 @@ func run(args []string) error {
 
 	switch args[0] {
 	case "content":
-		return seedContent(ctx, pool)
+		if err := seedContent(ctx, pool); err != nil {
+			return err
+		}
+		return seedPlacement(ctx, pool)
+	case "placement":
+		return seedPlacement(ctx, pool)
 	case "demo":
 		email, password := "demo@engora.dev", "engora-demo-2026"
 		if len(args) > 1 {

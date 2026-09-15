@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { AuthCard } from "@/features/auth/components/auth-card";
+import { AuthSwitch, PrivacyLinks } from "@/features/auth/components/auth-parts";
 import { ResetPasswordForm } from "@/features/auth/components/password-forms";
 
 export const metadata: Metadata = { title: "Choose a new password", robots: { index: false } };
@@ -13,9 +13,10 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
       title="Choose a new password"
       description="You'll be signed out of other devices for your security."
       footer={
-        <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
-          Back to log in
-        </Link>
+        <>
+          <AuthSwitch question="Remembered it?" href="/login" action="Sign in" />
+          <PrivacyLinks />
+        </>
       }
     >
       <ResetPasswordForm token={token ?? ""} />

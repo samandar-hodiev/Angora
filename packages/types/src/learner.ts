@@ -15,6 +15,10 @@ export interface SkillProgress {
 
 export interface ProgressOverview {
   current_level: string | null;
+  /** Latest estimate including "+", e.g. "B1+". */
+  current_estimated_level: string | null;
+  /** Practice minutes today in the learner's timezone. */
+  today_minutes: number;
   target_level: string | null;
   daily_goal_minutes: number;
   overall_score: number | null;
@@ -132,6 +136,10 @@ export interface LearningPlan {
   plan: Record<string, unknown>;
   generated_by: "system" | "ai" | "teacher";
   updated_at: Timestamp;
+  source_assessment_id: UUID | null;
+  daily_minutes: number | null;
+  level: string | null;
+  items: import("./journey").LearningPlanItem[];
 }
 
 // ---- Content bodies (schema_version 1) -------------------------------------------------

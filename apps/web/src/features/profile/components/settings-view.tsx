@@ -159,7 +159,7 @@ export function SettingsView() {
                   <Link href="/app/profile">Edit profile</Link>
                 </Button>
                 <Button variant="ghost" asChild>
-                  <Link href="/onboarding">Redo setup</Link>
+                  <Link href="/app/dashboard#assessments">Find my level again</Link>
                 </Button>
               </div>
             </div>

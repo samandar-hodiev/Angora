@@ -7,13 +7,17 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/admin"
+	"github.com/samandar-hodiev/engora/apps/api/internal/analytics"
+	"github.com/samandar-hodiev/engora/apps/api/internal/assessment"
 	"github.com/samandar-hodiev/engora/apps/api/internal/auth"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/grammar"
 	"github.com/samandar-hodiev/engora/apps/api/internal/health"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/learning"
+	"github.com/samandar-hodiev/engora/apps/api/internal/levels"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mistakes"
+	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/ratelimit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/profiles"
@@ -52,7 +56,10 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		middleware.Recovery(c.Reporter),
 		middleware.SecurityHeaders(cfg.App.IsProduction()),
 		middleware.CORS(cfg.HTTP.CORSAllowedOrigins),
-		middleware.BodyLimit(cfg.HTTP.MaxJSONBodyBytes),
+		middleware.BodyLimitWithOverrides(cfg.HTTP.MaxJSONBodyBytes, map[string]int64{
+			assessment.RecordingRoute: cfg.Storage.MaxUploadBytes + 1<<20,
+			profiles.AvatarRoute:      6 << 20,
+		}),
 		middleware.Errors(c.Reporter),
 	)
 
@@ -68,7 +75,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	auth.NewHandler(c.Auth).RegisterRoutes(v1, authLimit)
 
 	users.NewHandler(c.Users).RegisterRoutes(v1)
-	profiles.NewModule(c.DB, c.Audit, c.Log).RegisterRoutes(v1)
+	profiles.NewModule(c.DB, c.Audit, c.Log, c.Storage, c.Analytics).RegisterRoutes(v1)
 	learning.NewModule(c.DB, c.Redis).RegisterRoutes(v1)
 	subscriptions.NewHandler(c.Subscriptions).RegisterRoutes(v1)
 	progress.NewModule(c.DB).RegisterRoutes(v1)
@@ -76,6 +83,11 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	vocabulary.NewModule(c.DB).RegisterRoutes(v1)
 	grammar.NewModule(c.DB).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
+	levels.NewModule(c.DB).RegisterRoutes(v1)
+	onboarding.NewHandler(c.Onboarding).RegisterRoutes(v1)
+	assessment.NewHandler(c.Assessment).RegisterRoutes(v1)
+	analytics.RegisterRoutes(v1, c.Analytics, ratelimit.Middleware(ratelimit.NewRedisLimiter(c.Redis), "analytics",
+		120, time.Minute, c.Log))
 	admin.NewModule(c.DB).RegisterRoutes(v1)
 	jobs.RegisterRoutes(v1, c.Jobs)
 

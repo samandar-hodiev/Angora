@@ -77,6 +77,21 @@ func (f *fakeUsers) GetCredentialsByEmail(_ context.Context, email string) (user
 
 func (f *fakeUsers) TouchLastLogin(context.Context, uuid.UUID) error { return nil }
 
+func (f *fakeUsers) AuthStatus(ctx context.Context, id uuid.UUID) (string, bool, error) {
+	has, err := f.HasPassword(ctx, id)
+	return "email", has, err
+}
+
+func (f *fakeUsers) HasPassword(_ context.Context, id uuid.UUID) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, ok := f.byID[id]
+	if !ok {
+		return false, users.ErrNotFound
+	}
+	return c.PasswordHash != "", nil
+}
+
 func (f *fakeUsers) MarkEmailVerified(_ context.Context, id uuid.UUID) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -39,7 +39,14 @@ export type ClientPlatform = "web" | "ios" | "android";
 export interface Profile {
   user_id: UUID;
   display_name: string;
+  first_name: string;
+  last_name: string;
+  /** Path on the API origin (e.g. /api/v1/avatars/...), or null. */
   avatar_url: string | null;
+  phone_country: string | null;
+  /** E.164, e.g. +998901234567. */
+  phone_number: string | null;
+  profile_completed_at: Timestamp | null;
   native_language: string | null;
   timezone: string;
   current_level: string | null;

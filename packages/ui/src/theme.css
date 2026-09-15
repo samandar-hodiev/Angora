@@ -453,6 +453,76 @@
   filter: blur(36px);
 }
 
+/* ---- Journey backdrop: auth, account setup, onboarding and assessment ----------------------
+ * One quiet, consistent atmosphere for the whole new-learner journey: the page's dark base,
+ * a barely visible green grid that fades towards the edges, and soft green → blue liquid light
+ * drifting very slowly behind the content. Render once per page, behind everything. */
+
+@utility journey-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--background);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(color-mix(in oklch, var(--primary) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in oklch, var(--primary) 6%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+    background-position: center top;
+    -webkit-mask-image: radial-gradient(ellipse 72% 62% at 50% 32%, black 15%, transparent 78%);
+    mask-image: radial-gradient(ellipse 72% 62% at 50% 32%, black 15%, transparent 78%);
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -30%;
+    background:
+      radial-gradient(34% 28% at 34% 30%, color-mix(in oklch, var(--primary) 15%, transparent), transparent 70%),
+      radial-gradient(30% 26% at 68% 58%, oklch(0.62 0.11 235 / 0.11), transparent 70%),
+      radial-gradient(26% 22% at 46% 88%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 70%);
+    filter: blur(64px);
+    animation: journey-drift 28s var(--ease-standard) infinite alternate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+/* A calm, premium container for journey steps: subtle glass, fine border, soft depth. */
+@utility journey-card {
+  background-color: color-mix(in oklch, var(--surface) 70%, transparent);
+  background-image: linear-gradient(180deg, oklch(1 0 0 / 0.035), transparent 45%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    0 28px 64px -36px oklch(0 0 0 / 0.55);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  backdrop-filter: blur(18px) saturate(120%);
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background-color: var(--surface);
+  }
+}
+
+@keyframes journey-drift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(2%, 2%, 0) scale(1.06);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

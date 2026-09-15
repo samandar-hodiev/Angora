@@ -36,7 +36,11 @@ type Streak struct {
 }
 
 type Overview struct {
-	CurrentLevel     *string         `json:"current_level"`
+	CurrentLevel *string `json:"current_level"`
+	// CurrentEstimatedLevel is the latest estimate including "+" (e.g. B1+), from user_levels.
+	CurrentEstimatedLevel *string `json:"current_estimated_level"`
+	// TodayMinutes is practice time today in the learner's timezone (placement tests excluded).
+	TodayMinutes     int             `json:"today_minutes"`
 	TargetLevel      *string         `json:"target_level"`
 	DailyGoalMinutes int             `json:"daily_goal_minutes"`
 	OverallScore     *float64        `json:"overall_score"`
@@ -95,6 +99,22 @@ func (m *Module) Overview(ctx context.Context, userID uuid.UUID) (Overview, erro
 		return Overview{}, err
 	}
 
+	err = m.pool.QueryRow(ctx, `
+		WITH day AS (
+		    SELECT date_trunc('day', now() AT TIME ZONE p.timezone) AT TIME ZONE p.timezone AS start
+		    FROM profiles p WHERE p.user_id = $1)
+		SELECT (SELECT cefr FROM user_levels WHERE user_id = $1 AND kind = 'estimated' ORDER BY created_at DESC LIMIT 1),
+		       COALESCE((
+		           SELECT sum(ms) FROM (
+		               SELECT time_spent_ms AS ms FROM reading_attempts, day WHERE user_id = $1 AND mode <> 'placement' AND created_at >= day.start
+		               UNION ALL SELECT time_spent_ms FROM listening_attempts, day WHERE user_id = $1 AND mode <> 'placement' AND created_at >= day.start
+		               UNION ALL SELECT time_spent_ms FROM writing_submissions, day WHERE user_id = $1 AND mode <> 'placement' AND created_at >= day.start
+		               UNION ALL SELECT COALESCE(duration_ms, 0) FROM speaking_sessions, day WHERE user_id = $1 AND mode <> 'placement' AND created_at >= day.start
+		           ) t), 0)::bigint / 60000`, userID).Scan(&o.CurrentEstimatedLevel, &o.TodayMinutes)
+	if err != nil {
+		return Overview{}, err
+	}
+
 	rows, err := m.pool.Query(ctx, `
 		SELECT s.code, s.name, COALESCE(sp.score, 0)::float8, COALESCE(sp.xp, 0),
 		       COALESCE(sp.sessions_count, 0), l.code, sp.last_practiced_at
@@ -116,7 +136,8 @@ func (m *Module) Overview(ctx context.Context, userID uuid.UUID) (Overview, erro
 		if err := rows.Scan(&s.Code, &s.Name, &s.Score, &s.XP, &s.Sessions, &s.EstimatedLevel, &s.LastPracticedAt); err != nil {
 			return Overview{}, err
 		}
-		if s.Sessions > 0 {
+		// A skill counts once it has evidence: practice sessions or an assessment estimate.
+		if s.Sessions > 0 || s.EstimatedLevel != nil {
 			total += s.Score
 			practiced++
 		}

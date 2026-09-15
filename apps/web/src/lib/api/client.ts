@@ -61,14 +61,16 @@ export function createApiClient(config: ApiClientConfig) {
       "X-Client-Platform": "web",
       ...options.headers,
     };
-    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    // FormData (file uploads) sets its own multipart boundary header.
+    const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
+    if (options.body !== undefined && !isForm) headers["Content-Type"] = "application/json";
     if (token) headers.Authorization = `Bearer ${token}`;
 
     try {
       return await doFetch(buildUrl(path, options.version ?? config.version, options.query), {
         method: options.method ?? "GET",
         headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
         signal: options.signal,
       });
     } catch (error) {
@@ -77,7 +79,7 @@ export function createApiClient(config: ApiClientConfig) {
     }
   }
 
-  async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
+  async function fetchWithRefresh(path: string, options: RequestOptions): Promise<Response> {
     const useAuth = options.auth !== false;
     let response = await send(path, options, useAuth ? config.getAccessToken() : null);
 
@@ -90,6 +92,30 @@ export function createApiClient(config: ApiClientConfig) {
         config.onUnauthorized?.();
       }
     }
+    return response;
+  }
+
+  async function errorFrom(response: Response): Promise<ApiError> {
+    try {
+      const envelope = (await response.json()) as ApiEnvelope<unknown>;
+      if (envelope && typeof envelope === "object" && "success" in envelope && !envelope.success) {
+        return new ApiError(response.status, envelope.error);
+      }
+    } catch {
+      // fall through
+    }
+    return ApiError.invalidResponse(response.status);
+  }
+
+  /** Binary downloads (e.g. listening audio) with the same auth and refresh behaviour. */
+  async function blob(path: string, options: Omit<RequestOptions, "method" | "body"> = {}): Promise<Blob> {
+    const response = await fetchWithRefresh(path, { ...options, method: "GET" });
+    if (!response.ok) throw await errorFrom(response);
+    return response.blob();
+  }
+
+  async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
+    const response = await fetchWithRefresh(path, options);
 
     if (response.status === 204) {
       return { data: undefined as T };
@@ -113,6 +139,9 @@ export function createApiClient(config: ApiClientConfig) {
 
   return {
     request,
+    blob,
+    postForm: <T>(path: string, form: FormData, options?: Omit<RequestOptions, "method" | "body">) =>
+      request<T>(path, { ...options, method: "POST", body: form }).then((r) => r.data),
     get: <T>(path: string, options?: Omit<RequestOptions, "method" | "body">) =>
       request<T>(path, { ...options, method: "GET" }).then((r) => r.data),
     getPage: <T>(path: string, options?: Omit<RequestOptions, "method" | "body">) =>

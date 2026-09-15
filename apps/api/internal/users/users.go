@@ -45,8 +45,10 @@ type NewAccount struct {
 	PasswordHash string
 	DisplayName  string
 	Timezone     string
-	// EmailVerified marks the email as verified at creation (verified by the identity provider).
+	// EmailVerified marks the email as verified at creation (by a code or an identity provider).
 	EmailVerified bool
+	// AuthProvider is how the account was created: email (default) | google | apple | phone.
+	AuthProvider string
 }
 
 var (
@@ -61,5 +63,8 @@ type Repository interface {
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
+	HasPassword(ctx context.Context, id uuid.UUID) (bool, error)
+	// AuthStatus returns the account's primary auth provider and whether a password is set.
+	AuthStatus(ctx context.Context, id uuid.UUID) (provider string, hasPassword bool, err error)
 	List(ctx context.Context, offset, limit int) ([]User, int64, error)
 }

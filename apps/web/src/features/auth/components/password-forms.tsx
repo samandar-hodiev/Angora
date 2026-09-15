@@ -11,6 +11,7 @@ import { FormField } from "@/components/common/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { track } from "@/lib/analytics";
 import { applyApiErrors } from "@/lib/forms/apply-api-errors";
 
 import { useForgotPassword, useResetPassword } from "../password";
@@ -36,6 +37,7 @@ export function ForgotPasswordForm() {
 
   const onSubmit = form.handleSubmit(async ({ email }) => {
     setFormError(null);
+    track("forgot_password_started");
     try {
       await forgot.mutateAsync(email);
       setSent(true);
@@ -49,7 +51,12 @@ export function ForgotPasswordForm() {
       <Done
         icon={MailCheck}
         title="Check your email"
-        text="If an account exists for that address, we've sent a link to reset your password. It expires in one hour."
+        text="If an account exists for this email, we'll send reset instructions. The link expires in one hour."
+        action={
+          <Button variant="outline" asChild>
+            <Link href="/login">Back to sign in</Link>
+          </Button>
+        }
       />
     );
   }
@@ -62,10 +69,10 @@ export function ForgotPasswordForm() {
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       )}
-      <FormField id="email" label="Email" error={form.formState.errors.email?.message}>
+      <FormField id="email" label="Email address" error={form.formState.errors.email?.message}>
         <Input type="email" autoComplete="email" placeholder="you@example.com" {...form.register("email")} />
       </FormField>
-      <Button type="submit" className="w-full" loading={form.formState.isSubmitting}>
+      <Button type="submit" variant="liquid" size="lg" className="w-full" loading={form.formState.isSubmitting}>
         Send reset link
       </Button>
     </form>
@@ -101,10 +108,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <Done
         icon={ShieldCheck}
         title="Password updated"
-        text="You can now log in with your new password."
+        text="Your password has been changed. Sign in with your new password."
         action={
-          <Button asChild>
-            <Link href="/login">Log in</Link>
+          <Button variant="liquid" asChild>
+            <Link href="/login">Continue to sign in</Link>
           </Button>
         }
       />
@@ -115,6 +122,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     setFormError(null);
     try {
       await reset.mutateAsync({ token, password });
+      track("password_reset_completed");
       setDone(true);
     } catch (error) {
       const message = applyApiErrors(error, form.setError, ["password"]);
@@ -141,7 +149,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <FormField id="confirm_password" label="Confirm new password" error={form.formState.errors.confirm_password?.message}>
         <Input type="password" autoComplete="new-password" {...form.register("confirm_password")} />
       </FormField>
-      <Button type="submit" className="w-full" loading={form.formState.isSubmitting}>
+      <Button type="submit" variant="liquid" size="lg" className="w-full" loading={form.formState.isSubmitting}>
         Update password
       </Button>
     </form>

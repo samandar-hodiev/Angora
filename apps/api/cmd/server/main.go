@@ -14,6 +14,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/config"
 	"github.com/samandar-hodiev/engora/apps/api/internal/app"
+	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/logger"
 )
 
@@ -43,6 +44,16 @@ func run() error {
 	router, err := app.NewRouter(container)
 	if err != nil {
 		return err
+	}
+
+	// In development the API also processes background jobs, so AI evaluations complete
+	// without running `make worker`. Production runs dedicated worker processes.
+	if cfg.Jobs.EmbeddedWorker {
+		worker := jobs.NewWorker(container.Jobs, log.With(slog.String("process", "embedded-worker")), container.Reporter)
+		worker.Concurrency = 2
+		app.RegisterJobHandlers(worker, container)
+		go worker.Run(ctx)
+		log.Info("embedded job worker started", slog.Any("job_types", worker.Types()))
 	}
 
 	srv := &http.Server{

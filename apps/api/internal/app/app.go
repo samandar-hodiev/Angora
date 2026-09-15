@@ -15,10 +15,14 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai/providers/mock"
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai/providers/openai"
+	"github.com/samandar-hodiev/engora/apps/api/internal/analytics"
+	"github.com/samandar-hodiev/engora/apps/api/internal/assessment"
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/auth"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
+	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
+	"github.com/samandar-hodiev/engora/apps/api/internal/personalization"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/cache"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/observability"
@@ -46,6 +50,10 @@ type Container struct {
 	AI            *ai.Gateway
 	Storage       storage.ObjectStorage
 	Jobs          jobs.Queue
+	Analytics     analytics.Tracker
+	Plans         *personalization.Service
+	Onboarding    *onboarding.Service
+	Assessment    *assessment.Service
 }
 
 func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container, error) {
@@ -84,7 +92,10 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	c.Mailer = mail.New(cfg.Mail.Provider, log)
 	c.Users = users.NewPostgresRepository(c.DB)
 	c.Tokens = auth.NewTokenIssuer(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
+	c.Analytics = analytics.NewPostgresTracker(c.DB, log)
 	authDeps := auth.Deps{
+		EmailCodes: auth.NewPostgresEmailCodeStore(c.DB),
+		Tracker:    c.Analytics,
 		Users:      c.Users,
 		Tokens:     auth.NewPostgresTokenRepository(c.DB),
 		Resets:     auth.NewPostgresResetStore(c.DB),
@@ -106,6 +117,21 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	}
 	c.Subscriptions = subscriptions.NewService(subscriptions.NewPostgresStore(c.DB))
 	c.Jobs = jobs.NewRedisQueue(c.Redis, "default")
+
+	c.Plans = personalization.NewService(c.DB, c.Analytics)
+	c.Onboarding = onboarding.NewService(c.DB, c.Plans, c.Analytics)
+	c.Assessment = assessment.NewService(assessment.Deps{
+		Pool:           c.DB,
+		Storage:        c.Storage,
+		Queue:          c.Jobs,
+		Evaluator:      ai.NewPlacementEvaluator(c.AI),
+		Plans:          c.Plans,
+		Progress:       c.Onboarding,
+		Tracker:        c.Analytics,
+		Log:            log,
+		MaxUploadBytes: cfg.Storage.MaxUploadBytes,
+	})
+	c.Onboarding.SetPlacement(c.Assessment)
 
 	log.Info("container ready",
 		slog.String("env", string(cfg.App.Env)),

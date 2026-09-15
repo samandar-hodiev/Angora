@@ -1,7 +1,9 @@
 "use client";
 
-import { ArrowRight, Clock, Flame, Sparkles } from "lucide-react";
+import type { LearningPlanItem } from "@engora/types";
+import { ArrowRight, Clock, Compass, Flame } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { SectionTitle } from "@/components/common/page-header";
 import { EmptyState, ErrorState } from "@/components/common/states";
@@ -11,9 +13,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Meter, ProgressRing } from "@/components/ui/data-display";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 import { contentHref, skillHref } from "@/config/navigation";
-import { useHistory, useMistakeSummary, useProgress, useRecommendations } from "@/features/learner/hooks";
+import { useAssessmentHistory, useCreateAssessment } from "@/features/assessment/hooks";
+import { useHistory, useLearningPlan, useMistakeSummary, useProgress, useRecommendations } from "@/features/learner/hooks";
+import { baseLevel, skillName } from "@/features/onboarding/labels";
 import { useProfile } from "@/features/profile/hooks";
+import { track } from "@/lib/analytics";
+import { errorMessage } from "@/lib/api/errors";
 import { formatCategory, humanize, timeAgo } from "@/lib/learning-format";
 
 function greeting(date = new Date()): string {
@@ -24,23 +31,59 @@ function greeting(date = new Date()): string {
 }
 
 const coreSkills = ["speaking", "writing", "reading", "listening"];
+const placementLevels = ["A1", "A2", "B1", "B2", "C1"];
+const FIRST_SESSION_KEY = "engora-first-session-started";
+
+function planItemHref(item: LearningPlanItem): string {
+  return item.content ? contentHref(item.content.skill ?? item.skill, item.content.id) : skillHref(item.skill);
+}
+
+function markFirstSession() {
+  try {
+    if (localStorage.getItem(FIRST_SESSION_KEY)) return;
+    localStorage.setItem(FIRST_SESSION_KEY, "1");
+  } catch {
+    return;
+  }
+  track("first_learning_session_started");
+}
 
 /**
- * "What should I do today?" The dashboard composes API resources only; the mobile app
- * renders the same state from the same endpoints.
+ * "What should I do today?" Everything here comes from the API (plan, estimated level,
+ * practice time, progress, weaknesses, assessments); the mobile app renders the same state.
  */
 export function DashboardView() {
+  const router = useRouter();
   const profile = useProfile();
   const progress = useProgress();
+  const plan = useLearningPlan();
   const recommendations = useRecommendations();
   const mistakes = useMistakeSummary();
   const history = useHistory(1);
+  const assessments = useAssessmentHistory();
+  const createAssessment = useCreateAssessment();
 
   const p = profile.data;
+  const overview = progress.data;
+  const level = overview?.current_estimated_level ?? p?.current_level ?? null;
+  const goal = overview?.daily_goal_minutes ?? p?.daily_goal_minutes ?? 15;
+  const today = overview?.today_minutes ?? 0;
+  const items = plan.data?.items ?? [];
+  const next = items.find((i) => i.status !== "completed") ?? items[0];
   const firstRec = recommendations.data?.[0];
-  const continueHref = firstRec?.content ? contentHref(firstRec.content.skill, firstRec.content.id) : "/app/learn";
-  const strongest = [...(progress.data?.skills ?? [])].filter((s) => s.sessions > 0).sort((a, b) => b.score - a.score)[0];
+  const continueHref = next ? planItemHref(next) : firstRec?.content ? contentHref(firstRec.content.skill, firstRec.content.id) : "/app/learn";
+  const strongest = [...(overview?.skills ?? [])].filter((s) => s.sessions > 0 || s.estimated_level).sort((a, b) => b.score - a.score)[0];
   const focus = mistakes.data?.weaknesses[0];
+  const latestAssessment = assessments.data?.find((a) => a.status === "completed");
+  const openAssessment = assessments.data?.find((a) => a.status === "in_progress" || a.status === "processing");
+
+  const startPlacement = () => {
+    const base = level ? baseLevel(level) : "B1";
+    createAssessment.mutate(placementLevels.includes(base) ? base : "B1", {
+      onSuccess: (assessment) => router.push(`/placement-test/${assessment.id}`),
+      onError: (error) => toast({ title: "Couldn't start the placement test", description: errorMessage(error), variant: "error" }),
+    });
+  };
 
   return (
     <div className="grid gap-10">
@@ -51,65 +94,110 @@ export function DashboardView() {
         ) : (
           <h1 className="text-h1">
             {greeting()}
-            {p?.display_name ? `, ${p.display_name}` : ""}
+            {p?.first_name || p?.display_name ? `, ${p.first_name || p.display_name}` : ""}
           </h1>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          {p?.current_level ? <Badge variant="secondary">{p.current_level} English</Badge> : null}
-          {progress.data && progress.data.streak.current_days > 0 && (
-            <Badge variant="warning">
-              <Flame aria-hidden /> {progress.data.streak.current_days} day streak
+          {level && (
+            <Badge variant="secondary" title="Estimated level">
+              {level} English
             </Badge>
           )}
-          {p?.target_level && <span className="text-body-sm text-fg-muted">Target {p.target_level}</span>}
+          {overview && overview.streak.current_days > 0 && (
+            <Badge variant="warning">
+              <Flame aria-hidden /> {overview.streak.current_days} day streak
+            </Badge>
+          )}
+          {level && <span className="text-body-sm text-fg-muted">Estimated level</span>}
         </div>
       </section>
-
-      {p && !p.onboarding_completed_at && (
-        <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary-subtle p-5 sm:flex-row sm:items-center">
-          <Sparkles className="size-5 text-primary" aria-hidden />
-          <div className="flex-1">
-            <p className="text-h4 text-primary-subtle-foreground">Finish setting up your plan</p>
-            <p className="text-body-sm text-fg-secondary">Four quick questions so Engora can personalise your practice.</p>
-          </div>
-          <Button asChild>
-            <Link href="/onboarding">Continue setup</Link>
-          </Button>
-        </div>
-      )}
 
       {/* Daily goal + continue */}
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <div className="flex items-center gap-5 rounded-xl border bg-surface p-5">
-          <ProgressRing value={0} size={76} label="Today's goal progress">
+          <ProgressRing value={Math.min(100, (today / Math.max(goal, 1)) * 100)} size={76} label="Today's goal progress">
             <Clock className="size-5 text-fg-muted" aria-hidden />
           </ProgressRing>
           <div className="grid gap-1">
             <p className="text-label text-fg-muted">Today&apos;s goal</p>
-            {profile.isPending ? <Skeleton className="h-7 w-28" /> : <p className="text-h2 tabular-nums">0 / {p?.daily_goal_minutes ?? 15} min</p>}
-            <p className="text-caption text-fg-muted">Time is tracked once you complete practice sessions.</p>
+            {progress.isPending ? (
+              <Skeleton className="h-7 w-28" />
+            ) : (
+              <p className="text-h2 tabular-nums">
+                {today} / {goal} min
+              </p>
+            )}
+            <p className="text-caption text-fg-muted">Practice time today</p>
           </div>
         </div>
         <div className="flex flex-col justify-between gap-4 rounded-xl border bg-surface p-5 sm:flex-row sm:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary-subtle-foreground">
-              <SkillIcon code={firstRec?.content?.skill ?? "speaking"} className="size-5" />
+              <SkillIcon code={next?.skill ?? firstRec?.content?.skill ?? "speaking"} className="size-5" />
             </span>
             <div className="min-w-0">
-              <p className="text-label text-fg-muted">Continue learning</p>
-              {recommendations.isPending ? (
+              <p className="text-label text-fg-muted">{next ? `Continue learning · ${skillName(next.skill)}` : "Continue learning"}</p>
+              {plan.isPending ? (
                 <Skeleton className="mt-1 h-6 w-48" />
               ) : (
-                <p className="truncate text-h4">{firstRec?.content?.title ?? "Choose a skill to practise"}</p>
+                <p className="truncate text-h4">{next?.title ?? firstRec?.content?.title ?? "Choose a skill to practise"}</p>
               )}
             </div>
           </div>
           <Button asChild size="lg">
-            <Link href={continueHref}>
+            <Link href={continueHref} onClick={markFirstSession}>
               Continue learning <ArrowRight aria-hidden />
             </Link>
           </Button>
         </div>
+      </section>
+
+      {/* Today's plan */}
+      <section aria-labelledby="plan-title">
+        <SectionTitle id="plan-title" title="Today's plan" />
+        {plan.isPending ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
+          </div>
+        ) : plan.isError ? (
+          <ErrorState error={plan.error} onRetry={() => void plan.refetch()} />
+        ) : items.length === 0 ? (
+          <EmptyState
+            title="No plan yet"
+            description="Take the placement test and Engora will build a plan around your level."
+            action={
+              <Button onClick={startPlacement} loading={createAssessment.isPending}>
+                Find my level
+              </Button>
+            }
+          />
+        ) : (
+          <ol className="grid gap-3 sm:grid-cols-2">
+            {items.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={planItemHref(item)}
+                  onClick={markFirstSession}
+                  className="flex h-full items-center gap-4 rounded-xl border bg-surface p-4 transition-colors duration-micro outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                >
+                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary-subtle-foreground">
+                    <SkillIcon code={item.skill} className="size-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-label text-fg-muted">
+                      {skillName(item.skill)}
+                      {item.reason_code === "weakness" && <Badge variant="outline">Focus area</Badge>}
+                    </span>
+                    <span className="block text-h4">{item.title}</span>
+                  </span>
+                  <span className="shrink-0 text-label tabular-nums text-fg-secondary">{item.minutes} min</span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       {/* Recommended */}
@@ -124,7 +212,15 @@ export function DashboardView() {
         ) : recommendations.isError ? (
           <ErrorState error={recommendations.error} onRetry={() => void recommendations.refetch()} />
         ) : recommendations.data.length === 0 ? (
-          <EmptyState title="No recommendations yet" description="Complete a practice session and your next steps will appear here." action={<Button asChild variant="outline"><Link href="/app/learn">Browse skills</Link></Button>} />
+          <EmptyState
+            title="No recommendations yet"
+            description="Complete a practice session and your next steps will appear here."
+            action={
+              <Button asChild variant="outline">
+                <Link href="/app/learn">Browse skills</Link>
+              </Button>
+            }
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {recommendations.data.slice(0, 3).map((rec) => (
@@ -157,11 +253,19 @@ export function DashboardView() {
           <div className="grid gap-4 rounded-xl border bg-surface p-5">
             {progress.isPending
               ? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-8" />)
-              : progress.data?.skills
+              : overview?.skills
                   .filter((s) => coreSkills.includes(s.code))
                   .map((s) => (
                     <Link key={s.code} href={skillHref(s.code)} className="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40">
-                      <Meter label={s.name} value={s.score} display={s.sessions === 0 ? "Not started" : `${Math.round(s.score)}%`} />
+                      <Meter
+                        label={s.name}
+                        value={s.score}
+                        display={
+                          s.sessions === 0 && !s.estimated_level
+                            ? "Not started"
+                            : `${Math.round(s.score)}%${s.estimated_level ? ` · ${s.estimated_level}` : ""}`
+                        }
+                      />
                     </Link>
                   ))}
           </div>
@@ -205,7 +309,7 @@ export function DashboardView() {
               <>
                 {strongest && (
                   <p>
-                    Your strongest skill is <span className="font-medium">{strongest.name}</span> ({Math.round(strongest.score)}).
+                    Your strongest skill is <span className="font-medium">{strongest.name}</span> ({Math.round(strongest.score)}%).
                   </p>
                 )}
                 {focus && (
@@ -213,7 +317,7 @@ export function DashboardView() {
                     Focus next: <span className="font-medium text-foreground">{formatCategory(focus.category)}</span>
                   </p>
                 )}
-                <p className="text-caption text-fg-muted">Based on your recent activity</p>
+                <p className="text-caption text-fg-muted">Based on your assessment and recent activity</p>
               </>
             ) : (
               <p className="text-fg-secondary">Complete your first practice and your coach will suggest what to focus on.</p>
@@ -221,6 +325,51 @@ export function DashboardView() {
           </AIInsight>
         </section>
       </div>
+
+      {/* Assessments */}
+      <section aria-labelledby="assessments-title" id="assessments">
+        <SectionTitle id="assessments-title" title="Level assessments" />
+        <div className="flex flex-col gap-4 rounded-xl border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary-subtle-foreground">
+              <Compass className="size-5" aria-hidden />
+            </span>
+            <div className="grid gap-0.5">
+              {assessments.isPending ? (
+                <Skeleton className="h-6 w-56" />
+              ) : latestAssessment ? (
+                <>
+                  <p className="text-h4">Latest estimate: {latestAssessment.overall_cefr}</p>
+                  <p className="text-body-sm text-fg-muted">
+                    {latestAssessment.completed_at ? timeAgo(latestAssessment.completed_at) : ""} · {assessments.data?.length ?? 0} in history
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-h4">Find your estimated level</p>
+                  <p className="text-body-sm text-fg-muted">A four-skill placement test personalises your plan.</p>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {latestAssessment && (
+              <Button variant="outline" asChild>
+                <Link href={`/assessment-results/${latestAssessment.id}`}>View results</Link>
+              </Button>
+            )}
+            {openAssessment ? (
+              <Button asChild>
+                <Link href={`/placement-test/${openAssessment.id}`}>Continue test</Link>
+              </Button>
+            ) : (
+              <Button onClick={startPlacement} loading={createAssessment.isPending}>
+                {latestAssessment ? "Retake placement test" : "Take the placement test"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Recent activity */}
       <section aria-labelledby="activity-title">
@@ -246,7 +395,10 @@ export function DashboardView() {
                 <SkillIcon code={item.kind} className="size-4 text-fg-muted" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body-sm font-medium">{item.title}</p>
-                  <p className="text-caption text-fg-muted capitalize">{item.kind}</p>
+                  <p className="text-caption text-fg-muted capitalize">
+                    {item.kind}
+                    {item.mode === "placement" ? " · placement" : ""}
+                  </p>
                 </div>
                 {item.score !== null && <span className="text-label tabular-nums">{item.score <= 9 ? item.score.toFixed(1) : `${Math.round(item.score)}%`}</span>}
                 <span className="w-16 text-right text-caption text-fg-muted">{timeAgo(item.created_at)}</span>
