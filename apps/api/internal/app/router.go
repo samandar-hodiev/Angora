@@ -59,6 +59,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		middleware.BodyLimitWithOverrides(cfg.HTTP.MaxJSONBodyBytes, map[string]int64{
 			assessment.RecordingRoute: cfg.Storage.MaxUploadBytes + 1<<20,
 			profiles.AvatarRoute:      6 << 20,
+			profiles.WallpaperRoute:   9 << 20,
 		}),
 		middleware.Errors(c.Reporter),
 	)

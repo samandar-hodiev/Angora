@@ -110,6 +110,8 @@ See [docs/architecture/learner-journey.md](../architecture/learner-journey.md) f
 | PUT | `/api/v1/profile/setup` | `{ first_name, last_name?, phone_country?, phone_number? (E.164) }` |
 | POST / DELETE | `/api/v1/profile/avatar` | multipart `file` (JPG/PNG/WebP ≤ 5 MB, content-sniffed) |
 | GET | `/api/v1/avatars/*key` | public, immutable |
+| POST / DELETE | `/api/v1/profile/wallpaper` | multipart `file` (JPG/PNG/WebP ≤ 8 MB, content-sniffed); background for the app's main area |
+| GET | `/api/v1/wallpapers/*key` | public, immutable |
 | GET | `/api/v1/onboarding` | full state: `step`, `profile_completed`, goals, daily minutes, levels, `options` |
 | POST | `/api/v1/onboarding/start` | welcome → goals (requires completed profile) |
 | PUT | `/api/v1/onboarding/goals` | `{ goals: [...] }` from `options.goals` |

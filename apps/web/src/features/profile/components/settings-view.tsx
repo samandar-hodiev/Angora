@@ -20,10 +20,12 @@ import { useTheme } from "@/providers/theme-provider";
 
 import { useSaveAppearance } from "../appearance";
 import { useProfile, useUpdateProfile } from "../hooks";
+import { WallpaperPicker } from "./wallpaper-picker";
 
 const sections = [
   ["account", "Account"],
   ["appearance", "Appearance"],
+  ["background", "Background"],
   ["notifications", "Notifications"],
   ["learning", "Learning preferences"],
   ["language", "Language"],
@@ -122,6 +124,14 @@ export function SettingsView() {
                 </OptionCard>
               ))}
             </div>
+          </SettingsSection>
+
+          <SettingsSection
+            id="background"
+            title="Background"
+            description="Your own wallpaper behind the learning area. The header and sidebar stay as they are."
+          >
+            <WallpaperPicker />
           </SettingsSection>
 
           <SettingsSection id="notifications" title="Notifications">

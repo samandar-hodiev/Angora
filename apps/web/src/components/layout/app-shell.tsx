@@ -30,6 +30,7 @@ import { useIsAdmin } from "@/features/admin/api";
 import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
 import { useSyncAppearance } from "@/features/profile/appearance";
+import { WallpaperLayer } from "@/features/profile/components/wallpaper-layer";
 import { useProfile } from "@/features/profile/hooks";
 import { apiAssetUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -79,7 +80,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main id="main" className="flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8">
+        <main id="main" className="relative isolate flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8">
+          {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
+          <WallpaperLayer />
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>

@@ -22,6 +22,12 @@ export const profileSetupApi = {
     return apiClient.postForm<Profile>("/profile/avatar", form);
   },
   removeAvatar: () => apiClient.delete<Profile>("/profile/avatar"),
+  uploadWallpaper: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.postForm<Profile>("/profile/wallpaper", form);
+  },
+  removeWallpaper: () => apiClient.delete<Profile>("/profile/wallpaper"),
 };
 
 function useProfileMutation<TVariables>(fn: (variables: TVariables) => Promise<Profile>) {
@@ -38,3 +44,5 @@ function useProfileMutation<TVariables>(fn: (variables: TVariables) => Promise<P
 export const useSetupProfile = () => useProfileMutation(profileSetupApi.setup);
 export const useUploadAvatar = () => useProfileMutation(profileSetupApi.uploadAvatar);
 export const useRemoveAvatar = () => useProfileMutation(() => profileSetupApi.removeAvatar());
+export const useUploadWallpaper = () => useProfileMutation(profileSetupApi.uploadWallpaper);
+export const useRemoveWallpaper = () => useProfileMutation(() => profileSetupApi.removeWallpaper());

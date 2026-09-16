@@ -4,11 +4,9 @@
 package profiles
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -25,7 +23,6 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/storage"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/httpx"
-	"github.com/samandar-hodiev/engora/apps/api/pkg/logger"
 )
 
 type Profile struct {
@@ -34,7 +31,9 @@ type Profile struct {
 	FirstName   string    `json:"first_name"`
 	LastName    string    `json:"last_name"`
 	// AvatarURL is a path on the API origin (e.g. /api/v1/avatars/...), or null.
-	AvatarURL             *string        `json:"avatar_url"`
+	AvatarURL *string `json:"avatar_url"`
+	// WallpaperURL is the background the learner uploaded for the app's main area, or null.
+	WallpaperURL          *string        `json:"wallpaper_url"`
 	PhoneCountry          *string        `json:"phone_country"`
 	PhoneNumber           *string        `json:"phone_number"`
 	NativeLanguage        *string        `json:"native_language"`
@@ -73,10 +72,16 @@ type SetupInput struct {
 
 var ErrNotFound = errors.New("profile not found")
 
-// AvatarRoute is the upload route; the router gives it a larger body limit.
-const AvatarRoute = "/api/v1/profile/avatar"
+// Upload routes; the router gives each of them a larger body limit.
+const (
+	AvatarRoute    = "/api/v1/profile/avatar"
+	WallpaperRoute = "/api/v1/profile/wallpaper"
+)
 
-const maxAvatarBytes = 5 << 20
+const (
+	maxAvatarBytes    = 5 << 20
+	maxWallpaperBytes = 8 << 20
+)
 
 type Module struct {
 	pool    *pgxpool.Pool
@@ -97,8 +102,11 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.PUT("/setup", m.handleSetup)
 	g.POST("/avatar", m.handleAvatarUpload)
 	g.DELETE("/avatar", m.handleAvatarDelete)
-	// Avatars are public by unguessable key so <img> tags work on every client.
+	g.POST("/wallpaper", m.handleWallpaperUpload)
+	g.DELETE("/wallpaper", m.handleWallpaperDelete)
+	// Both are public by unguessable key so <img> tags and CSS work on every client.
 	v1.GET("/avatars/*key", m.handleAvatarGet)
+	v1.GET("/wallpapers/*key", m.handleWallpaperGet)
 }
 
 func (m *Module) handleGet(c *gin.Context) {
@@ -141,14 +149,14 @@ func (m *Module) handleUpdate(c *gin.Context) {
 func (m *Module) Get(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	var p Profile
 	err := m.pool.QueryRow(ctx, `
-		SELECT p.user_id, p.display_name, p.first_name, p.last_name, p.avatar_url, p.phone_country, p.phone_number,
+		SELECT p.user_id, p.display_name, p.first_name, p.last_name, p.avatar_url, p.wallpaper_url, p.phone_country, p.phone_number,
 		       p.native_language, p.timezone, cl.code, tl.code, p.learning_goals, p.daily_goal_minutes, p.preferences,
 		       p.profile_completed_at, p.onboarding_completed_at, p.updated_at
 		FROM profiles p
 		LEFT JOIN levels cl ON cl.id = p.current_level_id
 		LEFT JOIN levels tl ON tl.id = p.target_level_id
 		WHERE p.user_id = $1`, userID,
-	).Scan(&p.UserID, &p.DisplayName, &p.FirstName, &p.LastName, &p.AvatarURL, &p.PhoneCountry, &p.PhoneNumber,
+	).Scan(&p.UserID, &p.DisplayName, &p.FirstName, &p.LastName, &p.AvatarURL, &p.WallpaperURL, &p.PhoneCountry, &p.PhoneNumber,
 		&p.NativeLanguage, &p.Timezone, &p.CurrentLevel, &p.TargetLevel, &p.LearningGoals, &p.DailyGoalMinutes, &p.Preferences,
 		&p.ProfileCompletedAt, &p.OnboardingCompletedAt, &p.UpdatedAt)
 	if database.IsNotFound(err) {
@@ -279,111 +287,17 @@ func (m *Module) Setup(ctx context.Context, userID uuid.UUID, in SetupInput) (Pr
 	return profile, !wasComplete, err
 }
 
-func avatarURL(key string) string {
-	return "/api/v1/avatars/" + strings.TrimPrefix(key, "avatars/")
-}
+func (m *Module) handleAvatarUpload(c *gin.Context) { m.uploadImage(c, avatarAsset) }
 
-func (m *Module) handleAvatarUpload(c *gin.Context) {
-	p, err := authz.CurrentPrincipal(c)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		httpx.Fail(c, apperr.Validation(map[string]any{"fields": map[string]any{"file": "is required"}}))
-		return
-	}
-	defer file.Close()
+func (m *Module) handleAvatarDelete(c *gin.Context) { m.deleteImage(c, avatarAsset) }
 
-	ctx := c.Request.Context()
-	data, err := io.ReadAll(io.LimitReader(file, maxAvatarBytes+1))
-	if err != nil {
-		httpx.Fail(c, apperr.BadRequest("The image could not be read. Please try again."))
-		return
-	}
-	allowed, err := storage.ImagePolicy(maxAvatarBytes).Validate(header.Header.Get("Content-Type"), int64(len(data)), data[:min(len(data), 512)])
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	key := storage.NewKey("avatars", p.UserID, allowed.Extension, time.Now())
-	if err := m.store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), allowed.Canonical); err != nil {
-		logger.FromContext(ctx, m.log).Error("store avatar failed", slog.String("error", err.Error()))
-		httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "We couldn't upload your photo. Please try again."))
-		return
-	}
+func (m *Module) handleAvatarGet(c *gin.Context) { m.serveImage(c, avatarAsset) }
 
-	var oldKey *string
-	err = m.pool.QueryRow(ctx, `
-		UPDATE profiles p SET avatar_storage_key = $2, avatar_url = $3
-		FROM (SELECT avatar_storage_key FROM profiles WHERE user_id = $1) old
-		WHERE p.user_id = $1 RETURNING old.avatar_storage_key`, p.UserID, key, avatarURL(key)).Scan(&oldKey)
-	if err != nil {
-		_ = m.store.Delete(context.WithoutCancel(ctx), key)
-		httpx.Fail(c, err)
-		return
-	}
-	if oldKey != nil && *oldKey != key {
-		_ = m.store.Delete(context.WithoutCancel(ctx), *oldKey)
-	}
-	profile, err := m.Get(ctx, p.UserID)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	httpx.OK(c, profile)
-}
+func (m *Module) handleWallpaperUpload(c *gin.Context) { m.uploadImage(c, wallpaperAsset) }
 
-func (m *Module) handleAvatarDelete(c *gin.Context) {
-	p, err := authz.CurrentPrincipal(c)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	ctx := c.Request.Context()
-	var oldKey *string
-	err = m.pool.QueryRow(ctx, `
-		UPDATE profiles p SET avatar_storage_key = NULL, avatar_url = NULL
-		FROM (SELECT avatar_storage_key FROM profiles WHERE user_id = $1) old
-		WHERE p.user_id = $1 RETURNING old.avatar_storage_key`, p.UserID).Scan(&oldKey)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	if oldKey != nil {
-		_ = m.store.Delete(context.WithoutCancel(ctx), *oldKey)
-	}
-	profile, err := m.Get(ctx, p.UserID)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	httpx.OK(c, profile)
-}
+func (m *Module) handleWallpaperDelete(c *gin.Context) { m.deleteImage(c, wallpaperAsset) }
 
-func (m *Module) handleAvatarGet(c *gin.Context) {
-	key := "avatars/" + strings.TrimPrefix(c.Param("key"), "/")
-	if storage.ValidateKey(key) != nil {
-		httpx.Fail(c, apperr.NotFound("Avatar"))
-		return
-	}
-	ctx := c.Request.Context()
-	var exists bool
-	if err := m.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM profiles WHERE avatar_storage_key = $1)`, key).Scan(&exists); err != nil || !exists {
-		httpx.Fail(c, apperr.NotFound("Avatar"))
-		return
-	}
-	body, info, err := m.store.Get(ctx, key)
-	if err != nil {
-		httpx.Fail(c, apperr.NotFound("Avatar"))
-		return
-	}
-	defer body.Close()
-	c.DataFromReader(200, info.Size, info.ContentType, body, map[string]string{
-		"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff",
-	})
-}
+func (m *Module) handleWallpaperGet(c *gin.Context) { m.serveImage(c, wallpaperAsset) }
 
 func (m *Module) levelID(ctx context.Context, code *string) (*uuid.UUID, error) {
 	if code == nil {

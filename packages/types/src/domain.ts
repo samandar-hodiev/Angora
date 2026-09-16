@@ -43,6 +43,8 @@ export interface Profile {
   last_name: string;
   /** Path on the API origin (e.g. /api/v1/avatars/...), or null. */
   avatar_url: string | null;
+  /** Background image for the app's main area (e.g. /api/v1/wallpapers/...), or null. */
+  wallpaper_url: string | null;
   phone_country: string | null;
   /** E.164, e.g. +998901234567. */
   phone_number: string | null;
