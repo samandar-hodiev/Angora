@@ -126,20 +126,20 @@ function ProfileSetupFields({ profile, status }: { profile: Profile; status: Pas
         </FormField>
       </div>
 
-      <FormField id="phone_number" label="Phone number" description="Optional · for account recovery later" error={errors.phone_number?.message}>
-        <Controller
-          control={form.control}
-          name="phone_number"
-          render={({ field }) => (
+      <Controller
+        control={form.control}
+        name="phone_number"
+        render={({ field }) => (
+          <FormField id="phone_number" label="Phone number" description="Optional · for account recovery later" error={errors.phone_number?.message}>
             <PhoneInput
               country={phoneCountry}
               number={field.value}
               onCountryChange={(code) => form.setValue("phone_country", code)}
               onNumberChange={field.onChange}
             />
-          )}
-        />
-      </FormField>
+          </FormField>
+        )}
+      />
 
       {showPassword ? (
         <fieldset className="grid gap-4 rounded-xl border bg-surface/40 p-4">

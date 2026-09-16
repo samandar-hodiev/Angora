@@ -1,13 +1,14 @@
 "use client";
 
-import { Bell, CreditCard, LogOut, Menu, Monitor, Moon, Settings, Shield, Sun, UserRound } from "lucide-react";
+import { Bell, CreditCard, LogOut, Menu, Shield, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Brand } from "@/components/common/brand";
 import { OfflineBanner } from "@/components/common/offline-banner";
-import { IconButton } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Avatar,
   AvatarFallback,
@@ -16,8 +17,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   initials,
@@ -30,12 +29,10 @@ import { homeNav, isActivePath, learnNav, mobileNav, primaryNav, secondaryNav, s
 import { useIsAdmin } from "@/features/admin/api";
 import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
-import { useSaveAppearance, useSyncAppearance } from "@/features/profile/appearance";
+import { useSyncAppearance } from "@/features/profile/appearance";
 import { useProfile } from "@/features/profile/hooks";
 import { apiAssetUrl } from "@/lib/media";
-import { isThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/providers/theme-provider";
 
 /**
  * Authenticated layout. Desktop: sidebar. Mobile: top bar + floating glass bottom
@@ -189,12 +186,17 @@ function UserMenu() {
   const isAdmin = useIsAdmin();
   const logout = useLogout();
   const router = useRouter();
-  const { preference } = useTheme();
-  const { save } = useSaveAppearance();
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.display_name || user?.email;
   const avatar = apiAssetUrl(profile?.avatar_url);
 
+  const signOut = async () => {
+    await logout.mutateAsync().catch(() => undefined);
+    router.replace("/login");
+  };
+
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40" aria-label="Account menu">
@@ -220,11 +222,6 @@ function UserMenu() {
             <CreditCard /> Subscription
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/app/settings">
-            <Settings /> Settings
-          </Link>
-        </DropdownMenuItem>
         {isAdmin && (
           <DropdownMenuItem asChild>
             <Link href="/admin">
@@ -233,29 +230,29 @@ function UserMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Appearance</DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={preference} onValueChange={(v) => isThemePreference(v) && save(v)}>
-          <DropdownMenuRadioItem value="light">
-            <Sun /> Light
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">
-            <Moon /> Dark
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system">
-            <Monitor /> System
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={logout.isPending}
-          onSelect={async () => {
-            await logout.mutateAsync().catch(() => undefined);
-            router.replace("/login");
-          }}
-        >
+        <DropdownMenuItem disabled={logout.isPending} onSelect={() => setConfirmSignOut(true)}>
           <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+
+    {/* Signing out ends the session on every tab, so it is always confirmed first. */}
+    <Dialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Sign out of Engora?</DialogTitle>
+          <DialogDescription>You&apos;ll need to sign in again to continue learning. Your progress is saved.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setConfirmSignOut(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" loading={logout.isPending} onClick={() => void signOut()}>
+            Sign out
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
