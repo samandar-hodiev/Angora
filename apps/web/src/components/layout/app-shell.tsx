@@ -32,6 +32,7 @@ import { useSkills } from "@/features/learning/hooks";
 import { useSyncAppearance } from "@/features/profile/appearance";
 import { WallpaperLayer } from "@/features/profile/components/wallpaper-layer";
 import { useProfile } from "@/features/profile/hooks";
+import { useWallpaper } from "@/features/profile/wallpaper";
 import { apiAssetUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ import { cn } from "@/lib/utils";
  */
 export function AppShell({ children }: { children: ReactNode }) {
   useSyncAppearance();
+  const wallpaper = useWallpaper();
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15.5rem_minmax(0,1fr)]">
@@ -80,7 +82,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main id="main" className="relative isolate flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8">
+        <main
+          id="main"
+          // Tells the theme that faint text here has a photo behind it (see theme.css).
+          data-wallpaper={wallpaper.selection === "custom" ? "photo" : undefined}
+          className="relative isolate flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8"
+        >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
           <WallpaperLayer />
           <div className="mx-auto w-full max-w-6xl">{children}</div>

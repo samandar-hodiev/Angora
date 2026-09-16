@@ -469,6 +469,24 @@
   }
 }
 
+/* ---- Text over a photo wallpaper --------------------------------------------------------
+ * A learner's photo sits behind the main area, and the faintest text (labels, captions) is
+ * the first thing it costs. Veiling the photo until those labels pass on their own would
+ * leave almost no photo, so instead the muted and secondary tokens step up one notch inside
+ * that area only. Everything keeps its hierarchy; the wallpaper keeps more of itself.
+ * The text utilities compile to color: var(--text-muted) / var(--text-secondary), so those are
+ * the names to redefine here; the mapped --color-fg-* names never reach the rendered colour. */
+
+[data-wallpaper="photo"] {
+  --text-secondary: oklch(0.33 0.013 165);
+  --text-muted: oklch(0.42 0.011 165);
+
+  @variant dark {
+    --text-secondary: oklch(0.85 0.006 165);
+    --text-muted: oklch(0.72 0.008 165);
+  }
+}
+
 /* ---- Liquid: ambient light for AI, voice and progress moments ---------------------------- */
 
 @utility liquid-field {
