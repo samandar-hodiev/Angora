@@ -12,7 +12,6 @@ import { FormField } from "@/components/common/form-field";
 import { ErrorState } from "@/components/common/states";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,16 +37,12 @@ export function ProfileCard() {
   if (isPending) return <Skeleton className="h-96 rounded-xl" />;
   if (isError) return <ErrorState title="Couldn't load your profile" error={error} onRetry={() => void refetch()} />;
 
+  // The heading lives outside the card (see ProfileView), like every other section.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Learning profile</CardTitle>
-        <CardDescription>Used to personalise practice. Synced across all your devices.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ProfileForm profile={profile} />
-      </CardContent>
-    </Card>
+    <div className="grid gap-5 rounded-xl border bg-surface p-5">
+      <p className="text-body-sm text-fg-secondary">Used to personalise practice. Synced across all your devices.</p>
+      <ProfileForm profile={profile} />
+    </div>
   );
 }
 

@@ -8,12 +8,13 @@ import { ErrorState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Meter } from "@/components/ui/data-display";
-import { Avatar, AvatarFallback, initials } from "@/components/ui/overlay";
+import { Avatar, AvatarFallback, AvatarImage, initials } from "@/components/ui/overlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/features/auth/hooks";
 import { useProgress } from "@/features/learner/hooks";
 import { goalLabel } from "@/features/onboarding/labels";
 import { useCurrentSubscription } from "@/features/subscription/hooks";
+import { apiAssetUrl } from "@/lib/media";
 
 import { useProfile } from "../hooks";
 import { ProfileCard } from "./profile-form";
@@ -28,17 +29,20 @@ export function ProfileView() {
 
   if (profile.isError) return <ErrorState error={profile.error} onRetry={() => void profile.refetch()} />;
   const p = profile.data;
+  const name = [p?.first_name, p?.last_name].filter(Boolean).join(" ") || p?.display_name || "";
+  const avatar = apiAssetUrl(p?.avatar_url);
 
   return (
     <>
       <PageHeader title="Profile" />
       <section className="grid gap-6 rounded-xl border bg-surface p-6 sm:grid-cols-[auto_1fr] sm:items-center">
         <Avatar className="size-20">
-          <AvatarFallback className="text-h2">{initials(p?.display_name ?? user?.email)}</AvatarFallback>
+          {avatar && <AvatarImage src={avatar} alt="" className="object-cover" />}
+          <AvatarFallback className="text-h2">{initials(name || user?.email)}</AvatarFallback>
         </Avatar>
         <div className="grid gap-3">
           <div>
-            {profile.isPending ? <Skeleton className="h-8 w-48" /> : <h2 className="text-h2">{p?.display_name || "Learner"}</h2>}
+            {profile.isPending ? <Skeleton className="h-8 w-48" /> : <h2 className="text-h2">{name || "Learner"}</h2>}
             <p className="text-body-sm text-fg-muted">{user?.email}</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -70,7 +74,8 @@ export function ProfileView() {
         </div>
       </section>
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      {/* Side by side only on screens wider than a MacBook; stacked on laptops and below. */}
+      <div className="mt-10 grid gap-10 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <section aria-labelledby="overview-title">
           <SectionTitle
             id="overview-title"
@@ -89,7 +94,8 @@ export function ProfileView() {
                   .map((s) => <Meter key={s.code} label={s.name} value={s.score} display={s.sessions ? String(Math.round(s.score)) : "—"} />)}
           </div>
         </section>
-        <section aria-label="Edit profile">
+        <section aria-labelledby="learning-profile-title">
+          <SectionTitle id="learning-profile-title" title="Learning profile" />
           <ProfileCard />
         </section>
       </div>
