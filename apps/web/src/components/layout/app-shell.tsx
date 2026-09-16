@@ -43,8 +43,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15.5rem_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-surface/60 md:flex">
-        <div className="px-5 pt-5 pb-4">
+      <aside className="glass-frosted sticky top-0 isolate hidden h-dvh flex-col overflow-hidden border-y-0 border-l-0 md:flex">
+        {/* Faint moving green light behind the frosted surface */}
+        <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <span className="absolute -top-16 -left-12 size-56 animate-liquid-slow rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-70 blur-2xl motion-reduce:animate-none" />
+        </span>
+        <div className="relative px-5 pt-5 pb-4">
           <Brand href="/app/dashboard" />
         </div>
         <SidebarNav />
@@ -52,22 +56,25 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-col">
         <OfflineBanner />
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur sm:px-6">
+        <header className="glass-frosted sticky top-0 z-30 flex h-14 items-center gap-2 overflow-hidden border-x-0 border-t-0 px-3 sm:px-6">
+          <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+            <span className="absolute -top-10 left-1/4 h-24 w-1/2 animate-liquid rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-60 blur-2xl motion-reduce:animate-none" />
+          </span>
           <Sheet>
             <SheetTrigger asChild>
-              <IconButton label="Open navigation" className="md:hidden">
+              <IconButton label="Open navigation" className="relative md:hidden">
                 <Menu />
               </IconButton>
             </SheetTrigger>
-            <SheetContent side="left" title="Navigation" className="p-0">
+            <SheetContent side="left" title="Navigation" className="glass-panel border-r-(--glass-border) bg-transparent p-0">
               <div className="px-5 pt-5">
                 <Brand href="/app/dashboard" />
               </div>
               <SidebarNav inSheet />
             </SheetContent>
           </Sheet>
-          <Brand href="/app/dashboard" className="md:hidden" />
-          <div className="ml-auto flex items-center gap-1">
+          <Brand href="/app/dashboard" className="relative md:hidden" />
+          <div className="relative ml-auto flex items-center gap-1">
             <NotificationsMenu />
             <UserMenu />
           </div>
@@ -98,7 +105,7 @@ function MobileNavLink({ item }: { item: NavItem }) {
         aria-current={active ? "page" : undefined}
         className={cn(
           "flex flex-col items-center gap-0.5 rounded-xl py-2 text-[11px] font-medium transition-colors duration-micro",
-          active ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-muted",
+          active ? "nav-liquid text-foreground" : "text-fg-muted",
         )}
       >
         <item.icon className="size-5" aria-hidden />
@@ -121,12 +128,11 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
         href={item.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "relative flex items-center gap-3 rounded-md px-3 py-2 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+          "relative flex items-center gap-3 rounded-lg px-3 py-2 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
           nested && "py-1.5 pl-10",
-          active ? "bg-surface-active font-medium text-foreground" : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+          active ? "nav-liquid font-medium text-foreground" : "text-fg-secondary hover:bg-surface-active hover:text-foreground",
         )}
       >
-        {active && <span aria-hidden className="absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />}
         {!nested && <item.icon className={cn("size-4", active ? "text-primary" : "text-fg-muted")} aria-hidden />}
         {item.label}
       </Link>
@@ -135,7 +141,7 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
   };
 
   return (
-    <nav aria-label="Main" className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
+    <nav aria-label="Main" className="relative flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
       <ul className="grid gap-0.5">
         <li>{link(homeNav)}</li>
         <li>
