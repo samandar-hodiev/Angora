@@ -75,6 +75,12 @@ export const wallpaperPresets = [
     image:
       "radial-gradient(64% 54% at 18% 12%, oklch(0.82 0.07 80 / 0.4), transparent 72%), radial-gradient(56% 48% at 86% 24%, oklch(0.78 0.06 55 / 0.3), transparent 72%), radial-gradient(72% 58% at 48% 98%, oklch(0.86 0.05 95 / 0.24), transparent 72%)",
   },
+  {
+    id: "prism",
+    label: "Prism",
+    image:
+      "radial-gradient(58% 50% at 12% 10%, oklch(0.62 0.24 27 / 0.48), transparent 70%), radial-gradient(56% 48% at 88% 18%, oklch(0.6 0.22 264 / 0.42), transparent 70%), radial-gradient(66% 56% at 50% 98%, oklch(0.72 0.2 145 / 0.38), transparent 72%)",
+  },
 ] as const;
 
 export type PresetId = (typeof wallpaperPresets)[number]["id"];
