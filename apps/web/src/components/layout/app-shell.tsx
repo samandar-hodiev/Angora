@@ -3,7 +3,7 @@
 import { Bell, CreditCard, LogOut, Menu, Shield, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { Brand } from "@/components/common/brand";
 import { OfflineBanner } from "@/components/common/offline-banner";
@@ -85,8 +85,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main
           id="main"
           // Tells the theme a photo sits behind this area, and which way it reads, so text on it
-          // can follow the picture instead of the theme (see theme.css).
+          // can follow the picture instead of the theme (see theme.css). --app-header-h is the
+          // header above: anything pinned inside the area measures from it.
           data-wallpaper-tone={wallpaper.selection === "custom" ? (wallpaper.tone ?? "dark") : undefined}
+          style={{ "--app-header-h": "3.5rem" } as CSSProperties}
           className="relative isolate flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8"
         >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
