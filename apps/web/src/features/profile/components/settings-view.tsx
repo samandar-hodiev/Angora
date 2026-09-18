@@ -84,7 +84,9 @@ export function SettingsView() {
       <PageHeader title="Settings" />
       <div className="grid gap-8 lg:grid-cols-[12rem_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="hidden lg:block">
-          <ul className="sticky top-20 grid gap-0.5">
+          {/* Its own surface: the section list is the one piece of small text that would
+              otherwise sit bare on a learner's wallpaper. */}
+          <ul className="sticky top-20 grid gap-0.5 rounded-xl border bg-surface p-2">
             {sections.map(([id, label]) => (
               <li key={id}>
                 <a href={`#${id}`} className="block rounded-md px-3 py-1.5 text-body-sm text-fg-secondary hover:bg-surface-hover hover:text-foreground">

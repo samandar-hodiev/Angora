@@ -6,10 +6,12 @@ import { useWallpaper } from "../wallpaper";
  * The learner's background. It fills the main learning area only — never the header or the
  * sidebar — and stays put while the page scrolls.
  *
- * A photo has to sit behind text in both themes, so instead of hiding it under a thick veil
- * the photo itself is pulled towards the theme: brightened in light mode, dimmed in dark.
- * That keeps the picture legible as a picture while headings and cards keep their contrast.
- * The presets are translucent colour washes already and need neither treatment.
+ * A photo has to sit behind text in both themes. Veiling it until the faintest label passed on
+ * its own turned out to need almost the whole picture away (measured: a flat light veil had to
+ * reach 0.96), so the photo stays visible and the text is protected instead — see the halo and
+ * the stepped-up text tokens under [data-wallpaper="photo"] in theme.css. Here the photo is
+ * only nudged towards the theme: softened and slightly lifted in light mode, dimmed in dark.
+ * The presets are translucent colour washes already and need none of this.
  */
 export function WallpaperLayer() {
   const { image, selection } = useWallpaper();
@@ -17,23 +19,24 @@ export function WallpaperLayer() {
   const isPhoto = selection === "custom";
 
   return (
-    <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+    >
       <span
         className={
           isPhoto
             ? // Oversized so the blur's soft edge is cropped away instead of showing as a rim.
-              "absolute -inset-4 bg-cover bg-fixed bg-center [filter:brightness(1.2)_saturate(0.9)_blur(2px)] dark:[filter:brightness(0.6)_saturate(0.95)]"
+              "absolute -inset-4 bg-cover bg-fixed bg-center [filter:brightness(1.05)_saturate(1.15)_blur(3px)] dark:[filter:brightness(0.65)_saturate(1.05)_blur(2px)]"
             : "absolute inset-0 bg-cover bg-fixed bg-center"
         }
         style={{ backgroundImage: image }}
       />
-      {/* The veil sets a luminance floor for whatever photo is uploaded, so the faintest text
-          sitting straight on it still clears 4.5:1. Light mode needs more of it: its muted text
-          is close to the page colour, while dark mode's text is far from its near-black base. */}
-      {/* Light mode veils towards the card surface (white) rather than the page colour: the
-          faintest text is measured against white, so the same amount of veil buys more
-          contrast and the photo keeps more of itself. */}
-      {isPhoto && <span className="absolute inset-0 bg-surface/84 dark:bg-background/55" />}
+      {/* Only enough veil to keep the picture calm behind content. The text's own halo does the
+          readability work, so this stays light and the photo keeps its colour. */}
+      {isPhoto && (
+        <span className="absolute inset-0 bg-surface/55 dark:bg-background/45" />
+      )}
     </span>
   );
 }
