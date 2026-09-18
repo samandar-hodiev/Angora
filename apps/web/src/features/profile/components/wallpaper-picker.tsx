@@ -10,7 +10,14 @@ import { cn } from "@/lib/utils";
 
 import { useProfile } from "../hooks";
 import { useRemoveWallpaper, useUploadWallpaper } from "../setup-api";
-import { measureWallpaperTone, useSaveWallpaper, wallpaperPresets, wallpaperSelection, type WallpaperId } from "../wallpaper";
+import {
+  measureWallpaperTone,
+  useSaveWallpaper,
+  wallpaperPhotoUrl,
+  wallpaperPresets,
+  wallpaperSelection,
+  type WallpaperId,
+} from "../wallpaper";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -65,11 +72,13 @@ export function WallpaperPicker() {
       return;
     }
     try {
-      // Measured from the local file: it decides whether text over this photo goes light or
-      // dark, so the picture never has to be washed out to stay readable.
-      const tone = await measureWallpaperTone(file);
-      await upload.mutateAsync(file);
-      // The upload only stores the image; this is what puts it on screen.
+      const stored = await upload.mutateAsync(file);
+      // The tone decides whether text over this photo goes light or dark, so the picture never
+      // has to be washed out to stay readable. The local file is the cheap source; if it cannot
+      // be decoded, the stored copy is read instead, and if both fail the layer measures later.
+      const tone = (await measureWallpaperTone(file)) ?? (await measureWallpaperTone(wallpaperPhotoUrl(stored) ?? ""));
+      // The upload only stores the image; this is what puts it on screen. An unmeasurable photo
+      // clears the tone rather than inheriting the previous photo's — the layer re-measures it.
       await saveAsync("custom", tone);
     } catch (err) {
       setError(errorMessage(err));

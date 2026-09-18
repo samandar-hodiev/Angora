@@ -124,25 +124,30 @@ export function wallpaperImage(profile: Profile | undefined): string | null {
 
 /**
  * Mean luminance of the image, which decides whether text over it goes light or dark. Measured
- * from a File while uploading, or from the stored photo's URL for backgrounds set before this
- * existed. Falls back to "dark": most photos are, and the layer defaults the same way.
+ * from a File while uploading, or from the stored photo's URL.
+ *
+ * Returns null when the image cannot be read, rather than guessing: a guess would be saved as
+ * if it were measured, and the caller can retry from the other source instead.
  */
-export async function measureWallpaperTone(source: File | string): Promise<WallpaperTone> {
-  const objectUrl = typeof source === "string" ? null : URL.createObjectURL(source);
+export async function measureWallpaperTone(source: File | string): Promise<WallpaperTone | null> {
   try {
-    const image = new Image();
-    if (typeof source === "string") image.crossOrigin = "anonymous";
-    image.src = objectUrl ?? (source as string);
-    await image.decode();
+    // Decoded through createImageBitmap rather than <img>: the CSS background has already
+    // cached this URL as a no-CORS response, and asking <img crossorigin> for the same entry
+    // fails to decode. A reloading CORS fetch gets its own, readable copy.
+    const blob = typeof source === "string" ? await (await fetch(source, { mode: "cors", cache: "reload" })).blob() : source;
+    const bitmap = await createImageBitmap(blob);
 
+    const width = 48;
+    const height = Math.max(1, Math.round((bitmap.height / bitmap.width) * width));
     const canvas = document.createElement("canvas");
-    canvas.width = 48;
-    canvas.height = 32;
+    canvas.width = width;
+    canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return "dark";
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    if (!context) return null;
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
 
-    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = context.getImageData(0, 0, width, height);
     let total = 0;
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i] ?? 0;
@@ -152,9 +157,7 @@ export async function measureWallpaperTone(source: File | string): Promise<Wallp
     }
     return total / (data.length / 4) < 0.5 ? "dark" : "light";
   } catch {
-    return "dark";
-  } finally {
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    return null;
   }
 }
 
@@ -170,10 +173,13 @@ export function useWallpaper() {
 
 export function useSaveWallpaper() {
   const update = useUpdateProfile();
-  const preferences = (id: WallpaperId, tone?: WallpaperTone) => (tone ? { wallpaper: id, wallpaper_tone: tone } : { wallpaper: id });
+  // `undefined` leaves the stored tone alone; `null` clears it, so a new photo never inherits
+  // the previous one's reading. Anything cleared is measured again by the layer.
+  const preferences = (id: WallpaperId, tone?: WallpaperTone | null) =>
+    tone === undefined ? { wallpaper: id } : { wallpaper: id, wallpaper_tone: tone };
   return {
-    save: (id: WallpaperId, tone?: WallpaperTone) => update.mutate({ preferences: preferences(id, tone) }),
-    saveAsync: (id: WallpaperId, tone?: WallpaperTone) => update.mutateAsync({ preferences: preferences(id, tone) }),
+    save: (id: WallpaperId, tone?: WallpaperTone | null) => update.mutate({ preferences: preferences(id, tone) }),
+    saveAsync: (id: WallpaperId, tone?: WallpaperTone | null) => update.mutateAsync({ preferences: preferences(id, tone) }),
     saveTone: (tone: WallpaperTone) => update.mutate({ preferences: { wallpaper_tone: tone } }),
     isSaving: update.isPending,
   };
