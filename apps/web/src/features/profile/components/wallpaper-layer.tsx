@@ -56,9 +56,10 @@ export function WallpaperLayer() {
   return (
     <span aria-hidden className={cn(frame, "overflow-clip")}>
       <span className={cn("absolute inset-0 bg-cover bg-center", photoFilter)} style={{ backgroundImage: image }} />
-      {/* The scrim settles the picture in the theme's direction, so text and cards keep the
-          contrast they were designed with. The value lives with the theme in theme.css. */}
-      <span className="absolute inset-0 bg-(--photo-scrim)" />
+      {/* The scrim settles the picture in the theme's direction. A photo that runs against the
+          theme — a dark one in light mode, a bright one in dark mode — gets the stronger of the
+          two, because that is when text lying on the photo has the least to work with. */}
+      <span className={cn("absolute inset-0", darkPhoto ? "bg-(--photo-scrim-clash) dark:bg-(--photo-scrim)" : "bg-(--photo-scrim) dark:bg-(--photo-scrim-clash)")} />
     </span>
   );
 }

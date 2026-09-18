@@ -141,7 +141,8 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
         className={cn(
           "relative flex items-center gap-3 rounded-lg px-3 py-2 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
           nested && "py-1.5 pl-10",
-          active ? "nav-liquid font-medium text-foreground" : "text-fg-secondary hover:bg-surface-active hover:text-foreground",
+          // Hover is a wash of the shell's own colour: a white one disappears against the cards.
+          active ? "nav-liquid font-medium text-foreground" : "text-(--nav-text) hover:bg-(--nav-hover) hover:text-foreground",
         )}
       >
         {!nested && <item.icon className={cn("size-4", active ? "text-primary" : "text-fg-muted")} aria-hidden />}
