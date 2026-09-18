@@ -82,6 +82,8 @@
 
   /* Slightly off-white, so the frosted shell reads as glass against white cards instead of
    * disappearing into them. Dark mode keeps its own values below. */
+  --photo-scrim: oklch(1 0 0 / 0.46);
+
   --frost-bg: oklch(0.955 0.004 165 / 0.62);
   --frost-bg-scrolled: oklch(0.945 0.005 165 / 0.82);
   --frost-border: oklch(0.2 0.02 165 / 0.1);
@@ -150,6 +152,8 @@
   --liquid-1: oklch(69.6% 0.17 162.48 / 0.24);
   --liquid-2: oklch(0.6 0.1 185 / 0.15);
   --liquid-3: oklch(0.55 0.1 140 / 0.13);
+
+  --photo-scrim: oklch(0.11 0.006 165 / 0.24);
 
   --frost-bg: oklch(0.21 0.005 165 / 0.4);
   --frost-bg-scrolled: oklch(0.18 0.005 165 / 0.62);
@@ -523,67 +527,23 @@
   }
 }
 
-/* ---- The learning area over a photo wallpaper -------------------------------------------
- * With a photo behind it, the whole area reads one way — the photo's way, not the theme's.
- * Cards, text and the scrim all follow the measured tone, so a screen never mixes light text
- * on some blocks with dark text on others, and a light theme never has to wash the picture out
- * to stay readable.
+/* ---- Text over a photo wallpaper --------------------------------------------------------
+ * The theme decides how the app reads: dark mode keeps dark glass cards with light text over
+ * any wallpaper, light mode keeps light cards with dark text. Only three things react to the
+ * picture — the scrim that settles it behind the content (see --photo-scrim per theme), the
+ * halo that keeps bare text legible over whatever the photo is doing there, and one notch more
+ * weight on the faintest text, which is the first thing a photo costs.
  *
- * Chips that state their own colours (badges, primary/secondary buttons, popovers) keep the
- * theme's palette and drop the halo: they are opaque, so the photo never reaches their text. */
-
-[data-wallpaper-tone="dark"] {
-  --halo: oklch(0.11 0.01 165 / 0.82);
-  --photo-scrim: oklch(0.1 0.008 165 / 0.42);
-
-  --on-photo: oklch(0.97 0.004 165);
-  --on-photo-secondary: oklch(0.88 0.005 165);
-  --on-photo-muted: oklch(0.78 0.006 165);
-
-  /* Surfaces, borders and glass follow the photo too, or meters, rings, dividers and the
-   * `glass` blocks would keep the theme's colours and stand out against the cards. */
-  --surface: oklch(0.175 0.005 165);
-  --surface-elevated: oklch(0.205 0.006 165);
-  --surface-hover: oklch(0.22 0.006 165);
-  --surface-active: oklch(0.255 0.008 165);
-  --border: oklch(0.275 0.008 165);
-  --border-subtle: oklch(0.22 0.006 165);
-  --glass: oklch(0.2 0.006 165 / 0.62);
-  --glass-base: oklch(0.19 0.006 165 / 0.55);
-  --glass-border: oklch(1 0 0 / 0.08);
-  --glass-highlight: oklch(1 0 0 / 0.06);
-}
-
-[data-wallpaper-tone="light"] {
-  --halo: var(--background);
-  /* Dark text over a light photo already has the contrast it needs, so this only settles the
-   * picture; heavier than this and the photo starts to look washed. */
-  --photo-scrim: oklch(1 0 0 / 0.3);
-
-  --on-photo: oklch(0.19 0.012 165);
-  --on-photo-secondary: oklch(0.34 0.013 165);
-  --on-photo-muted: oklch(0.44 0.011 165);
-
-  --surface: oklch(1 0 0);
-  --surface-elevated: oklch(1 0 0);
-  --surface-hover: oklch(0.966 0.004 165);
-  --surface-active: oklch(0.94 0.006 165);
-  --border: oklch(0.905 0.006 165);
-  --border-subtle: oklch(0.94 0.004 165);
-  --glass: oklch(1 0 0 / 0.72);
-  --glass-base: oklch(1 0 0 / 0.64);
-  --glass-border: oklch(0.2 0.02 165 / 0.09);
-  --glass-highlight: oklch(1 0 0 / 0.9);
-}
+ * An earlier version flipped the whole area to the photo's own tone. That turned dark mode
+ * white under a bright photo, which is not what dark mode is for. */
 
 [data-wallpaper-tone] {
-  --foreground: var(--on-photo);
-  --text-primary: var(--on-photo);
-  --text-secondary: var(--on-photo-secondary);
-  --text-muted: var(--on-photo-muted);
+  --halo: var(--background);
+
+  --text-secondary: var(--text-secondary-card);
+  --text-muted: var(--text-muted-card);
 }
 
-/* A card is opaque enough that its own text needs no halo, but it keeps the photo's palette. */
 /* Anything with a background of its own — cards, chips, badges, buttons — needs no halo: the
  * photo never reaches its text. */
 [data-wallpaper-tone]
@@ -602,17 +562,6 @@
     button
   ) {
   --halo: transparent;
-}
-
-/* Headings and body copy carry no colour utility — they inherit it from body, which resolved
- * --foreground long before this subtree redefined it. So the colour is set here as well, in the
- * base layer: utilities sit in a later layer, which keeps badges and anything else that states
- * its own text colour untouched. */
-
-@layer base {
-  [data-wallpaper-tone] {
-    color: var(--on-photo);
-  }
 }
 
 [data-wallpaper-tone] :is(h1, h2, h3, h4, p, span, a, li, dt, dd, label, strong) {
@@ -634,28 +583,18 @@
  * opaque — they have to be readable over whatever they happen to cover. */
 
 main :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][class~="border"]) {
-  background-color: color-mix(in oklch, var(--surface) 88%, transparent);
+  background-color: color-mix(in oklch, var(--surface) 86%, transparent);
   border-color: color-mix(in oklch, var(--border) 70%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
   backdrop-filter: blur(16px) saturate(120%);
-
-  @variant dark {
-    background-color: color-mix(in oklch, var(--surface) 84%, transparent);
-  }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background-color: var(--surface);
   }
 }
 
-/* With a photo behind them, cards tint in the photo's direction — one number for both themes,
- * so nothing on the page is more see-through than anything else. */
-main[data-wallpaper-tone] :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][class~="border"]) {
-  background-color: color-mix(in oklch, var(--surface) 86%, transparent);
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-}
-
-main[data-wallpaper-tone] :is([class~="bg-primary-subtle"][class~="border"]) {
+/* The green-tinted panel keeps its hint of colour at the same density as the plain cards. */
+main :is([class~="bg-primary-subtle"][class~="border"]) {
   background-color: color-mix(in oklch, color-mix(in oklch, var(--surface) 90%, var(--primary)) 86%, transparent);
 }
 

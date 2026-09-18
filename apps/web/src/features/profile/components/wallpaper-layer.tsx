@@ -19,11 +19,11 @@ const frame = "pointer-events-none fixed top-14 right-0 bottom-0 left-0 -z-10 md
  * filter on the element — `cover` then fits the whole scroll height and blows the picture up —
  * and a sticky layer still drifts by the header's height at the top of the page.
  *
- * A photo is treated by its own tone rather than by the theme: a dark photo keeps the deep,
- * saturated reading it has in dark mode even when the app is light (washing it towards white is
- * what made it look faded), and the text over it goes light — see [data-wallpaper-tone] in
- * theme.css. A light photo gets the opposite pairing. The presets are translucent colour washes
- * already and need none of this.
+ * The app keeps its own reading — dark mode stays dark, light mode stays light — and the photo
+ * is pulled towards it instead: a bright picture is dimmed for dark mode, a dark one lifted for
+ * light mode. That is what the measured tone is for here; the scrim and the text halo live with
+ * the theme in theme.css. The presets are translucent colour washes already and need none of
+ * this.
  */
 export function WallpaperLayer() {
   const { image, selection, tone, photoUrl } = useWallpaper();
@@ -47,19 +47,17 @@ export function WallpaperLayer() {
     );
   }
 
+  // Each pairing gets its own nudge: the further the photo is from the theme, the more it moves.
   const darkPhoto = (tone ?? "dark") === "dark";
+  const photoFilter = darkPhoto
+    ? "[filter:brightness(1.3)_saturate(0.95)_blur(1px)] dark:[filter:brightness(0.95)_saturate(1.1)_blur(1px)]"
+    : "[filter:brightness(1)_saturate(1.05)_blur(1px)] dark:[filter:brightness(0.82)_saturate(1.12)_blur(1px)]";
 
   return (
     <span aria-hidden className={cn(frame, "overflow-clip")}>
-      <span
-        className={cn(
-          "absolute inset-0 bg-cover bg-center",
-          darkPhoto ? "[filter:brightness(0.7)_saturate(1.1)_blur(1px)]" : "[filter:brightness(1.02)_saturate(1.05)_blur(1px)]",
-        )}
-        style={{ backgroundImage: image }}
-      />
-      {/* A scrim in the photo's own direction — dark over a dark photo, light over a light one —
-          so it settles the picture without draining its colour. The value lives with the tone. */}
+      <span className={cn("absolute inset-0 bg-cover bg-center", photoFilter)} style={{ backgroundImage: image }} />
+      {/* The scrim settles the picture in the theme's direction, so text and cards keep the
+          contrast they were designed with. The value lives with the theme in theme.css. */}
       <span className="absolute inset-0 bg-(--photo-scrim)" />
     </span>
   );
