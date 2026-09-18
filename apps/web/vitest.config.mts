@@ -13,5 +13,9 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     css: false,
+    // The interaction tests drive real typing through userEvent. Idle they take about a second,
+    // but on a loaded machine (a build or a browser running alongside) they cross the 5s default
+    // and fail as flakes rather than as anything worth reading.
+    testTimeout: 15000,
   },
 });

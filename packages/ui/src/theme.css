@@ -22,7 +22,9 @@
 :root {
   color-scheme: light;
 
-  --background: oklch(0.985 0.003 165);
+  /* Light grey, not white: white cards need something to sit on, or the page and the cards
+   * read as one flat sheet. Dark mode already separates them. */
+  --background: oklch(0.963 0.004 165);
   --foreground: var(--text-primary-base);
 
   --surface: oklch(1 0 0);
@@ -598,11 +600,30 @@
  * toasts are portalled outside `main` and use bg-popover / bg-surface-elevated, which stay
  * opaque — they have to be readable over whatever they happen to cover. */
 
-main :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][class~="border"]) {
-  background-color: color-mix(in oklch, var(--surface) 86%, transparent);
+main
+  :is(
+    [class~="bg-surface"][class~="border"],
+    [class~="bg-primary-subtle"][class~="border"],
+    [class~="glass"],
+    [class~="glass-card"],
+    [class~="glass-panel"]
+  ) {
+  /* One value for every block and both themes: mixed opacities were why some blocks looked
+   * twice as see-through as their neighbours. */
+  background-color: color-mix(in oklch, var(--surface) 66%, transparent);
   border-color: color-mix(in oklch, var(--border) 70%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
   backdrop-filter: blur(16px) saturate(120%);
+  /* A whisper of lift, so a card is legible as a card without a heavy border. */
+  box-shadow:
+    0 1px 2px oklch(0.2 0.02 165 / 0.04),
+    0 10px 26px -18px oklch(0.2 0.02 165 / 0.14);
+
+  @variant dark {
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.2),
+      0 12px 28px -20px oklch(0 0 0 / 0.5);
+  }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background-color: var(--surface);
