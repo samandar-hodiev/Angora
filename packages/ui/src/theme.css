@@ -539,8 +539,19 @@
   --on-photo: oklch(0.97 0.004 165);
   --on-photo-secondary: oklch(0.88 0.005 165);
   --on-photo-muted: oklch(0.78 0.006 165);
-  --on-photo-surface: oklch(0.175 0.005 165);
-  --on-photo-border: oklch(1 0 0 / 0.14);
+
+  /* Surfaces, borders and glass follow the photo too, or meters, rings, dividers and the
+   * `glass` blocks would keep the theme's colours and stand out against the cards. */
+  --surface: oklch(0.175 0.005 165);
+  --surface-elevated: oklch(0.205 0.006 165);
+  --surface-hover: oklch(0.22 0.006 165);
+  --surface-active: oklch(0.255 0.008 165);
+  --border: oklch(0.275 0.008 165);
+  --border-subtle: oklch(0.22 0.006 165);
+  --glass: oklch(0.2 0.006 165 / 0.62);
+  --glass-base: oklch(0.19 0.006 165 / 0.55);
+  --glass-border: oklch(1 0 0 / 0.08);
+  --glass-highlight: oklch(1 0 0 / 0.06);
 }
 
 [data-wallpaper-tone="light"] {
@@ -552,8 +563,17 @@
   --on-photo: oklch(0.19 0.012 165);
   --on-photo-secondary: oklch(0.34 0.013 165);
   --on-photo-muted: oklch(0.44 0.011 165);
-  --on-photo-surface: oklch(1 0 0);
-  --on-photo-border: oklch(0.2 0.02 165 / 0.12);
+
+  --surface: oklch(1 0 0);
+  --surface-elevated: oklch(1 0 0);
+  --surface-hover: oklch(0.966 0.004 165);
+  --surface-active: oklch(0.94 0.006 165);
+  --border: oklch(0.905 0.006 165);
+  --border-subtle: oklch(0.94 0.004 165);
+  --glass: oklch(1 0 0 / 0.72);
+  --glass-base: oklch(1 0 0 / 0.64);
+  --glass-border: oklch(0.2 0.02 165 / 0.09);
+  --glass-highlight: oklch(1 0 0 / 0.9);
 }
 
 [data-wallpaper-tone] {
@@ -563,19 +583,24 @@
   --text-muted: var(--on-photo-muted);
 }
 
-[data-wallpaper-tone]
-  :is([class~="bg-primary"], [class~="bg-secondary"], [class~="bg-surface-elevated"], [class~="bg-popover"], [class~="btn-liquid"]) {
-  --halo: transparent;
-
-  --foreground: var(--text-primary-base);
-  --text-primary: var(--text-primary-base);
-  --text-secondary: var(--text-secondary-card);
-  --text-muted: var(--text-muted-card);
-}
-
 /* A card is opaque enough that its own text needs no halo, but it keeps the photo's palette. */
+/* Anything with a background of its own — cards, chips, badges, buttons — needs no halo: the
+ * photo never reaches its text. */
 [data-wallpaper-tone]
-  :is([class~="bg-surface"], [class~="bg-primary-subtle"], [class~="glass"], [class~="glass-card"], [class~="glass-panel"], [data-slot="badge"]) {
+  :is(
+    [class~="bg-surface"],
+    [class~="bg-surface-hover"],
+    [class~="bg-surface-active"],
+    [class~="bg-primary"],
+    [class~="bg-primary-subtle"],
+    [class~="bg-secondary"],
+    [class~="btn-liquid"],
+    [class~="glass"],
+    [class~="glass-card"],
+    [class~="glass-panel"],
+    [data-slot="badge"],
+    button
+  ) {
   --halo: transparent;
 }
 
@@ -587,11 +612,6 @@
 @layer base {
   [data-wallpaper-tone] {
     color: var(--on-photo);
-  }
-
-  [data-wallpaper-tone]
-    :is([class~="bg-primary"], [class~="bg-secondary"], [class~="bg-surface-elevated"], [class~="bg-popover"], [class~="btn-liquid"]) {
-    color: var(--text-primary-base);
   }
 }
 
@@ -631,12 +651,12 @@ main :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][cl
 /* With a photo behind them, cards tint in the photo's direction — one number for both themes,
  * so nothing on the page is more see-through than anything else. */
 main[data-wallpaper-tone] :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][class~="border"]) {
-  background-color: color-mix(in oklch, var(--on-photo-surface) 86%, transparent);
-  border-color: var(--on-photo-border);
+  background-color: color-mix(in oklch, var(--surface) 86%, transparent);
+  border-color: color-mix(in oklch, var(--border) 70%, transparent);
 }
 
 main[data-wallpaper-tone] :is([class~="bg-primary-subtle"][class~="border"]) {
-  background-color: color-mix(in oklch, color-mix(in oklch, var(--on-photo-surface) 90%, var(--primary)) 86%, transparent);
+  background-color: color-mix(in oklch, color-mix(in oklch, var(--surface) 90%, var(--primary)) 86%, transparent);
 }
 
 /* ---- Liquid: ambient light for AI, voice and progress moments ---------------------------- */
