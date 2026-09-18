@@ -142,7 +142,7 @@ function ProfileSetupFields({ profile, status }: { profile: Profile; status: Pas
       />
 
       {showPassword ? (
-        <fieldset className="grid gap-4 rounded-xl border bg-surface/40 p-4">
+        <fieldset className="grid gap-4 rounded-xl border bg-surface p-4">
           <legend className="px-1 text-label">{passwordRequired ? "Create a password" : "Add a password"}</legend>
           <p className="-mt-2 text-caption text-fg-muted">
             {passwordRequired

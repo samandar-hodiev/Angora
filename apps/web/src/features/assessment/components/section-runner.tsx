@@ -128,7 +128,7 @@ export function SectionHub({ assessment }: { assessment: Assessment }) {
       </ol>
 
       {next && (
-        <div className="grid gap-4 rounded-2xl border bg-surface/40 p-5">
+        <div className="grid gap-4 rounded-2xl border bg-surface p-5">
           <p className="text-h4">Before you start {skillName(next.skill).toLowerCase()}</p>
           <ul className="grid gap-1.5 text-body-sm text-fg-secondary">
             {sectionTips(next).map((tip) => (

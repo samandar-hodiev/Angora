@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 function StateFrame({ className, children, role }: { className?: string; children: ReactNode; role?: "alert" | "status" }) {
   return (
-    <div role={role} className={cn("flex flex-col items-center gap-3 rounded-xl border border-dashed bg-surface/50 px-6 py-10 text-center", className)}>
+    <div role={role} className={cn("flex flex-col items-center gap-3 rounded-xl border border-dashed bg-surface px-6 py-10 text-center", className)}>
       {children}
     </div>
   );

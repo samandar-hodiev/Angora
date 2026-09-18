@@ -523,24 +523,24 @@
   }
 }
 
-/* ---- Text over a photo wallpaper --------------------------------------------------------
- * Which way text runs is decided by the photo, not by the theme: on a dark photo it goes light
- * with a dark halo — the reading dark mode already gives it — and on a light photo it stays
- * dark with a light halo. The tone is measured from the image itself, so a light theme no
- * longer has to wash the picture out to stay readable.
+/* ---- The learning area over a photo wallpaper -------------------------------------------
+ * With a photo behind it, the whole area reads one way — the photo's way, not the theme's.
+ * Cards, text and the scrim all follow the measured tone, so a screen never mixes light text
+ * on some blocks with dark text on others, and a light theme never has to wash the picture out
+ * to stay readable.
  *
- * Only text lying straight on the photo is affected. Opaque surfaces (cards, buttons, badges,
- * glass) re-point the tokens at the page's own *-base colours and set --halo to transparent,
- * which switches both the colour and the halo back off in one place. */
+ * Chips that state their own colours (badges, primary/secondary buttons, popovers) keep the
+ * theme's palette and drop the halo: they are opaque, so the photo never reaches their text. */
 
 [data-wallpaper-tone="dark"] {
   --halo: oklch(0.11 0.01 165 / 0.82);
   --photo-scrim: oklch(0.1 0.008 165 / 0.42);
 
-  --foreground: oklch(0.97 0.004 165);
-  --text-primary: oklch(0.97 0.004 165);
-  --text-secondary: oklch(0.88 0.005 165);
-  --text-muted: oklch(0.78 0.006 165);
+  --on-photo: oklch(0.97 0.004 165);
+  --on-photo-secondary: oklch(0.88 0.005 165);
+  --on-photo-muted: oklch(0.78 0.006 165);
+  --on-photo-surface: oklch(0.175 0.005 165);
+  --on-photo-border: oklch(1 0 0 / 0.14);
 }
 
 [data-wallpaper-tone="light"] {
@@ -549,31 +549,22 @@
    * picture; heavier than this and the photo starts to look washed. */
   --photo-scrim: oklch(1 0 0 / 0.3);
 
-  /* Faint text on a light photo needs one notch more weight than on a plain page. */
-  --text-secondary: oklch(0.33 0.013 165);
-  --text-muted: oklch(0.42 0.011 165);
+  --on-photo: oklch(0.19 0.012 165);
+  --on-photo-secondary: oklch(0.34 0.013 165);
+  --on-photo-muted: oklch(0.44 0.011 165);
+  --on-photo-surface: oklch(1 0 0);
+  --on-photo-border: oklch(0.2 0.02 165 / 0.12);
+}
+
+[data-wallpaper-tone] {
+  --foreground: var(--on-photo);
+  --text-primary: var(--on-photo);
+  --text-secondary: var(--on-photo-secondary);
+  --text-muted: var(--on-photo-muted);
 }
 
 [data-wallpaper-tone]
-  :is(
-    [class~="bg-surface"],
-    [class~="bg-surface-elevated"],
-    [class~="bg-card"],
-    [class~="bg-popover"],
-    [class~="bg-primary"],
-    [class~="bg-primary-subtle"],
-    [class~="bg-secondary"],
-    [class~="glass"],
-    [class~="glass-card"],
-    [class~="glass-panel"],
-    [class~="glass-frosted"],
-    [class~="journey-card"],
-    [class~="btn-liquid"],
-    button,
-    [role="radio"],
-    [role="tab"],
-    [data-slot="badge"]
-  ) {
+  :is([class~="bg-primary"], [class~="bg-secondary"], [class~="bg-surface-elevated"], [class~="bg-popover"], [class~="btn-liquid"]) {
   --halo: transparent;
 
   --foreground: var(--text-primary-base);
@@ -582,36 +573,24 @@
   --text-muted: var(--text-muted-card);
 }
 
+/* A card is opaque enough that its own text needs no halo, but it keeps the photo's palette. */
+[data-wallpaper-tone]
+  :is([class~="bg-surface"], [class~="bg-primary-subtle"], [class~="glass"], [class~="glass-card"], [class~="glass-panel"], [data-slot="badge"]) {
+  --halo: transparent;
+}
+
 /* Headings and body copy carry no colour utility — they inherit it from body, which resolved
  * --foreground long before this subtree redefined it. So the colour is set here as well, in the
  * base layer: utilities sit in a later layer, which keeps badges and anything else that states
  * its own text colour untouched. */
 
 @layer base {
-  [data-wallpaper-tone="dark"] {
-    color: oklch(0.97 0.004 165);
+  [data-wallpaper-tone] {
+    color: var(--on-photo);
   }
 
   [data-wallpaper-tone]
-    :is(
-      [class~="bg-surface"],
-      [class~="bg-surface-elevated"],
-      [class~="bg-card"],
-      [class~="bg-popover"],
-      [class~="bg-primary"],
-      [class~="bg-primary-subtle"],
-      [class~="bg-secondary"],
-      [class~="glass"],
-      [class~="glass-card"],
-      [class~="glass-panel"],
-      [class~="glass-frosted"],
-      [class~="journey-card"],
-      [class~="btn-liquid"],
-      button,
-      [role="radio"],
-      [role="tab"],
-      [data-slot="badge"]
-    ) {
+    :is([class~="bg-primary"], [class~="bg-secondary"], [class~="bg-surface-elevated"], [class~="bg-popover"], [class~="btn-liquid"]) {
     color: var(--text-primary-base);
   }
 }
@@ -626,14 +605,15 @@
 }
 
 /* ---- Cards in the learning area ---------------------------------------------------------
- * Frosted rather than solid, so a learner's wallpaper shows through them in both themes.
+ * Frosted rather than solid, so a learner's wallpaper shows through them in both themes, and
+ * every card-like block carries the same amount of glass — mixed opacities were the reason
+ * some blocks looked twice as transparent as their neighbours.
  *
- * Scoped to `main` and to the card pattern (`border` + `bg-surface`): menus, dialogs and
+ * Scoped to `main` and to the card pattern (`border` + a surface class): menus, dialogs and
  * toasts are portalled outside `main` and use bg-popover / bg-surface-elevated, which stay
- * opaque — they have to be readable over whatever they happen to cover. The mix keeps enough
- * of the surface for text inside a card to hold its contrast over any photo. */
+ * opaque — they have to be readable over whatever they happen to cover. */
 
-main :is([class~="bg-surface"][class~="border"]) {
+main :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][class~="border"]) {
   background-color: color-mix(in oklch, var(--surface) 88%, transparent);
   border-color: color-mix(in oklch, var(--border) 70%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
@@ -646,6 +626,17 @@ main :is([class~="bg-surface"][class~="border"]) {
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background-color: var(--surface);
   }
+}
+
+/* With a photo behind them, cards tint in the photo's direction — one number for both themes,
+ * so nothing on the page is more see-through than anything else. */
+main[data-wallpaper-tone] :is([class~="bg-surface"][class~="border"], [class~="bg-primary-subtle"][class~="border"]) {
+  background-color: color-mix(in oklch, var(--on-photo-surface) 86%, transparent);
+  border-color: var(--on-photo-border);
+}
+
+main[data-wallpaper-tone] :is([class~="bg-primary-subtle"][class~="border"]) {
+  background-color: color-mix(in oklch, color-mix(in oklch, var(--on-photo-surface) 90%, var(--primary)) 86%, transparent);
 }
 
 /* ---- Liquid: ambient light for AI, voice and progress moments ---------------------------- */

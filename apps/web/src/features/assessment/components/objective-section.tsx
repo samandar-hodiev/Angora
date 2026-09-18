@@ -162,7 +162,7 @@ function QuestionCard({
             key={option.id}
             value={option.id}
             className={cn(
-              "group flex w-full items-center gap-3 rounded-xl border bg-surface/50 px-4 py-3 text-left text-body-sm outline-none",
+              "group flex w-full items-center gap-3 rounded-xl border bg-surface px-4 py-3 text-left text-body-sm outline-none",
               "transition-[background-color,border-color] duration-micro ease-standard hover:border-primary/40 hover:bg-surface-hover",
               "data-[state=checked]:border-primary data-[state=checked]:bg-primary-subtle/50 focus-visible:ring-[3px] focus-visible:ring-ring/40",
             )}
