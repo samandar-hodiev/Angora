@@ -3,7 +3,7 @@
 import { Download, KeyRound, LogOut, Monitor, Moon, Sun, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/common/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { toast } from "@/components/ui/toast";
 import { useLogout, useSession } from "@/features/auth/hooks";
 import { useCurrentSubscription } from "@/features/subscription/hooks";
 import { errorMessage } from "@/lib/api/errors";
+import { cn } from "@/lib/utils";
 import type { ThemePreference } from "@/lib/theme";
 import { useTheme } from "@/providers/theme-provider";
 
@@ -40,9 +41,34 @@ const notificationOptions = [
   { key: "product_updates", label: "Product updates", description: "New features and learning content." },
 ] as const;
 
-function SettingsSection({ id, title, description, children }: { id: string; title: string; description?: string; children: ReactNode }) {
+function SettingsSection({
+  id,
+  title,
+  description,
+  flashed,
+  children,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  flashed: boolean;
+  children: ReactNode;
+}) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20 rounded-xl border bg-surface p-6">
+    <section
+      id={id}
+      aria-labelledby={`${id}-title`}
+      // Jumping here must clear the pinned title, or the section lands underneath it: the offset
+      // is the header, the area's padding, the title itself and the gap below it.
+      style={{ scrollMarginTop: "calc(var(--app-header-h, 3.5rem) + var(--main-pt, 1.5rem) + var(--page-title-h, 3.5rem) + 1.5rem)" }}
+      className={cn(
+        // An outline, not a ring: the card glass rule owns box-shadow, and a ring would be
+        // overridden by it. The outline fades out on its own when the flash ends.
+        "rounded-xl border bg-surface p-6 outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-500",
+        // A green edge for a moment after it is picked, so it is obvious where the jump landed.
+        flashed && "outline-primary",
+      )}
+    >
       <div className="mb-5 grid gap-1">
         <h2 id={`${id}-title`} className="text-h3">
           {title}
@@ -55,6 +81,8 @@ function SettingsSection({ id, title, description, children }: { id: string; tit
 }
 
 export function SettingsView() {
+  const [selected, setSelected] = useState("");
+  const [flash, setFlash] = useState<{ id: string; at: number } | null>(null);
   const { user } = useSession();
   const profile = useProfile();
   const update = useUpdateProfile();
@@ -63,6 +91,28 @@ export function SettingsView() {
   const subscription = useCurrentSubscription();
   const { preference } = useTheme();
   const { save: saveAppearance } = useSaveAppearance();
+
+  // Picking a section marks it in the menu and flashes it, so it is clear where the page landed.
+  const pick = (id: string) => {
+    setSelected(id);
+    setFlash({ id, at: Date.now() });
+  };
+
+  useEffect(() => {
+    const fromHash = () => {
+      const id = window.location.hash.slice(1);
+      if (id) pick(id);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timer = window.setTimeout(() => setFlash(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
 
   const notifications = (profile.data?.preferences?.notifications ?? {}) as Record<string, boolean>;
   const focus = (profile.data?.preferences?.focus_skills ?? []) as string[];
@@ -94,7 +144,17 @@ export function SettingsView() {
           >
             {sections.map(([id, label]) => (
               <li key={id}>
-                <a href={`#${id}`} className="block rounded-md px-3 py-1.5 text-body-sm text-fg-secondary hover:bg-surface-hover hover:text-foreground">
+                <a
+                  href={`#${id}`}
+                  onClick={() => pick(id)}
+                  aria-current={selected === id ? "true" : undefined}
+                  className={cn(
+                    "block rounded-md px-3 py-1.5 text-body-sm transition-colors duration-micro",
+                    selected === id
+                      ? "bg-primary-subtle font-medium text-primary-subtle-foreground"
+                      : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+                  )}
+                >
                   {label}
                 </a>
               </li>
@@ -103,7 +163,7 @@ export function SettingsView() {
         </nav>
 
         <div className="grid gap-6">
-          <SettingsSection id="account" title="Account" description="One account for web and the Engora mobile apps.">
+          <SettingsSection flashed={flash?.id === "account"} id="account" title="Account" description="One account for web and the Engora mobile apps.">
             <dl className="grid gap-4 text-body-sm sm:grid-cols-[10rem_1fr]">
               <dt className="text-fg-muted">Email</dt>
               <dd className="break-all">{user?.email}</dd>
@@ -116,7 +176,7 @@ export function SettingsView() {
             </dl>
           </SettingsSection>
 
-          <SettingsSection id="appearance" title="Appearance" description="Saved to your account, so it follows you to other devices.">
+          <SettingsSection flashed={flash?.id === "appearance"} id="appearance" title="Appearance" description="Saved to your account, so it follows you to other devices.">
             <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Theme">
               {(
                 [
@@ -134,6 +194,7 @@ export function SettingsView() {
           </SettingsSection>
 
           <SettingsSection
+            flashed={flash?.id === "background"}
             id="background"
             title="Background"
             description="Your own wallpaper behind the learning area. The header and sidebar stay as they are."
@@ -141,7 +202,7 @@ export function SettingsView() {
             <WallpaperPicker />
           </SettingsSection>
 
-          <SettingsSection id="notifications" title="Notifications">
+          <SettingsSection flashed={flash?.id === "notifications"} id="notifications" title="Notifications">
             <ul className="grid gap-5">
               {notificationOptions.map((opt) => (
                 <li key={opt.key} className="flex items-center justify-between gap-4">
@@ -160,7 +221,7 @@ export function SettingsView() {
             </ul>
           </SettingsSection>
 
-          <SettingsSection id="learning" title="Learning preferences" description="Level, goals and daily time shape your plan.">
+          <SettingsSection flashed={flash?.id === "learning"} id="learning" title="Learning preferences" description="Level, goals and daily time shape your plan.">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap gap-2">
                 {profile.data?.current_level && <Badge variant="secondary">Level {profile.data.current_level}</Badge>}
@@ -182,7 +243,7 @@ export function SettingsView() {
             </div>
           </SettingsSection>
 
-          <SettingsSection id="language" title="Language">
+          <SettingsSection flashed={flash?.id === "language"} id="language" title="Language">
             <div className="grid max-w-xs gap-2">
               <Label htmlFor="ui-language">Interface language</Label>
               <NativeSelect id="ui-language" defaultValue="en" disabled>
@@ -192,7 +253,7 @@ export function SettingsView() {
             </div>
           </SettingsSection>
 
-          <SettingsSection id="privacy" title="Privacy" description="Self-service export and deletion are on the way. Until then, contact support.">
+          <SettingsSection flashed={flash?.id === "privacy"} id="privacy" title="Privacy" description="Self-service export and deletion are on the way. Until then, contact support.">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" disabled>
                 <Download aria-hidden /> Download my data
@@ -203,7 +264,7 @@ export function SettingsView() {
             </div>
           </SettingsSection>
 
-          <SettingsSection id="security" title="Security">
+          <SettingsSection flashed={flash?.id === "security"} id="security" title="Security">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" asChild>
                 <Link href="/forgot-password">
@@ -216,7 +277,7 @@ export function SettingsView() {
             </div>
           </SettingsSection>
 
-          <SettingsSection id="subscription" title="Subscription">
+          <SettingsSection flashed={flash?.id === "subscription"} id="subscription" title="Subscription">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <p className="text-body">
                 Current plan: <span className="font-medium">{subscription.data?.entitlements.plan_name ?? "…"}</span>
