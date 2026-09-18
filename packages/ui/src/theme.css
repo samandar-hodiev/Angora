@@ -23,7 +23,7 @@
   color-scheme: light;
 
   --background: oklch(0.985 0.003 165);
-  --foreground: oklch(0.19 0.012 165);
+  --foreground: var(--text-primary-base);
 
   --surface: oklch(1 0 0);
   --surface-elevated: oklch(1 0 0);
@@ -50,9 +50,15 @@
   --info: oklch(0.55 0.05 230);
   --info-foreground: oklch(0.99 0 0);
 
-  --text-primary: oklch(0.19 0.012 165);
-  --text-secondary: oklch(0.4 0.012 165);
-  --text-muted: oklch(0.53 0.01 165);
+  /* *-base hold the page's own text colours; the tokens below point at them, so a scoped
+   * override (see "Text over a photo wallpaper") can restore them without repeating values. */
+  --text-primary-base: oklch(0.19 0.012 165);
+  --text-secondary-base: oklch(0.4 0.012 165);
+  --text-muted-base: oklch(0.53 0.01 165);
+
+  --text-primary: var(--text-primary-base);
+  --text-secondary: var(--text-secondary-base);
+  --text-muted: var(--text-muted-base);
   --text-disabled: oklch(0.72 0.006 165);
 
   --ring: oklch(69.6% 0.17 162.48);
@@ -85,7 +91,7 @@
   color-scheme: dark;
 
   --background: oklch(0.14 0.004 165);
-  --foreground: oklch(0.96 0.004 165);
+  --foreground: var(--text-primary-base);
 
   --surface: oklch(0.175 0.005 165);
   --surface-elevated: oklch(0.205 0.006 165);
@@ -112,9 +118,13 @@
   --info: oklch(0.72 0.05 230);
   --info-foreground: oklch(0.16 0.02 165);
 
-  --text-primary: oklch(0.96 0.004 165);
-  --text-secondary: oklch(0.79 0.006 165);
-  --text-muted: oklch(0.64 0.008 165);
+  --text-primary-base: oklch(0.96 0.004 165);
+  --text-secondary-base: oklch(0.79 0.006 165);
+  --text-muted-base: oklch(0.64 0.008 165);
+
+  --text-primary: var(--text-primary-base);
+  --text-secondary: var(--text-secondary-base);
+  --text-muted: var(--text-muted-base);
   --text-disabled: oklch(0.47 0.006 165);
 
   --ring: oklch(69.6% 0.17 162.48);
@@ -505,37 +515,73 @@
 }
 
 /* ---- Text over a photo wallpaper --------------------------------------------------------
- * A learner's photo sits behind the main area, and the faintest text (labels, captions) is
- * the first thing it costs. Veiling the photo until those labels pass on their own would
- * leave almost no photo, so instead the muted and secondary tokens step up one notch inside
- * that area only. Everything keeps its hierarchy; the wallpaper keeps more of itself.
- * The text utilities compile to color: var(--text-muted) / var(--text-secondary), so those are
- * the names to redefine here; the mapped --color-fg-* names never reach the rendered colour. */
+ * Which way text runs is decided by the photo, not by the theme: on a dark photo it goes light
+ * with a dark halo — the reading dark mode already gives it — and on a light photo it stays
+ * dark with a light halo. The tone is measured from the image itself, so a light theme no
+ * longer has to wash the picture out to stay readable.
+ *
+ * Only text lying straight on the photo is affected. Opaque surfaces (cards, buttons, badges,
+ * glass) re-point the tokens at the page's own *-base colours and set --halo to transparent,
+ * which switches both the colour and the halo back off in one place. */
 
-[data-wallpaper="photo"] {
+[data-wallpaper-tone="dark"] {
+  --halo: oklch(0.11 0.01 165 / 0.82);
+  --photo-scrim: oklch(0.1 0.008 165 / 0.42);
+
+  --foreground: oklch(0.97 0.004 165);
+  --text-primary: oklch(0.97 0.004 165);
+  --text-secondary: oklch(0.88 0.005 165);
+  --text-muted: oklch(0.78 0.006 165);
+}
+
+[data-wallpaper-tone="light"] {
+  --halo: var(--background);
+  --photo-scrim: oklch(1 0 0 / 0.45);
+
+  /* Faint text on a light photo needs one notch more weight than on a plain page. */
   --text-secondary: oklch(0.33 0.013 165);
   --text-muted: oklch(0.42 0.011 165);
+}
 
-  @variant dark {
-    --text-secondary: oklch(0.85 0.006 165);
-    --text-muted: oklch(0.72 0.008 165);
+[data-wallpaper-tone]
+  :is(
+    [class~="bg-surface"],
+    [class~="bg-surface-elevated"],
+    [class~="bg-card"],
+    [class~="bg-popover"],
+    [class~="bg-primary"],
+    [class~="bg-primary-subtle"],
+    [class~="bg-secondary"],
+    [class~="glass"],
+    [class~="glass-card"],
+    [class~="glass-panel"],
+    [class~="glass-frosted"],
+    [class~="journey-card"],
+    [class~="btn-liquid"],
+    button,
+    [role="radio"],
+    [role="tab"],
+    [data-slot="badge"]
+  ) {
+  --halo: transparent;
+
+  --foreground: var(--text-primary-base);
+  --text-primary: var(--text-primary-base);
+  --text-secondary: var(--text-secondary-base);
+  --text-muted: var(--text-muted-base);
+}
+
+/* Headings and body copy carry no colour utility — they inherit it from body, which resolved
+ * --foreground long before this subtree redefined it. So the colour is set here as well, in the
+ * base layer: utilities sit in a later layer, which keeps badges and anything else that states
+ * its own text colour untouched. */
+
+@layer base {
+  [data-wallpaper-tone="dark"] {
+    color: oklch(0.97 0.004 165);
   }
 
-  /* Text lying straight on the photo carries its own halo in the page colour — the trick
-   * desktop wallpapers use — so the picture stays visible instead of being veiled away. */
-  & :is(h1, h2, h3, h4, p, span, a, li, dt, dd, label, strong) {
-    /* Layers stack, so a couple of tight repeats give small glyphs the density they need.
-     * Wide radii are deliberately left out: they read as a white smear around the type. */
-    text-shadow:
-      0 0 1px var(--background),
-      0 0 1px var(--background),
-      0 0 2px var(--background),
-      0 0 4px var(--background);
-  }
-
-  /* Anything on an opaque surface already has a background of its own: no halo needed, and a
-   * halo there would only smudge the type. Class names are matched as whole tokens. */
-  &
+  [data-wallpaper-tone]
     :is(
       [class~="bg-surface"],
       [class~="bg-surface-elevated"],
@@ -549,14 +595,23 @@
       [class~="glass-panel"],
       [class~="glass-frosted"],
       [class~="journey-card"],
-      [class~="btn-liquid"]
-    )
-    :is(h1, h2, h3, h4, p, span, a, li, dt, dd, label, strong),
-  &
-    :is(button, [role="radio"], [role="tab"], [data-slot="badge"])
-    :is(span, p, strong) {
-    text-shadow: none;
+      [class~="btn-liquid"],
+      button,
+      [role="radio"],
+      [role="tab"],
+      [data-slot="badge"]
+    ) {
+    color: var(--text-primary-base);
   }
+}
+
+[data-wallpaper-tone] :is(h1, h2, h3, h4, p, span, a, li, dt, dd, label, strong) {
+  /* Tight repeats build the density small glyphs need; wide radii read as a smear. */
+  text-shadow:
+    0 0 1px var(--halo),
+    0 0 1px var(--halo),
+    0 0 2px var(--halo),
+    0 0 4px var(--halo);
 }
 
 /* ---- Liquid: ambient light for AI, voice and progress moments ---------------------------- */

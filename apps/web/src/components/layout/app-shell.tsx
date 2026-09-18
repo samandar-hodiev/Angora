@@ -84,8 +84,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <main
           id="main"
-          // Tells the theme that faint text here has a photo behind it (see theme.css).
-          data-wallpaper={wallpaper.selection === "custom" ? "photo" : undefined}
+          // Tells the theme a photo sits behind this area, and which way it reads, so text on it
+          // can follow the picture instead of the theme (see theme.css).
+          data-wallpaper-tone={wallpaper.selection === "custom" ? (wallpaper.tone ?? "dark") : undefined}
           className="relative isolate flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8"
         >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}

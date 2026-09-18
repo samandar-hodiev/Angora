@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 import { useProfile } from "../hooks";
 import { useRemoveWallpaper, useUploadWallpaper } from "../setup-api";
-import { useSaveWallpaper, wallpaperPresets, wallpaperSelection, type WallpaperId } from "../wallpaper";
+import { measureWallpaperTone, useSaveWallpaper, wallpaperPresets, wallpaperSelection, type WallpaperId } from "../wallpaper";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -39,7 +39,7 @@ function Swatch({ label, preview, selected, onSelect }: { label: string; preview
   );
 }
 
-/** Background picker: five built-in looks, or the learner's own image. */
+/** Background picker: ten built-in gradients, or the learner's own image. */
 export function WallpaperPicker() {
   const { data: profile } = useProfile();
   const { save, saveAsync } = useSaveWallpaper();
@@ -68,9 +68,12 @@ export function WallpaperPicker() {
       return;
     }
     try {
+      // Measured from the local file: it decides whether text over this photo goes light or
+      // dark, so the picture never has to be washed out to stay readable.
+      const tone = await measureWallpaperTone(file);
       await upload.mutateAsync(file);
       // The upload only stores the image; this is what puts it on screen.
-      await saveAsync("custom");
+      await saveAsync("custom", tone);
     } catch (err) {
       setError(errorMessage(err));
     }
