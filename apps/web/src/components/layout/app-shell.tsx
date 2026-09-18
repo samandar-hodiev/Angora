@@ -89,7 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           // header above: anything pinned inside the area measures from it.
           data-wallpaper-tone={wallpaper.selection === "custom" ? (wallpaper.tone ?? "dark") : undefined}
           style={{ "--app-header-h": "3.5rem" } as CSSProperties}
-          className="relative isolate flex-1 px-4 pt-6 pb-32 sm:px-6 md:pb-12 lg:px-10 lg:pt-8"
+          className="relative isolate flex-1 px-4 pt-(--main-pt) pb-32 [--main-pt:1.5rem] sm:px-6 md:pb-12 lg:px-10 lg:[--main-pt:2rem]"
         >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
           <WallpaperLayer />

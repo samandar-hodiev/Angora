@@ -89,7 +89,7 @@ export function SettingsView() {
               height the title itself publishes — so the two stay put while the sections scroll
               past, at any width or zoom. The lower z keeps the title on top if they ever meet. */}
           <ul
-            style={{ top: "calc(var(--app-header-h, 3.5rem) + var(--page-title-h, 3.5rem) + 0.75rem)" }}
+            style={{ top: "calc(var(--app-header-h, 3.5rem) + var(--page-title-h, 3.5rem) + 1.5rem)" }}
             className="sticky z-10 grid gap-0.5 rounded-xl border bg-surface p-2"
           >
             {sections.map(([id, label]) => (
