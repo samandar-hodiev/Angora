@@ -85,7 +85,7 @@
   /* Settles a photo wallpaper in the theme's direction. Two strengths: a photo that already
    * runs with the theme needs little, one that runs against it needs more, or the text lying
    * straight on it loses its contrast (see "Text over a photo wallpaper"). */
-  --photo-scrim: oklch(1 0 0 / 0.34);
+  --photo-scrim: oklch(1 0 0 / 0.26);
   --photo-scrim-clash: oklch(1 0 0 / 0.7);
 
   /* A clear grey, not off-white: the frosted shell has to read as its own surface next to the
@@ -256,6 +256,9 @@
   --animate-liquid: liquid-drift 10s var(--ease-standard) infinite alternate;
   --animate-liquid-slow: liquid-drift 18s var(--ease-standard) infinite
     alternate-reverse;
+  /* The aurora wallpaper: slow curtains that drift, wave and brighten, never in step. */
+  --animate-aurora: aurora-drift 16s var(--ease-standard) infinite alternate;
+  --animate-aurora-slow: aurora-drift 26s var(--ease-standard) infinite alternate-reverse;
   --animate-breathe: breathe 2.4s var(--ease-standard) infinite;
   --animate-shimmer: shimmer 2s linear infinite;
 
@@ -268,6 +271,20 @@
     }
     100% {
       transform: translate3d(-5%, 4%, 0) scale(0.96);
+    }
+  }
+  @keyframes aurora-drift {
+    0% {
+      transform: translate3d(-6%, -4%, 0) scale(1) skewY(-4deg);
+      opacity: 0.7;
+    }
+    50% {
+      transform: translate3d(8%, 6%, 0) scale(1.16) skewY(3deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translate3d(-4%, 10%, 0) scale(0.94) skewY(-2deg);
+      opacity: 0.8;
     }
   }
   @keyframes breathe {

@@ -9,8 +9,10 @@ import { apiAssetUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 import { useProfile } from "../hooks";
+import { AuroraCurtain } from "./wallpaper-layer";
 import { useRemoveWallpaper, useUploadWallpaper } from "../setup-api";
 import {
+  isAnimatedPreset,
   measureWallpaperTone,
   useSaveWallpaper,
   wallpaperPhotoUrl,
@@ -26,7 +28,19 @@ const tile = "grid gap-2 rounded-xl border p-1.5 text-left outline-none transiti
 const thumb = "grid h-16 place-items-center rounded-lg border bg-surface-active bg-cover bg-center";
 
 /** One built-in background. Part of the radio group, so arrow keys walk the set. */
-function PresetSwatch({ label, preview, selected, onSelect }: { label: string; preview: string | null; selected: boolean; onSelect: () => void }) {
+function PresetSwatch({
+  label,
+  preview,
+  animated,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  preview: string | null;
+  animated?: boolean;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   return (
     <button
       type="button"
@@ -35,8 +49,10 @@ function PresetSwatch({ label, preview, selected, onSelect }: { label: string; p
       onClick={onSelect}
       className={cn(tile, selected ? "border-primary ring-1 ring-primary" : "hover:border-primary/40")}
     >
-      <span aria-hidden className={thumb} style={preview ? { backgroundImage: preview } : undefined}>
+      {/* The animated preset previews itself, so what the swatch shows is what the area gets. */}
+      <span aria-hidden className={cn(thumb, "relative overflow-clip")} style={preview ? { backgroundImage: preview } : undefined}>
         {!preview && <ImageOff className="size-4 text-fg-muted" />}
+        {animated && <AuroraCurtain />}
       </span>
       <span className="px-1 pb-0.5 text-caption text-fg-secondary">{label}</span>
     </button>
@@ -104,6 +120,7 @@ export function WallpaperPicker() {
             key={preset.id}
             label={preset.label}
             preview={preset.image}
+            animated={isAnimatedPreset(preset)}
             selected={selection === preset.id}
             onSelect={() => choose(preset.id)}
           />

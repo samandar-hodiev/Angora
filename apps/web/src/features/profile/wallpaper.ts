@@ -46,10 +46,13 @@ export const wallpaperPresets = [
       "radial-gradient(70% 60% at 20% 10%, oklch(0.75 0.03 165 / 0.35), transparent 72%), radial-gradient(60% 50% at 85% 25%, oklch(0.7 0.02 240 / 0.28), transparent 72%), radial-gradient(75% 60% at 50% 100%, oklch(0.8 0.02 140 / 0.22), transparent 72%)",
   },
   {
-    id: "forest",
-    label: "Forest",
+    // The one preset that moves: a northern-lights curtain drifting behind the content. The
+    // still gradient below is what a reduced-motion setting (and the swatch) falls back to.
+    id: "aurora-live",
+    label: "Aurora live",
+    animated: true,
     image:
-      "radial-gradient(62% 52% at 18% 12%, oklch(0.55 0.13 152 / 0.44), transparent 70%), radial-gradient(56% 48% at 84% 24%, oklch(0.62 0.1 175 / 0.32), transparent 70%), radial-gradient(70% 58% at 46% 98%, oklch(0.48 0.1 145 / 0.3), transparent 72%)",
+      "radial-gradient(60% 45% at 22% 18%, oklch(0.78 0.17 158 / 0.5), transparent 70%), radial-gradient(52% 42% at 72% 26%, oklch(0.72 0.14 196 / 0.42), transparent 70%), radial-gradient(64% 50% at 48% 92%, oklch(0.62 0.16 292 / 0.32), transparent 72%)",
   },
   {
     id: "blossom",
@@ -84,6 +87,18 @@ export const wallpaperPresets = [
 ] as const;
 
 export type PresetId = (typeof wallpaperPresets)[number]["id"];
+export type WallpaperPreset = (typeof wallpaperPresets)[number];
+
+/** Only one preset moves, so the flag is optional across the set. */
+export function isAnimatedPreset(preset: WallpaperPreset | null): boolean {
+  return !!preset && "animated" in preset && preset.animated === true;
+}
+
+/** The preset behind a selection, if the learner picked one of the built-ins. */
+export function wallpaperPreset(profile: Profile | undefined): WallpaperPreset | null {
+  const selection = wallpaperSelection(profile);
+  return wallpaperPresets.find((preset) => preset.id === selection) ?? null;
+}
 export type WallpaperId = PresetId | "custom" | "none";
 
 /** Whether the photo itself is dark or light. Text over it follows this, not the theme. */
@@ -96,6 +111,8 @@ export function wallpaperSelection(profile: Profile | undefined): WallpaperId {
   const saved = profile?.preferences?.wallpaper;
   if (typeof saved !== "string") return "none";
   if (saved === "custom") return profile?.wallpaper_url ? "custom" : "none";
+  // The forest preset became the animated aurora; anyone already on it moves across with it.
+  if (saved === "forest") return "aurora-live";
   return wallpaperPresets.some((p) => p.id === saved) ? (saved as PresetId) : "none";
 }
 
@@ -168,6 +185,7 @@ export function useWallpaper() {
     selection: wallpaperSelection(profile),
     tone: wallpaperTone(profile),
     photoUrl: wallpaperPhotoUrl(profile),
+    preset: wallpaperPreset(profile),
   };
 }
 

@@ -18,6 +18,10 @@ export function ReadingView({ initialContentId }: { initialContentId?: string })
   const item = useContentItem<ReadingPassageBody>(current?.id);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const body = item.data?.body;
+  // A passage may arrive without questions, or mid-load without a body: read both defensively
+  // rather than trusting the shape, or the whole page throws on `.length`.
+  const questions = body?.questions ?? [];
+  const paragraphs = body?.passage?.split(/\n{2,}/) ?? [];
   const answered = Object.keys(answers).length;
 
   return (
@@ -54,7 +58,7 @@ export function ReadingView({ initialContentId }: { initialContentId?: string })
             </div>
           ) : (
             <div className="grid max-w-[65ch] gap-5 text-body-lg leading-8 text-foreground">
-              {body?.passage.split(/\n{2,}/).map((para, i) => (
+              {paragraphs.map((para, i) => (
                 <p key={i}>{para}</p>
               ))}
             </div>
@@ -67,13 +71,17 @@ export function ReadingView({ initialContentId }: { initialContentId?: string })
               <h2 id="questions-title" className="text-h3">
                 Questions
               </h2>
-              {body && (
+              {questions.length > 0 && (
                 <span className="text-label text-fg-muted tabular-nums">
-                  {answered} / {body.questions.length} answered
+                  {answered} / {questions.length} answered
                 </span>
               )}
             </div>
-            {body && <QuestionList questions={body.questions} answers={answers} onAnswer={(q, o) => setAnswers((a) => ({ ...a, [q]: o }))} />}
+            {questions.length > 0 ? (
+              <QuestionList questions={questions} answers={answers} onAnswer={(q, o) => setAnswers((a) => ({ ...a, [q]: o }))} />
+            ) : (
+              !item.isPending && <p className="text-body-sm text-fg-muted">This passage has no questions yet.</p>
+            )}
             <Tooltip content="Checking answers arrives with the reading release.">
               <span tabIndex={0}>
                 <Button className="w-full" disabled>

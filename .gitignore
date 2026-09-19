@@ -25,3 +25,6 @@ var/
 .idea/
 .vscode/
 *.log
+
+# Local screenshots shared during review, not part of the app
+images/

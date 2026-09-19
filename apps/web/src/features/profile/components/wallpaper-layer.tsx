@@ -4,7 +4,22 @@ import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { measureWallpaperTone, useSaveWallpaper, useWallpaper, type WallpaperTone } from "../wallpaper";
+import { isAnimatedPreset, measureWallpaperTone, useSaveWallpaper, useWallpaper, type WallpaperTone } from "../wallpaper";
+
+/**
+ * Northern lights: three soft curtains drifting out of step with each other. Sized in percent so
+ * the same markup works behind the whole learning area and inside a preview swatch, and stilled
+ * for anyone who asked for less motion.
+ */
+export function AuroraCurtain() {
+  return (
+    <span aria-hidden className="absolute inset-0 overflow-clip">
+      <span className="absolute -top-1/4 -left-1/5 h-[75%] w-[55%] animate-aurora rounded-full bg-[radial-gradient(closest-side,oklch(0.8_0.18_158_/_0.55),transparent)] blur-2xl motion-reduce:animate-none" />
+      <span className="absolute -top-[10%] left-1/3 h-[85%] w-[45%] animate-aurora-slow rounded-full bg-[radial-gradient(closest-side,oklch(0.74_0.14_196_/_0.45),transparent)] blur-2xl motion-reduce:animate-none" />
+      <span className="absolute right-0 -bottom-1/5 h-[70%] w-[50%] animate-aurora rounded-full bg-[radial-gradient(closest-side,oklch(0.64_0.17_292_/_0.4),transparent)] blur-2xl [animation-delay:-7s] motion-reduce:animate-none" />
+    </span>
+  );
+}
 
 /** The learning area, in the shell's own terms: below the header, right of the sidebar. */
 const frame = "pointer-events-none fixed top-14 right-0 bottom-0 left-0 md:left-62";
@@ -38,7 +53,7 @@ function scrim(tone: WallpaperTone) {
  * the theme in theme.css. The presets are translucent colour washes already and need none of it.
  */
 export function WallpaperLayer() {
-  const { image, selection, tone, photoUrl } = useWallpaper();
+  const { image, selection, tone, photoUrl, preset } = useWallpaper();
   const { saveTone } = useSaveWallpaper();
   const measured = useRef(false);
 
@@ -54,7 +69,11 @@ export function WallpaperLayer() {
   if (!image) return null;
 
   if (selection !== "custom") {
-    return <span aria-hidden className={cn(frame, "-z-10 bg-cover bg-center")} style={{ backgroundImage: image }} />;
+    return (
+      <span aria-hidden className={cn(frame, "-z-10 bg-cover bg-center")} style={{ backgroundImage: image }}>
+        {isAnimatedPreset(preset) && <AuroraCurtain />}
+      </span>
+    );
   }
 
   return (
@@ -72,7 +91,7 @@ export function WallpaperLayer() {
  * two line up exactly. With no wallpaper it is simply the page's own colour.
  */
 export function WallpaperMask() {
-  const { image, selection, tone } = useWallpaper();
+  const { image, selection, tone, preset } = useWallpaper();
   const clip = { clipPath: `inset(0 0 calc(100% - ${maskHeight}) 0)` };
 
   if (!image) return <span aria-hidden className={cn(frame, "z-10 bg-background")} style={clip} />;
@@ -81,6 +100,7 @@ export function WallpaperMask() {
     return (
       <span aria-hidden className={cn(frame, "z-10 bg-background")} style={clip}>
         <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: image }} />
+        {isAnimatedPreset(preset) && <AuroraCurtain />}
       </span>
     );
   }
