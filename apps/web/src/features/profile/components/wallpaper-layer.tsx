@@ -7,16 +7,26 @@ import { cn } from "@/lib/utils";
 import { isAnimatedPreset, measureWallpaperTone, useSaveWallpaper, useWallpaper, type WallpaperTone } from "../wallpaper";
 
 /**
- * Northern lights: three soft curtains drifting out of step with each other. Sized in percent so
- * the same markup works behind the whole learning area and inside a preview swatch, and stilled
- * for anyone who asked for less motion.
+ * Northern lights, drawn the way the real thing looks: a bright ribbon arcing across a night sky
+ * with a sharp lower edge and a soft glow rising above it, a fainter band higher up, and a column
+ * of light where the ribbon turns. The night sky itself is the preset's own gradient; these are
+ * the lights on top of it. Everything is a soft gradient — an earlier version drew the rays as a
+ * repeating gradient, which read as zebra stripes rather than light.
+ *
+ * Everything moves slowly — the ribbons drift and swell over three quarters of a minute, the rays
+ * shimmer sideways — so it reads as alive rather than as something flying past. Sized in percent,
+ * so the same markup works behind the whole learning area and inside a preview swatch, and
+ * reduced motion stills it.
  */
 export function AuroraCurtain() {
   return (
     <span aria-hidden className="absolute inset-0 overflow-clip">
-      <span className="absolute -top-1/4 -left-1/5 h-[75%] w-[55%] animate-aurora rounded-full bg-[radial-gradient(closest-side,oklch(0.8_0.18_158_/_0.55),transparent)] blur-2xl motion-reduce:animate-none" />
-      <span className="absolute -top-[10%] left-1/3 h-[85%] w-[45%] animate-aurora-slow rounded-full bg-[radial-gradient(closest-side,oklch(0.74_0.14_196_/_0.45),transparent)] blur-2xl motion-reduce:animate-none" />
-      <span className="absolute right-0 -bottom-1/5 h-[70%] w-[50%] animate-aurora rounded-full bg-[radial-gradient(closest-side,oklch(0.64_0.17_292_/_0.4),transparent)] blur-2xl [animation-delay:-7s] motion-reduce:animate-none" />
+      {/* The main ribbon: brightest along its lower edge, fading upwards into the sky. */}
+      <span className="absolute top-[16%] -left-[30%] h-[48%] w-[160%] animate-aurora rounded-[50%] bg-[radial-gradient(68%_52%_at_50%_86%,oklch(0.96_0.28_148_/_0.98),oklch(0.86_0.26_152_/_0.7)_24%,oklch(0.66_0.18_168_/_0.26)_54%,transparent_76%)] blur-md motion-reduce:animate-none" />
+      {/* A second, fainter band higher up, out of step with the first. */}
+      <span className="absolute top-[2%] -left-[20%] h-[40%] w-[150%] animate-aurora-slow rounded-[50%] bg-[radial-gradient(64%_54%_at_45%_86%,oklch(0.89_0.2_155_/_0.5),oklch(0.71_0.16_182_/_0.2)_45%,transparent_76%)] blur-2xl motion-reduce:animate-none" />
+      {/* Where the ribbon turns it stands up as a soft column of light, as in the photograph. */}
+      <span className="absolute top-[12%] left-[6%] h-[62%] w-[26%] animate-aurora-slow rounded-[50%] bg-[radial-gradient(48%_60%_at_50%_45%,oklch(0.92_0.24_152_/_0.45),oklch(0.72_0.18_168_/_0.18)_50%,transparent_78%)] blur-2xl motion-reduce:animate-none" />
     </span>
   );
 }

@@ -51,8 +51,10 @@ export const wallpaperPresets = [
     id: "aurora-live",
     label: "Aurora live",
     animated: true,
+    // A full night sky rather than a translucent wash, because the ribbon above it only reads
+    // against something dark. Text over it is handled like a dark photo (see useWallpaper).
     image:
-      "radial-gradient(60% 45% at 22% 18%, oklch(0.78 0.17 158 / 0.5), transparent 70%), radial-gradient(52% 42% at 72% 26%, oklch(0.72 0.14 196 / 0.42), transparent 70%), radial-gradient(64% 50% at 48% 92%, oklch(0.62 0.16 292 / 0.32), transparent 72%)",
+      "linear-gradient(168deg, oklch(0.19 0.06 258) 0%, oklch(0.23 0.07 236) 38%, oklch(0.29 0.08 205) 66%, oklch(0.2 0.05 248) 100%)",
   },
   {
     id: "blossom",
@@ -180,12 +182,15 @@ export async function measureWallpaperTone(source: File | string): Promise<Wallp
 
 export function useWallpaper() {
   const { data: profile } = useProfile();
+  const preset = wallpaperPreset(profile);
   return {
     image: wallpaperImage(profile),
     selection: wallpaperSelection(profile),
-    tone: wallpaperTone(profile),
+    // The animated aurora is a night scene, so text over it reads the way it does over a dark
+    // photo: light, with a dark halo.
+    tone: isAnimatedPreset(preset) ? ("dark" as WallpaperTone) : wallpaperTone(profile),
     photoUrl: wallpaperPhotoUrl(profile),
-    preset: wallpaperPreset(profile),
+    preset,
   };
 }
 
