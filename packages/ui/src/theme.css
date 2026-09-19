@@ -82,12 +82,6 @@
   --liquid-2: oklch(0.8 0.09 185 / 0.2);
   --liquid-3: oklch(0.86 0.08 140 / 0.18);
 
-  /* Settles a photo wallpaper in the theme's direction. Two strengths: a photo that already
-   * runs with the theme needs little, one that runs against it needs more, or the text lying
-   * straight on it loses its contrast (see "Text over a photo wallpaper"). */
-  --photo-scrim: oklch(1 0 0 / 0.26);
-  --photo-scrim-clash: oklch(1 0 0 / 0.7);
-
   /* A clear grey, not off-white: the frosted shell has to read as its own surface next to the
    * white cards instead of blending into the page. Dark mode keeps its own values below. */
   --frost-bg: oklch(0.875 0.006 165 / 0.78);
@@ -162,9 +156,6 @@
   --liquid-1: oklch(69.6% 0.17 162.48 / 0.24);
   --liquid-2: oklch(0.6 0.1 185 / 0.15);
   --liquid-3: oklch(0.55 0.1 140 / 0.13);
-
-  --photo-scrim: oklch(0.11 0.006 165 / 0.24);
-  --photo-scrim-clash: oklch(0.11 0.006 165 / 0.5);
 
   --frost-bg: oklch(0.21 0.005 165 / 0.4);
   --frost-bg-scrolled: oklch(0.18 0.005 165 / 0.62);
@@ -563,40 +554,85 @@
 }
 
 /* ---- Text over a photo wallpaper --------------------------------------------------------
- * The theme decides how the app reads: dark mode keeps dark glass cards with light text over
- * any wallpaper, light mode keeps light cards with dark text. Only three things react to the
- * picture — the scrim that settles it behind the content (see --photo-scrim per theme), the
- * halo that keeps bare text legible over whatever the photo is doing there, and one notch more
- * weight on the faintest text, which is the first thing a photo costs.
+ * The picture looks the same in both themes: it is never washed towards the theme, only settled
+ * by a light scrim in its own direction. What adapts is the text lying straight on it, which
+ * follows the photo — light with a dark halo over a dark picture, dark with a light halo over a
+ * bright one — the way labels on a desktop wallpaper do.
  *
- * An earlier version flipped the whole area to the photo's own tone. That turned dark mode
- * white under a bright photo, which is not what dark mode is for. */
+ * Cards never follow the photo: dark mode keeps dark glass, light mode keeps light glass, and
+ * their text stays the theme's own (restored below from the *-base tokens). When the photo runs
+ * against the theme the cards simply carry more glass, so their text still has its contrast. */
 
-[data-wallpaper-tone] {
-  --halo: var(--background);
-
-  --text-secondary: var(--text-secondary-card);
-  --text-muted: var(--text-muted-card);
+[data-wallpaper-tone="dark"] {
+  --halo: oklch(0.1 0.01 165 / 0.95);
+  --photo-scrim: oklch(0.1 0.008 165 / 0.2);
+  --on-photo: oklch(0.97 0.004 165);
+  --on-photo-secondary: oklch(0.9 0.005 165);
+  --on-photo-muted: oklch(0.82 0.006 165);
 }
 
-/* Anything with a background of its own — cards, chips, badges, buttons — needs no halo: the
- * photo never reaches its text. */
+[data-wallpaper-tone="light"] {
+  --halo: oklch(1 0 0 / 0.9);
+  --photo-scrim: oklch(1 0 0 / 0.14);
+  --on-photo: oklch(0.17 0.012 165);
+  --on-photo-secondary: oklch(0.28 0.013 165);
+  --on-photo-muted: oklch(0.3 0.012 165);
+}
+
+[data-wallpaper-tone] {
+  --foreground: var(--on-photo);
+  --text-primary: var(--on-photo);
+  --text-secondary: var(--on-photo-secondary);
+  --text-muted: var(--on-photo-muted);
+}
+
+/* Anything with a background of its own — cards, chips, buttons, menus — keeps the theme's text
+ * and needs no halo: the photo never reaches it. */
 [data-wallpaper-tone]
   :is(
     [class~="bg-surface"],
     [class~="bg-surface-hover"],
     [class~="bg-surface-active"],
+    [class~="bg-surface-elevated"],
+    [class~="bg-popover"],
     [class~="bg-primary"],
     [class~="bg-primary-subtle"],
     [class~="bg-secondary"],
     [class~="btn-liquid"],
     [class~="glass"],
     [class~="glass-card"],
-    [class~="glass-panel"],
-    [data-slot="badge"],
-    button
+    [class~="glass-panel"]
   ) {
   --halo: transparent;
+  --foreground: var(--text-primary-base);
+  --text-primary: var(--text-primary-base);
+  --text-secondary: var(--text-secondary-card);
+  --text-muted: var(--text-muted-card);
+}
+
+/* Headings and body copy carry no colour utility — they inherit it from body, which resolved
+ * --foreground before this subtree redefined it — so the colour is set here too, in the base
+ * layer, where any element that states its own colour (a badge, a button) still wins. */
+@layer base {
+  [data-wallpaper-tone] {
+    color: var(--on-photo);
+  }
+
+  [data-wallpaper-tone]
+    :is(
+      [class~="bg-surface"],
+      [class~="bg-surface-hover"],
+      [class~="bg-surface-active"],
+      [class~="bg-surface-elevated"],
+      [class~="bg-popover"],
+      [class~="bg-primary-subtle"],
+      [class~="bg-secondary"],
+      [class~="glass"],
+      [class~="glass-card"],
+      [class~="glass-panel"]
+    ) {
+    color: var(--text-primary-base);
+  }
 }
 
 [data-wallpaper-tone] :is(h1, h2, h3, h4, p, span, a, li, dt, dd, label, strong) {
@@ -605,8 +641,9 @@
     0 0 1px var(--halo),
     0 0 1px var(--halo),
     0 0 2px var(--halo),
-    0 0 4px var(--halo),
-    0 0 7px var(--halo);
+    0 0 3px var(--halo),
+    0 0 5px var(--halo),
+    0 0 8px var(--halo);
 }
 
 /* ---- Cards in the learning area ---------------------------------------------------------
@@ -645,6 +682,25 @@ main
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background-color: var(--surface);
+  }
+}
+
+/* A photo running against the theme — dark picture in light mode, bright picture in dark mode —
+ * would show through the glass as the wrong colour behind the card's text; those cards carry
+ * more glass, still one value for every card on the page. */
+main[data-wallpaper-tone="dark"]
+  :is([class~="bg-surface"][class~="border"], [class~="glass"], [class~="glass-card"], [class~="glass-panel"]) {
+  background-color: color-mix(in oklch, var(--surface) 88%, transparent);
+
+  @variant dark {
+    background-color: color-mix(in oklch, var(--surface) 66%, transparent);
+  }
+}
+
+main[data-wallpaper-tone="light"]
+  :is([class~="bg-surface"][class~="border"], [class~="glass"], [class~="glass-card"], [class~="glass-panel"]) {
+  @variant dark {
+    background-color: color-mix(in oklch, var(--surface) 88%, transparent);
   }
 }
 

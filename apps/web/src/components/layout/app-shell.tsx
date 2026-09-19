@@ -87,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           // Tells the theme a photo sits behind this area, and which way it reads, so text on it
           // can follow the picture instead of the theme (see theme.css). --app-header-h is the
           // header above: anything pinned inside the area measures from it.
-          data-wallpaper-tone={wallpaper.tone && (wallpaper.selection === "custom" || wallpaper.preset) ? wallpaper.tone : undefined}
+          data-wallpaper-tone={wallpaper.tone ?? (wallpaper.selection === "custom" ? "dark" : undefined)}
           style={{ "--app-header-h": "3.5rem" } as CSSProperties}
           className="relative isolate flex-1 px-4 pt-(--main-pt) pb-32 [--main-pt:1.5rem] sm:px-6 md:pb-12 lg:px-10 lg:[--main-pt:2rem]"
         >

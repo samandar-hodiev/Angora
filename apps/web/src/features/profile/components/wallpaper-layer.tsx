@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { isAnimatedPreset, measureWallpaperTone, useSaveWallpaper, useWallpaper, type WallpaperTone } from "../wallpaper";
+import { isAnimatedPreset, measureWallpaperTone, useSaveWallpaper, useWallpaper } from "../wallpaper";
 
 /**
  * Northern lights, drawn the way the real thing looks: a bright ribbon arcing across a night sky
@@ -13,8 +13,7 @@ import { isAnimatedPreset, measureWallpaperTone, useSaveWallpaper, useWallpaper,
  * the lights on top of it. Everything is a soft gradient — an earlier version drew the rays as a
  * repeating gradient, which read as zebra stripes rather than light.
  *
- * Everything moves slowly — the ribbons drift and swell over three quarters of a minute, the rays
- * shimmer sideways — so it reads as alive rather than as something flying past. Sized in percent,
+ * Everything moves slowly — the ribbons drift and swell over three quarters of a minute — so it reads as alive rather than as something flying past. Sized in percent,
  * so the same markup works behind the whole learning area and inside a preview swatch, and
  * reduced motion stills it.
  */
@@ -37,30 +36,14 @@ const frame = "pointer-events-none fixed top-14 right-0 bottom-0 left-0 md:left-
 /** Everything above this line belongs to the title, not to the scrolling content. */
 const maskHeight = "calc(var(--main-pt, 1.5rem) + var(--page-title-h, 3.5rem) + 0.75rem)";
 
-/** Each pairing gets its own nudge: the further the photo is from the theme, the more it moves. */
-function photoFilter(tone: WallpaperTone) {
-  return tone === "dark"
-    ? "[filter:brightness(1.3)_saturate(0.95)_blur(1px)] dark:[filter:brightness(0.95)_saturate(1.1)_blur(1px)]"
-    : "[filter:brightness(1)_saturate(1.05)_blur(1px)] dark:[filter:brightness(0.82)_saturate(1.12)_blur(1px)]";
-}
-
-function scrim(tone: WallpaperTone) {
-  // A photo that runs against the theme — a dark one in light mode, a bright one in dark mode —
-  // gets the stronger of the two, because that is when text lying on it has the least to work with.
-  return tone === "dark"
-    ? "bg-(--photo-scrim-clash) dark:bg-(--photo-scrim)"
-    : "bg-(--photo-scrim) dark:bg-(--photo-scrim-clash)";
-}
-
 /**
  * The learner's background. It fills the main learning area only — never the header or the
  * sidebar — and is genuinely fixed to the viewport, inset to the shell's own measurements, so it
  * does not move by a pixel while the page scrolls.
  *
- * The app keeps its own reading — dark mode stays dark, light mode stays light — and the photo is
- * pulled towards it instead: a bright picture is dimmed for dark mode, a dark one lifted for
- * light mode. That is what the measured tone is for here; the scrim and the text halo live with
- * the theme in theme.css. The presets are translucent colour washes already and need none of it.
+ * A photo is shown as it is, the same in both themes. Its measured tone decides which way the
+ * text lying on it runs and which way the light scrim settles it (see [data-wallpaper-tone] in
+ * theme.css); cards keep the theme regardless. The presets are colour washes and need none of it.
  */
 export function WallpaperLayer() {
   const { image, selection, tone, photoUrl, preset } = useWallpaper();
@@ -88,8 +71,10 @@ export function WallpaperLayer() {
 
   return (
     <span aria-hidden className={cn(frame, "-z-10 overflow-clip")}>
-      <span className={cn("absolute inset-0 bg-cover bg-center", photoFilter(tone ?? "dark"))} style={{ backgroundImage: image }} />
-      <span className={cn("absolute inset-0", scrim(tone ?? "dark"))} />
+      {/* Shown as it is — no brightness or blur — so it reads the same in both themes. */}
+      <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: image }} />
+      {/* A light settle in the photo's own direction; see [data-wallpaper-tone] in theme.css. */}
+      <span className="absolute inset-0 bg-(--photo-scrim)" />
     </span>
   );
 }
@@ -101,7 +86,7 @@ export function WallpaperLayer() {
  * two line up exactly. With no wallpaper it is simply the page's own colour.
  */
 export function WallpaperMask() {
-  const { image, selection, tone, preset } = useWallpaper();
+  const { image, selection, preset } = useWallpaper();
   const clip = { clipPath: `inset(0 0 calc(100% - ${maskHeight}) 0)` };
 
   if (!image) return <span aria-hidden className={cn(frame, "z-10 bg-background")} style={clip} />;
@@ -117,8 +102,10 @@ export function WallpaperMask() {
 
   return (
     <span aria-hidden className={cn(frame, "z-10 overflow-clip bg-background")} style={clip}>
-      <span className={cn("absolute inset-0 bg-cover bg-center", photoFilter(tone ?? "dark"))} style={{ backgroundImage: image }} />
-      <span className={cn("absolute inset-0", scrim(tone ?? "dark"))} />
+      {/* Shown as it is — no brightness or blur — so it reads the same in both themes. */}
+      <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: image }} />
+      {/* A light settle in the photo's own direction; see [data-wallpaper-tone] in theme.css. */}
+      <span className="absolute inset-0 bg-(--photo-scrim)" />
     </span>
   );
 }

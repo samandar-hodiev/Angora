@@ -188,7 +188,12 @@ export function useWallpaper() {
     selection: wallpaperSelection(profile),
     // The animated aurora is a night scene, so text over it reads the way it does over a dark
     // photo: light, with a dark halo.
-    tone: isAnimatedPreset(preset) ? ("dark" as WallpaperTone) : wallpaperTone(profile),
+    // A plain colour wash has no tone of its own; it must not inherit the last photo's.
+    tone: isAnimatedPreset(preset)
+      ? ("dark" as WallpaperTone)
+      : wallpaperSelection(profile) === "custom"
+        ? wallpaperTone(profile)
+        : null,
     photoUrl: wallpaperPhotoUrl(profile),
     preset,
   };
