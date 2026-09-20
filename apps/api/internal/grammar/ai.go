@@ -316,9 +316,13 @@ func (m *Module) aiVisual(c *gin.Context) {
 	})
 }
 
-// GET /grammar/visuals/:id — serve a generated diagram.
+// GET /grammar/visuals/:id — serve a canonical diagram.
+//
+// Public, like avatars and wallpapers, so an <img> tag works without the client having to
+// proxy an authenticated fetch. What makes that safe is what it will not serve: the query
+// requires user_id IS NULL, so a personal visual can never be reached from here whatever id
+// is guessed.
 func (m *Module) visual(c *gin.Context) {
-	p, _ := authz.PrincipalFrom(c)
 	ctx := c.Request.Context()
 
 	id, err := uuid.Parse(c.Param("id"))
@@ -328,21 +332,15 @@ func (m *Module) visual(c *gin.Context) {
 	}
 
 	var key, mimeType string
-	var ownerID *uuid.UUID
 	err = m.pool.QueryRow(ctx, `
-		SELECT storage_key, mime_type, user_id FROM grammar_visuals
-		WHERE id = $1 AND status = 'ready'`, id).Scan(&key, &mimeType, &ownerID)
+		SELECT storage_key, mime_type FROM grammar_visuals
+		WHERE id = $1 AND status = 'ready' AND user_id IS NULL`, id).Scan(&key, &mimeType)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, apperr.NotFound("Visual"))
 		return
 	}
 	if err != nil {
 		httpx.Fail(c, err)
-		return
-	}
-	// Canonical visuals (owner NULL) are shared; a personalized one belongs to one learner.
-	if ownerID != nil && *ownerID != p.UserID {
-		httpx.Fail(c, apperr.NotFound("Visual"))
 		return
 	}
 
@@ -353,7 +351,8 @@ func (m *Module) visual(c *gin.Context) {
 	}
 	defer body.Close()
 
-	c.Header("Cache-Control", "private, max-age=86400")
+	// Shared content, so it may be cached by the browser rather than re-fetched per page.
+	c.Header("Cache-Control", "public, max-age=86400")
 	c.DataFromReader(200, info.Size, mimeType, body, nil)
 }
 

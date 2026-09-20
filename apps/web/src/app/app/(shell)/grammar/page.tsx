@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 
-import { GrammarView } from "@/features/learner/components/grammar-view";
+import { GrammarLibraryView } from "@/features/grammar/components/library-view";
 
-export const metadata: Metadata = { title: "Grammar" };
+export const metadata: Metadata = {
+  title: "Grammar",
+  description: "Browse and search every grammar topic, with practice that targets your own mistakes.",
+};
 
 export default function Page() {
-  return <GrammarView />;
+  return <GrammarLibraryView />;
 }

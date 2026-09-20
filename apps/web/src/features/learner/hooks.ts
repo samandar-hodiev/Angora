@@ -46,10 +46,6 @@ export function useVocabularyDeck(page = 1) {
   });
 }
 
-export function useGrammarTopics() {
-  return useQuery({ queryKey: queryKeys.grammar.topics, queryFn: learnerApi.grammarTopics, enabled: useAuthed() });
-}
-
 export function useRecommendations() {
   return useQuery({ queryKey: queryKeys.recommendations.list, queryFn: learnerApi.recommendations, enabled: useAuthed() });
 }

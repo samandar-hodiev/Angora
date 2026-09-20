@@ -218,6 +218,11 @@ const (
 )
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
+	// Canonical diagrams are shared product content, served like avatars and wallpapers:
+	// public by unguessable id, so a plain <img> works on every client. Personal visuals
+	// are never served here — the handler refuses anything with an owner.
+	v1.GET("/grammar/visuals/:id", m.visual)
+
 	g := v1.Group("/grammar", authz.RequirePermission(authz.PermLearningPractice))
 
 	// Library. Reads are cheap and cacheable; none of them touch an AI provider.
@@ -230,7 +235,6 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/topics/:slug", m.topic)
 	g.GET("/topics/:slug/related", m.related)
 	g.GET("/topics/:slug/compare/:other", m.comparison)
-	g.GET("/visuals/:id", m.visual)
 
 	// Practice. Everything here is scored in Go except free-writing analysis.
 	g.POST("/topics/:slug/practice", m.startPractice)

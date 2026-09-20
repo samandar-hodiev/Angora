@@ -80,7 +80,8 @@ export interface MistakeSummary {
   weaknesses: Weakness[];
 }
 
-// ---- Vocabulary & grammar ------------------------------------------------------------
+// ---- Vocabulary ----------------------------------------------------------------------
+// Grammar has its own module: see ./grammar.
 
 export interface VocabularyCard {
   id: UUID;
@@ -101,17 +102,6 @@ export interface VocabularyCard {
 export interface VocabularyDeck {
   summary: { total: number; due: number; new: number; learning: number; reviewing: number; mastered: number };
   cards: VocabularyCard[];
-}
-
-export interface GrammarTopic {
-  slug: string;
-  name: string;
-  description: string;
-  level: string | null;
-  /** 0–100 */
-  mastery: number;
-  attempts: number;
-  last_practiced_at: Timestamp | null;
 }
 
 // ---- Personalization -----------------------------------------------------------------

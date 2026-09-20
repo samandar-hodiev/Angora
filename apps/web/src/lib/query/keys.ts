@@ -34,7 +34,15 @@ export const queryKeys = {
     deck: (page: number) => ["vocabulary", "deck", page] as const,
   },
   grammar: {
-    topics: ["grammar", "topics"] as const,
+    all: ["grammar"] as const,
+    categories: ["grammar", "categories"] as const,
+    topics: (category: string, level: string) => ["grammar", "topics", category, level] as const,
+    search: (query: string, level: string) => ["grammar", "search", query, level] as const,
+    topic: (slug: string) => ["grammar", "topic", slug] as const,
+    comparison: (slug: string, other: string) => ["grammar", "compare", slug, other] as const,
+    map: ["grammar", "map"] as const,
+    overview: ["grammar", "overview"] as const,
+    progress: ["grammar", "progress"] as const,
   },
   recommendations: {
     list: ["recommendations"] as const,

@@ -11,14 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Meter, ProgressRing, Stat } from "@/components/ui/data-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { skillHref } from "@/config/navigation";
+import { useGrammarProgress } from "@/features/grammar/hooks";
 import { formatCategory, timeAgo } from "@/lib/learning-format";
 
-import { useGrammarTopics, useMistakeSummary, useProgress } from "../hooks";
+import { useMistakeSummary, useProgress } from "../hooks";
 
 export function ProgressView() {
   const progress = useProgress();
   const mistakes = useMistakeSummary();
-  const grammar = useGrammarTopics();
+  const grammar = useGrammarProgress();
 
   if (progress.isPending) {
     return (
@@ -37,7 +38,6 @@ export function ProgressView() {
   const p = progress.data;
   const sessions = p.skills.reduce((sum, s) => sum + s.sessions, 0);
   const xp = p.skills.reduce((sum, s) => sum + s.xp, 0);
-  const mastered = (grammar.data ?? []).filter((t) => t.mastery >= 80);
 
   return (
     <>
@@ -105,20 +105,63 @@ export function ProgressView() {
             <EmptyState title="No weaknesses detected" className="py-8" />
           )}
         </section>
-        <section aria-labelledby="mastered-title">
-          <SectionTitle id="mastered-title" title="Mastered topics" />
-          {mastered.length > 0 ? (
-            <ul className="flex flex-wrap gap-2">
-              {mastered.map((t) => (
-                <li key={t.slug}>
-                  <Badge variant="success" className="px-2.5 py-1 text-body-sm">
-                    {t.name} · {Math.round(t.mastery)}%
-                  </Badge>
-                </li>
-              ))}
-            </ul>
+        <section aria-labelledby="grammar-title">
+          <SectionTitle
+            id="grammar-title"
+            title="Grammar"
+            action={
+              grammar.data ? (
+                <Link href="/app/grammar" className="text-label text-fg-muted hover:text-foreground">
+                  Overall {Math.round(grammar.data.overall)}% <ArrowRight className="inline size-3.5" aria-hidden />
+                </Link>
+              ) : undefined
+            }
+          />
+          {grammar.isPending ? (
+            <Skeleton className="h-44 rounded-xl" />
+          ) : grammar.isError || !grammar.data ? (
+            // Grammar failing must not take the rest of Progress down.
+            <EmptyState title="Grammar progress is unavailable" className="py-8" />
+          ) : grammar.data.stats.topics_started === 0 ? (
+            <EmptyState
+              title="You haven't practised any grammar yet"
+              description="Open a topic and practise it — your mastery will appear here."
+              className="py-8"
+              action={
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/app/grammar">Browse grammar</Link>
+                </Button>
+              }
+            />
           ) : (
-            <EmptyState title="Nothing mastered yet" description="Topics above 80% mastery appear here." className="py-8" />
+            <div className="grid gap-4 rounded-xl border bg-surface p-5">
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm text-fg-secondary">
+                <span>
+                  <span className="font-medium text-foreground">{grammar.data.stats.topics_started}</span> started
+                </span>
+                <span>
+                  <span className="font-medium text-foreground">{grammar.data.stats.topics_mastered}</span> mastered
+                </span>
+                <span>
+                  <span className="font-medium text-foreground">{grammar.data.stats.topics_total}</span> topics in total
+                </span>
+              </div>
+              <ul className="grid gap-3">
+                {grammar.data.categories
+                  .filter((c) => c.started > 0)
+                  .slice(0, 6)
+                  .map((c) => (
+                    <li key={c.slug}>
+                      <Meter
+                        label={c.name}
+                        value={c.mastery}
+                        display={`${Math.round(c.mastery)}%`}
+                        tone={c.mastery >= 80 ? "success" : c.mastery < 50 ? "warning" : "primary"}
+                      />
+                    </li>
+                  ))}
+              </ul>
+            </div>
           )}
         </section>
       </div>
