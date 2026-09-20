@@ -48,6 +48,10 @@ type GrammarTopicContext struct {
 	SignalWords    []string
 	CommonMistakes []string
 	RelatedTopics  []string
+	// HasCanonical says whether Summary and the rest come from curated product content.
+	// When they do, the model explains that rule; when they do not, it teaches the topic
+	// itself, because its answer is what the learner will read as the rule.
+	HasCanonical bool
 }
 
 // GrammarLearner is who the explanation is for. Everything here already exists on the
@@ -66,21 +70,45 @@ type GrammarLearner struct {
 }
 
 // GrammarExplanation is the structured, level-appropriate explanation of one topic.
+//
+// It is deliberately long-form. For a topic that has no canonical content yet this is the
+// teaching text the learner reads, and for one that does it is a second, personal pass over
+// the same rule — so it carries full paragraphs and worked examples, not a summary.
 type GrammarExplanation struct {
-	Definition     string              `json:"definition"`
-	WhenToUse      []string            `json:"when_to_use"`
-	Formulas       []GrammarFormula    `json:"formulas"`
-	Positive       []string            `json:"positive"`
-	Negative       []string            `json:"negative"`
-	Questions      []string            `json:"questions"`
-	CommonMistakes []GrammarCorrection `json:"common_mistakes"`
-	MiniCheck      *GrammarMiniCheck   `json:"mini_check,omitempty"`
+	Summary string `json:"summary"`
+	// Paragraphs is the explanation proper: several paragraphs that actually teach the rule.
+	Paragraphs     []string               `json:"paragraphs"`
+	WhenToUse      []GrammarUse           `json:"when_to_use"`
+	Formulas       []GrammarFormula       `json:"formulas"`
+	Positive       []string               `json:"positive"`
+	Negative       []string               `json:"negative"`
+	Questions      []string               `json:"questions"`
+	Examples       []GrammarWorkedExample `json:"examples"`
+	SignalWords    []string               `json:"signal_words"`
+	CommonMistakes []GrammarCorrection    `json:"common_mistakes"`
+	Tips           []string               `json:"tips"`
+	// CompareNote contrasts this topic with the one learners most often confuse it with.
+	CompareNote string            `json:"compare_note"`
+	MiniCheck   *GrammarMiniCheck `json:"mini_check"`
+}
+
+// GrammarUse is one situation the form is used in, with a sentence showing it. A bare list
+// of uses is abstract; here each one has to earn its example.
+type GrammarUse struct {
+	Use     string `json:"use"`
+	Example string `json:"example"`
+}
+
+// GrammarWorkedExample is a sentence plus why it is built that way.
+type GrammarWorkedExample struct {
+	Sentence string `json:"sentence"`
+	Note     string `json:"note"`
 }
 
 type GrammarFormula struct {
-	Label   string `json:"label"`
-	Pattern string `json:"pattern"`
-	Example string `json:"example"`
+	Label    string   `json:"label"`
+	Pattern  string   `json:"pattern"`
+	Examples []string `json:"examples"`
 }
 
 type GrammarCorrection struct {
@@ -111,63 +139,206 @@ type GrammarWritingAnalysis struct {
 }
 
 // GrammarTutorService implements the grammar AI tasks on top of the Gateway.
+//
+// Two models, chosen by what the work is worth rather than by what it looks like:
+//
+//	fast   short, frequent, per-learner replies — the tutor answering one question
+//	main   anything written once and read many times, or graded: explanations, free-text
+//	       marking, diagrams
+//
+// An explanation looks like the cheap job and is not: it is generated once per topic, level
+// and language, and then it is what every learner who opens that topic is taught from.
 type GrammarTutorService struct {
-	gateway *Gateway
-	// explainModel is a small, cheap model: rewriting a known rule at a known level.
-	explainModel string
-	// analysisModel is the stronger model, used only where the answer is not already known:
-	// free text and tutoring.
-	analysisModel string
+	gateway   *Gateway
+	fastModel string
+	mainModel string
 }
 
-func NewGrammarTutor(g *Gateway, explainModel, analysisModel string) *GrammarTutorService {
-	return &GrammarTutorService{gateway: g, explainModel: explainModel, analysisModel: analysisModel}
+func NewGrammarTutor(g *Gateway, fastModel, mainModel string) *GrammarTutorService {
+	if fastModel == "" {
+		fastModel = mainModel
+	}
+	return &GrammarTutorService{gateway: g, fastModel: fastModel, mainModel: mainModel}
 }
 
+// grammarExplanationSchema is what the model must return.
+//
+// OpenAI's strict structured output requires every property to be listed in
+// `required` and `additionalProperties: false` on every object, so an optional field
+// is expressed as a nullable one (see mini_check). Getting this wrong does not
+// degrade the output — the provider rejects the request outright.
 var grammarExplanationSchema = json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["definition", "when_to_use", "formulas", "positive", "negative", "questions", "common_mistakes"],
+  "required": [
+    "summary",
+    "paragraphs",
+    "when_to_use",
+    "formulas",
+    "positive",
+    "negative",
+    "questions",
+    "examples",
+    "signal_words",
+    "common_mistakes",
+    "tips",
+    "compare_note",
+    "mini_check"
+  ],
   "properties": {
-    "definition": {"type": "string"},
-    "when_to_use": {"type": "array", "items": {"type": "string"}},
+    "summary": {
+      "type": "string"
+    },
+    "paragraphs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "when_to_use": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "use",
+          "example"
+        ],
+        "properties": {
+          "use": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "formulas": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["label", "pattern", "example"],
+        "required": [
+          "label",
+          "pattern",
+          "examples"
+        ],
         "properties": {
-          "label": {"type": "string"},
-          "pattern": {"type": "string"},
-          "example": {"type": "string"}
+          "label": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
-    "positive": {"type": "array", "items": {"type": "string"}},
-    "negative": {"type": "array", "items": {"type": "string"}},
-    "questions": {"type": "array", "items": {"type": "string"}},
+    "positive": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "negative": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sentence",
+          "note"
+        ],
+        "properties": {
+          "sentence": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "signal_words": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "common_mistakes": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["wrong", "right", "why"],
+        "required": [
+          "wrong",
+          "right",
+          "why"
+        ],
         "properties": {
-          "wrong": {"type": "string"},
-          "right": {"type": "string"},
-          "why": {"type": "string"}
+          "wrong": {
+            "type": "string"
+          },
+          "right": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          }
         }
       }
     },
+    "tips": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "compare_note": {
+      "type": "string"
+    },
     "mini_check": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["question", "options", "answer"],
+      "required": [
+        "question",
+        "options",
+        "answer"
+      ],
       "properties": {
-        "question": {"type": "string"},
-        "options": {"type": "array", "items": {"type": "string"}},
-        "answer": {"type": "integer"}
+        "question": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "answer": {
+          "type": "integer"
+        }
       }
     }
   }
@@ -181,7 +352,7 @@ func (s *GrammarTutorService) ExplainGrammar(ctx context.Context, topic GrammarT
 		PromptVersion: GrammarExplainPrompt,
 		Metadata:      map[string]any{"topic": topic.Slug, "level": learner.Level.String()},
 	}, AnalysisRequest{
-		Model:        s.explainModel,
+		Model:        s.mainModel,
 		Instructions: explainInstructions(topic, learner),
 		Input:        topicBrief(topic, learner),
 		SchemaName:   SchemaGrammarExplain,
@@ -208,10 +379,10 @@ func (s *GrammarTutorService) ExplainGrammar(ctx context.Context, topic GrammarT
 // input: an explanation with no examples is worse than no AI explanation at all, because
 // the learner already has the canonical content underneath it.
 func validateExplanation(e *GrammarExplanation) error {
-	if strings.TrimSpace(e.Definition) == "" {
-		return fmt.Errorf("grammar explanation has no definition")
+	if strings.TrimSpace(e.Summary) == "" && len(e.Paragraphs) == 0 {
+		return fmt.Errorf("grammar explanation has no explanation text")
 	}
-	if len(e.Positive) == 0 && len(e.Formulas) == 0 {
+	if len(e.Positive) == 0 && len(e.Examples) == 0 && len(e.Formulas) == 0 {
 		return fmt.Errorf("grammar explanation has neither examples nor formulas")
 	}
 	if e.MiniCheck != nil && (e.MiniCheck.Answer < 0 || e.MiniCheck.Answer >= len(e.MiniCheck.Options)) {
@@ -233,8 +404,15 @@ func explainInstructions(topic GrammarTopicContext, learner GrammarLearner) stri
 		fmt.Fprintf(&b, "Write the explanation in %s. Keep every example sentence in English, unchanged.\n\n", lang)
 	}
 
-	b.WriteString("You are given the canonical rule this product teaches. Explain THAT rule. ")
-	b.WriteString("Do not contradict it, do not replace its terminology, and do not add exceptions it does not mention.\n\n")
+	if topic.HasCanonical {
+		b.WriteString("You are given the canonical rule this product teaches. Explain THAT rule. ")
+		b.WriteString("Do not contradict it, do not replace its terminology, and do not add exceptions it does not mention.\n\n")
+	} else {
+		// No canonical content for this topic yet, so this explanation is what the learner
+		// reads as the rule. It has to be complete and correct on its own.
+		b.WriteString("There is no canonical text for this topic yet, so your explanation is what the learner will read as the rule. ")
+		b.WriteString("Teach it completely and accurately: standard, mainstream English grammar, nothing invented, no dialect-specific claims presented as general rules.\n\n")
+	}
 
 	if len(learner.RecentMistakes) > 0 {
 		b.WriteString("This learner recently made these mistakes on this topic. Address them directly in common_mistakes:\n")
@@ -247,8 +425,23 @@ func explainInstructions(topic GrammarTopicContext, learner GrammarLearner) stri
 		fmt.Fprintf(&b, "They already know: %s. You may build on these.\n\n", strings.Join(learner.KnownTopics, ", "))
 	}
 
-	b.WriteString("Give 2-4 positive examples, 2-3 negative examples and 2-3 questions. ")
-	b.WriteString("Finish with one mini_check: a single multiple-choice question with 3 options testing the main point.")
+	// The shape of a full lesson. This output is cached and read by many learners, so it is
+	// worth spending tokens on: the cost is paid once per topic, level and language.
+	b.WriteString("Write a COMPLETE lesson on this one point, not a summary:\n")
+	b.WriteString("- summary: one sentence a learner could repeat from memory.\n")
+	b.WriteString("- paragraphs: 3 to 5 paragraphs that actually teach the rule — what it means, how it is built, ")
+	b.WriteString("what changes in negatives and questions, and the one thing learners most often get wrong. Plain prose, no bullet points, no headings.\n")
+	b.WriteString("- when_to_use: 3 to 5 situations, each with its own example sentence.\n")
+	b.WriteString("- formulas: every form (affirmative, negative, question, and any others), each with 2-3 examples.\n")
+	b.WriteString("- positive, negative, questions: 3-4 sentences each.\n")
+	b.WriteString("- examples: 4 to 6 worked examples — a sentence, and a short note saying why it is built that way.\n")
+	b.WriteString("- signal_words: the words that typically appear with this form.\n")
+	b.WriteString("- common_mistakes: 3 to 5, each as the wrong sentence, the right sentence, and why.\n")
+	b.WriteString("- tips: 2-3 short practical notes a teacher would add.\n")
+	b.WriteString("- compare_note: one or two sentences on the form learners most often confuse this with, and how to tell them apart. ")
+	b.WriteString("Empty string if there is no such form.\n")
+	b.WriteString("- mini_check: one multiple-choice question with 3 options testing the main point, and the index of the correct one.\n\n")
+	b.WriteString("Every example sentence must be natural English a real person would say.")
 	return b.String()
 }
 
@@ -323,10 +516,10 @@ func (s *GrammarTutorService) AskGrammar(ctx context.Context, topic GrammarTopic
 		PromptVersion: GrammarTutorPrompt,
 		Metadata:      map[string]any{"topic": topic.Slug},
 	}, TextRequest{
-		Model:           s.analysisModel,
+		Model:           s.fastModel,
 		System:          b.String(),
 		Messages:        messages,
-		MaxOutputTokens: 500,
+		MaxOutputTokens: 600,
 	})
 }
 
@@ -380,7 +573,7 @@ func (s *GrammarTutorService) AnalyzeGrammarWriting(ctx context.Context, topic G
 		PromptVersion: GrammarWritingPrompt,
 		Metadata:      map[string]any{"topic": topic.Slug, "words": len(strings.Fields(text))},
 	}, AnalysisRequest{
-		Model:        s.analysisModel,
+		Model:        s.mainModel,
 		Instructions: b.String(),
 		Input:        input,
 		SchemaName:   SchemaGrammarWriting,
@@ -450,7 +643,7 @@ func (s *GrammarTutorService) VisualizeGrammar(ctx context.Context, topic Gramma
 		PromptVersion: GrammarVisualPrompt,
 		Metadata:      map[string]any{"topic": topic.Slug, "kind": kind},
 	}, TextRequest{
-		Model:           s.analysisModel,
+		Model:           s.mainModel,
 		System:          b.String(),
 		Messages:        []Message{{Role: "user", Content: input}},
 		MaxOutputTokens: 2000,

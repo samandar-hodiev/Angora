@@ -39,6 +39,7 @@ export const queryKeys = {
     topics: (category: string, level: string) => ["grammar", "topics", category, level] as const,
     search: (query: string, level: string) => ["grammar", "search", query, level] as const,
     topic: (slug: string) => ["grammar", "topic", slug] as const,
+    explanation: (slug: string) => ["grammar", "explanation", slug] as const,
     comparison: (slug: string, other: string) => ["grammar", "compare", slug, other] as const,
     map: ["grammar", "map"] as const,
     overview: ["grammar", "overview"] as const,

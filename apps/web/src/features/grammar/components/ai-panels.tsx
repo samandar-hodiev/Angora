@@ -1,7 +1,7 @@
 "use client";
 
-import { CircleAlert, Image as ImageIcon, MessageCircle, Send, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { CircleAlert, Image as ImageIcon, Lightbulb, MessageCircle, Send, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { InlineLoader } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -37,93 +37,198 @@ function AIFailure({ error, what }: { error: unknown; what: string }) {
   );
 }
 
-export function ExplainPanel({ slug, level }: { slug: string; level: string | null }) {
+/**
+ * The generated lesson.
+ *
+ * It loads with the topic rather than behind a button. For the topics that already have a
+ * curated rule this is a second pass over it, written for this learner's level; for the ones
+ * that do not, it is the lesson itself — which is why it is long-form and why it is not
+ * hidden behind an interaction.
+ */
+export function ExplainPanel({
+  slug,
+  level,
+  isPrimary,
+}: {
+  slug: string;
+  level: string | null;
+  /** True when the topic has no curated text, so this is the only explanation on the page. */
+  isPrimary?: boolean;
+}) {
   const explain = useGrammarExplanation(slug);
   const data = explain.data as GrammarExplanationResponse | undefined;
 
-  if (!data && !explain.isPending && !explain.isError) {
+  if (explain.isPending) {
     return (
-      <Button variant="outline" onClick={() => explain.mutate()}>
-        <Sparkles aria-hidden />
-        Explain with AI
-      </Button>
+      <div className="grid gap-3 rounded-xl border bg-surface p-5">
+        <InlineLoader label={`Writing the explanation${level ? ` for ${level}` : ""}…`} />
+        <p className="text-caption text-fg-muted">
+          The first time a topic is opened this is generated; after that it is instant.
+        </p>
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
     );
   }
 
+  if (explain.isError || !data) {
+    return (
+      <div className="grid gap-3">
+        <AIFailure error={explain.error} what="The AI explanation" />
+        {isPrimary && (
+          <p className="text-body-sm text-fg-muted">
+            The topic&apos;s related forms, comparisons and practice below still work.
+          </p>
+        )}
+        <div>
+          <Button variant="outline" size="sm" onClick={() => void explain.refetch()}>
+            <Sparkles aria-hidden />
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const e = data.explanation;
+
   return (
-    <div className="grid gap-4">
-      {explain.isPending && (
-        <div className="grid gap-3 rounded-xl border bg-surface p-5">
-          <InlineLoader label={`Explaining this at your level${level ? ` (${level})` : ""}…`} />
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
+    <article className="grid gap-6 rounded-xl border bg-surface p-5 sm:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <h3 className="text-h3">{isPrimary ? "The rule" : "Explained for you"}</h3>
+        <span className="flex items-center gap-2">
+          {data.level && <Badge variant="outline">{data.level}</Badge>}
+          <AIBadge cached={data.cached} />
+        </span>
+      </header>
+
+      {e.summary && <p className="text-body-lg text-fg-secondary">{e.summary}</p>}
+
+      {e.paragraphs?.length > 0 && (
+        <div className="grid gap-3">
+          {e.paragraphs.map((paragraph, i) => (
+            <p key={i} className="text-body">
+              {paragraph}
+            </p>
+          ))}
         </div>
       )}
 
-      {explain.isError && <AIFailure error={explain.error} what="AI explanation" />}
-
-      {data && (
-        <article className="grid gap-5 rounded-xl border bg-surface p-5">
-          <header className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-h4">Explained for you</h3>
-            <span className="flex items-center gap-2">
-              {data.level && <Badge variant="outline">{data.level}</Badge>}
-              <AIBadge cached={data.cached} />
-            </span>
-          </header>
-
-          <p className="text-body">{data.explanation.definition}</p>
-
-          {data.explanation.when_to_use.length > 0 && (
-            <div>
-              <h4 className="mb-1.5 text-label text-fg-muted">When to use it</h4>
-              <ul className="grid gap-1">
-                {data.explanation.when_to_use.map((item, i) => (
-                  <li key={i} className="text-body-sm text-fg-secondary">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {data.explanation.formulas.length > 0 && (
-            <div className="grid gap-2">
-              <h4 className="text-label text-fg-muted">Form</h4>
-              {data.explanation.formulas.map((f, i) => (
-                <div key={i} className="rounded-lg bg-surface-active px-3 py-2">
-                  <p className="text-label">{f.label}</p>
-                  <p className="font-mono text-body-sm">{f.pattern}</p>
-                  {f.example && <p className="mt-1 text-body-sm text-fg-secondary">{f.example}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <ExampleColumn title="Positive" items={data.explanation.positive} />
-            <ExampleColumn title="Negative" items={data.explanation.negative} />
-            <ExampleColumn title="Questions" items={data.explanation.questions} />
+      {e.formulas?.length > 0 && (
+        <Section title="Form">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {e.formulas.map((f, i) => (
+              <div key={i} className="grid gap-1.5 rounded-lg border bg-background p-3">
+                <p className="text-label text-fg-muted">{f.label}</p>
+                <p className="font-mono text-body-sm">{f.pattern}</p>
+                {f.examples?.length > 0 && (
+                  <ul className="grid gap-0.5 border-t pt-1.5">
+                    {f.examples.map((ex, j) => (
+                      <li key={j} className="text-body-sm text-fg-secondary">
+                        {ex}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
           </div>
-
-          {data.explanation.common_mistakes.length > 0 && (
-            <div className="grid gap-2">
-              <h4 className="text-label text-fg-muted">Watch out for</h4>
-              {data.explanation.common_mistakes.map((m, i) => (
-                <div key={i} className="grid gap-0.5 rounded-lg border-l-2 border-warning bg-surface-active px-3 py-2">
-                  <p className="text-body-sm text-fg-muted line-through">{m.wrong}</p>
-                  <p className="text-body-sm font-medium">{m.right}</p>
-                  <p className="text-caption text-fg-secondary">{m.why}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {data.explanation.mini_check && <MiniCheck check={data.explanation.mini_check} />}
-        </article>
+        </Section>
       )}
-    </div>
+
+      {e.when_to_use?.length > 0 && (
+        <Section title="When to use it">
+          <ul className="grid gap-2.5">
+            {e.when_to_use.map((item, i) => (
+              <li key={i} className="grid gap-0.5">
+                <span className="flex items-start gap-2 text-body">
+                  <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
+                  {item.use}
+                </span>
+                {item.example && <span className="pl-3.5 text-body-sm text-fg-secondary">{item.example}</span>}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {e.examples?.length > 0 && (
+        <Section title="Examples">
+          <ul className="divide-y rounded-lg border">
+            {e.examples.map((ex, i) => (
+              <li key={i} className="grid gap-0.5 px-3 py-2.5">
+                <p className="text-body">{ex.sentence}</p>
+                {ex.note && <p className="text-caption text-fg-muted">{ex.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <ExampleColumn title="Positive" items={e.positive ?? []} />
+        <ExampleColumn title="Negative" items={e.negative ?? []} />
+        <ExampleColumn title="Questions" items={e.questions ?? []} />
+      </div>
+
+      {e.signal_words?.length > 0 && (
+        <Section title="Signal words">
+          <ul className="flex flex-wrap gap-1.5">
+            {e.signal_words.map((word) => (
+              <li key={word}>
+                <Badge variant="outline">{word}</Badge>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {e.common_mistakes?.length > 0 && (
+        <Section title="Common mistakes">
+          <ul className="grid gap-2">
+            {e.common_mistakes.map((m, i) => (
+              <li key={i} className="grid gap-0.5 rounded-lg border-l-2 border-warning bg-background px-3 py-2">
+                <p className="text-body-sm text-fg-muted line-through">{m.wrong}</p>
+                <p className="text-body-sm font-medium">{m.right}</p>
+                <p className="text-caption text-fg-secondary">{m.why}</p>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {e.compare_note && (
+        <Section title="Easy to confuse">
+          <p className="text-body-sm text-fg-secondary">{e.compare_note}</p>
+        </Section>
+      )}
+
+      {e.tips?.length > 0 && (
+        <Section title="Tips">
+          <ul className="grid gap-1.5">
+            {e.tips.map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-body-sm text-fg-secondary">
+                <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {e.mini_check && <MiniCheck check={e.mini_check} />}
+    </article>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="grid gap-2">
+      <h4 className="text-label tracking-wide text-fg-muted uppercase">{title}</h4>
+      {children}
+    </section>
   );
 }
 

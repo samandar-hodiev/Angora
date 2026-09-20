@@ -94,9 +94,23 @@ export function useGrammarProgress() {
   return useQuery({ queryKey: queryKeys.grammar.progress, queryFn: grammarApi.progress, enabled: useAuthed() });
 }
 
-/** The AI explanation is requested on demand: it costs money and most learners never ask. */
-export function useGrammarExplanation(slug: string) {
-  return useMutation({ mutationFn: () => grammarApi.explain(slug) });
+/**
+ * The AI explanation loads with the topic rather than on a button press.
+ *
+ * It is cached on the server per topic, level and language, so only the first learner to
+ * open a topic pays for a generation; everyone after them gets a database read. That is
+ * what makes automatic loading affordable — and it has to be automatic, because for the
+ * topics with no canonical text yet this IS the lesson.
+ */
+export function useGrammarExplanation(slug: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.grammar.explanation(slug ?? ""),
+    queryFn: () => grammarApi.explain(slug!),
+    enabled: useAuthed() && Boolean(slug),
+    staleTime: 60 * 60_000,
+    // A provider outage is not worth three retries per topic view; the page works without it.
+    retry: false,
+  });
 }
 
 export function useGrammarTutor(slug: string) {

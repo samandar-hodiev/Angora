@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Columns2, Mic, PenLine, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Columns2, Mic, PenLine } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { EmptyState, ErrorState } from "@/components/common/states";
+import { ErrorState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Meter } from "@/components/ui/data-display";
@@ -61,20 +61,33 @@ export function GrammarTopicView({ slug }: { slug: string }) {
           </div>
         </header>
 
-        {t.content ? <CanonicalContent topic={t} /> : <ContentPending />}
+        {t.content ? (
+          <>
+            <CanonicalContent topic={t} />
+            {/* A second pass over the same rule, written for this learner's level. */}
+            <section aria-labelledby="ai-title" className="grid gap-3">
+              <h2 id="ai-title" className="text-h3">
+                Explained for your level
+              </h2>
+              <ExplainPanel slug={t.slug} level={t.level} />
+            </section>
+          </>
+        ) : (
+          // No curated text for this topic yet, so the generated lesson is the lesson.
+          <section aria-labelledby="ai-title" className="grid gap-3">
+            <h2 id="ai-title" className="text-h3">
+              What is {t.name}?
+            </h2>
+            <ExplainPanel slug={t.slug} level={t.level} isPrimary />
+          </section>
+        )}
 
         {t.compare.length > 0 && <CompareSection topic={t} initial={compareParam} />}
 
-        <section aria-labelledby="ai-title" className="grid gap-3">
-          <h2 id="ai-title" className="text-h3">
+        <section aria-labelledby="tools-title" className="grid gap-3">
+          <h2 id="tools-title" className="text-h3">
             Go deeper
           </h2>
-          <p className="text-body-sm text-fg-muted">
-            Generated for your level from the rule above — help around it, not a replacement for it.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <ExplainPanel slug={t.slug} level={t.level} />
-          </div>
           <VisualPanel slug={t.slug} existing={t.visuals} />
           <TutorPanel slug={t.slug} topicName={t.name} />
         </section>
@@ -242,21 +255,6 @@ function CanonicalContent({ topic }: { topic: GrammarTopic }) {
   );
 }
 
-/**
- * A topic whose canonical explanation has not been written yet. It says so plainly rather
- * than generating one: an invented rule that reads like the product's own is worse for a
- * learner than an honest gap.
- */
-function ContentPending() {
-  return (
-    <EmptyState
-      icon={Sparkles}
-      title="The full explanation is being written"
-      description="This topic is in the curriculum but its explanation has not been published yet. Its related topics and comparisons below still work."
-    />
-  );
-}
-
 function CompareSection({ topic, initial }: { topic: GrammarTopic; initial: string | null }) {
   const [other, setOther] = useState(
     () => topic.compare.find((c) => c.slug === initial)?.slug ?? topic.compare[0]!.slug,
@@ -421,7 +419,9 @@ function TopicRail({ topic }: { topic: GrammarTopic }) {
 }
 
 function RailList({ title, topics }: { title: string; topics: GrammarRelatedTopic[] }) {
-  if (topics.length === 0) return null;
+  // The API guarantees an array, but one unexpected null should hide a sidebar section,
+  // not take the whole topic page down with it.
+  if (!topics?.length) return null;
   return (
     <section aria-label={title} className="grid gap-1.5">
       <h2 className="text-label text-fg-muted">{title}</h2>

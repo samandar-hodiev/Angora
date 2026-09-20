@@ -255,10 +255,13 @@ func (m *Module) topic(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	topic.Prerequisites = relations[RelPrerequisite]
-	topic.Related = append(relations[RelRelated], relations[RelAlternative]...)
-	topic.Compare = append(relations[RelCompare], relations[RelCommonlyConfused]...)
-	topic.Next = relations[RelNext]
+	// A relation kind with no rows must serialize as [] and not null: the API contract says
+	// these are arrays, and a client that trusts it would otherwise crash on the one topic
+	// that happens to have no "related" links.
+	topic.Prerequisites = orEmpty(relations[RelPrerequisite])
+	topic.Related = orEmpty(append(relations[RelRelated], relations[RelAlternative]...))
+	topic.Compare = orEmpty(append(relations[RelCompare], relations[RelCommonlyConfused]...))
+	topic.Next = orEmpty(relations[RelNext])
 
 	topic.Visuals, err = m.visualsOf(ctx, topicID)
 	if err != nil {
@@ -434,6 +437,14 @@ func (m *Module) topicMap(c *gin.Context) {
 		nodes[ci].Groups = groups
 	}
 	httpx.OK(c, nodes)
+}
+
+// orEmpty turns a nil slice into an empty one, so it marshals as [] rather than null.
+func orEmpty[T any](in []T) []T {
+	if in == nil {
+		return []T{}
+	}
+	return in
 }
 
 func (m *Module) topicIDBySlug(ctx context.Context, slug string) (uuid.UUID, error) {

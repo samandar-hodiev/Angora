@@ -142,8 +142,10 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	})
 	c.Onboarding.SetPlacement(c.Assessment)
 
-	// Grammar explanations rephrase content the product already owns, so they run on the
-	// cheaper model; tutoring and free-text analysis need the stronger one.
+	// A grammar explanation is generated once per topic, level and language and then read
+	// by every learner who opens that topic, so it runs on the main model: the cost is paid
+	// once and the quality is what the learner is taught from. AI_FAST_MODEL, when set, is
+	// for the cheap per-request work.
 	fastModel := cfg.AI.FastModel
 	if fastModel == "" {
 		fastModel = cfg.AI.Model

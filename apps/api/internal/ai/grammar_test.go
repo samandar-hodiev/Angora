@@ -1,6 +1,9 @@
 package ai
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 // A generated visual is stored once and served to every learner who opens the topic, so
 // one poisoned SVG would reach all of them. These are the cases that must never get through.
@@ -78,10 +81,13 @@ func TestValidateExplanationRequiresSubstance(t *testing.T) {
 	if err := validateExplanation(&GrammarExplanation{}); err == nil {
 		t.Error("an empty explanation was accepted")
 	}
-	if err := validateExplanation(&GrammarExplanation{Definition: "x"}); err == nil {
+	if err := validateExplanation(&GrammarExplanation{Summary: "x"}); err == nil {
 		t.Error("an explanation with no examples or formulas was accepted")
 	}
-	ok := &GrammarExplanation{Definition: "Past Simple is for finished actions.", Positive: []string{"I worked."}}
+	ok := &GrammarExplanation{
+		Summary:  "Past Simple is for finished actions.",
+		Positive: []string{"I worked."},
+	}
 	if err := validateExplanation(ok); err != nil {
 		t.Errorf("a usable explanation was rejected: %v", err)
 	}
@@ -90,7 +96,7 @@ func TestValidateExplanationRequiresSubstance(t *testing.T) {
 // A mini-check whose answer points outside its options would mark a correct learner wrong.
 func TestValidateExplanationDropsABrokenMiniCheck(t *testing.T) {
 	e := &GrammarExplanation{
-		Definition: "x", Positive: []string{"I worked."},
+		Summary: "x", Positive: []string{"I worked."},
 		MiniCheck: &GrammarMiniCheck{Question: "q", Options: []string{"a", "b"}, Answer: 5},
 	}
 	if err := validateExplanation(e); err != nil {
@@ -99,4 +105,57 @@ func TestValidateExplanationDropsABrokenMiniCheck(t *testing.T) {
 	if e.MiniCheck != nil {
 		t.Error("a mini-check with an out-of-range answer should be dropped")
 	}
+}
+
+// OpenAI's strict structured output rejects a schema outright if any object omits
+// additionalProperties:false or leaves a property out of `required`. A rejected request is
+// not a degraded explanation — it is no explanation at all, for every learner — so the
+// shape is asserted here rather than discovered in production.
+func TestGrammarExplanationSchemaIsStrictModeSafe(t *testing.T) {
+	var root map[string]any
+	if err := json.Unmarshal(grammarExplanationSchema, &root); err != nil {
+		t.Fatalf("schema is not valid JSON: %v", err)
+	}
+
+	var check func(path string, node map[string]any)
+	check = func(path string, node map[string]any) {
+		types, _ := node["type"]
+		isObject := types == "object"
+		if list, ok := types.([]any); ok {
+			for _, t := range list {
+				if t == "object" {
+					isObject = true
+				}
+			}
+		}
+		if isObject {
+			if node["additionalProperties"] != false {
+				t.Errorf("%s: additionalProperties must be false", path)
+			}
+			props, _ := node["properties"].(map[string]any)
+			required := map[string]bool{}
+			for _, r := range toSlice(node["required"]) {
+				required[r.(string)] = true
+			}
+			for name := range props {
+				if !required[name] {
+					t.Errorf("%s: property %q is not in required", path, name)
+				}
+			}
+			for name, child := range props {
+				if c, ok := child.(map[string]any); ok {
+					check(path+"."+name, c)
+				}
+			}
+		}
+		if items, ok := node["items"].(map[string]any); ok {
+			check(path+"[]", items)
+		}
+	}
+	check("root", root)
+}
+
+func toSlice(v any) []any {
+	s, _ := v.([]any)
+	return s
 }

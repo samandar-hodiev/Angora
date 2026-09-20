@@ -333,7 +333,19 @@ export interface GrammarResult {
 export interface GrammarAIFormula {
   label: string;
   pattern: string;
+  examples: string[];
+}
+
+/** One situation the form is used in, with a sentence showing it. */
+export interface GrammarUse {
+  use: string;
   example: string;
+}
+
+/** A sentence plus why it is built that way. */
+export interface GrammarWorkedExample {
+  sentence: string;
+  note: string;
 }
 
 export interface GrammarAICorrection {
@@ -348,14 +360,25 @@ export interface GrammarMiniCheck {
   answer: number;
 }
 
+/**
+ * A full generated lesson on one topic. For a topic with no canonical content this is what
+ * the learner reads as the rule, so it is long-form rather than a summary.
+ */
 export interface GrammarExplanation {
-  definition: string;
-  when_to_use: string[];
+  summary: string;
+  /** The explanation proper: several paragraphs that teach the rule. */
+  paragraphs: string[];
+  when_to_use: GrammarUse[];
   formulas: GrammarAIFormula[];
   positive: string[];
   negative: string[];
   questions: string[];
+  examples: GrammarWorkedExample[];
+  signal_words: string[];
   common_mistakes: GrammarAICorrection[];
+  tips: string[];
+  /** How this differs from the form learners most often confuse it with. */
+  compare_note: string;
   mini_check?: GrammarMiniCheck | null;
 }
 

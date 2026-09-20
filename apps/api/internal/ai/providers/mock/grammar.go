@@ -30,21 +30,32 @@ func grammarExplanation(req ai.AnalysisRequest) json.RawMessage {
 		topic = "this grammar point"
 	}
 	out, _ := json.Marshal(ai.GrammarExplanation{
-		Definition: "[mock] " + topic + " is explained here at the learner's level.",
-		WhenToUse: []string{
-			"When the situation matches the rule above",
-			"In both speaking and writing",
+		Summary: "[mock] " + topic + " explained at the learner's level.",
+		Paragraphs: []string{
+			"[mock] This is where the full explanation of " + topic + " appears. With a real provider configured (AI_PROVIDER=openai) this is several paragraphs that teach the rule.",
+			"[mock] The second paragraph covers how the form changes in negatives and questions.",
+		},
+		WhenToUse: []ai.GrammarUse{
+			{Use: "When the situation matches the rule above", Example: "I finished the report."},
+			{Use: "In both speaking and writing", Example: "She arrived on time."},
 		},
 		Formulas: []ai.GrammarFormula{
-			{Label: "Affirmative", Pattern: "Subject + verb", Example: "I worked late."},
-			{Label: "Negative", Pattern: "Subject + did not + verb", Example: "I didn't work late."},
+			{Label: "Affirmative", Pattern: "Subject + verb", Examples: []string{"I worked late.", "She went home."}},
+			{Label: "Negative", Pattern: "Subject + did not + verb", Examples: []string{"I didn't work late."}},
 		},
 		Positive:  []string{"I finished the report.", "She arrived on time."},
 		Negative:  []string{"I didn't finish the report.", "She didn't arrive on time."},
 		Questions: []string{"Did you finish the report?", "Did she arrive on time?"},
+		Examples: []ai.GrammarWorkedExample{
+			{Sentence: "I visited London last year.", Note: "Finished time, so the past form."},
+			{Sentence: "She didn't call me back.", Note: "After didn't, the base form."},
+		},
+		SignalWords: []string{"yesterday", "last week", "ago"},
 		CommonMistakes: []ai.GrammarCorrection{
 			{Wrong: "I didn't finished.", Right: "I didn't finish.", Why: "After didn't, use the base form."},
 		},
+		Tips:        []string{"[mock] Learn the irregular forms as pairs, not as a list."},
+		CompareNote: "[mock] Contrast with the form learners most often confuse this with.",
 		MiniCheck: &ai.GrammarMiniCheck{
 			Question: "Which sentence is correct?",
 			Options:  []string{"I didn't went.", "I didn't go.", "I not went."},

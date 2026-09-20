@@ -470,6 +470,7 @@ func (m *Module) aiSubjectByID(ctx context.Context, userID, topicID uuid.UUID) (
 	if len(bodyRaw) > 0 && string(bodyRaw) != "null" {
 		var content Content
 		if json.Unmarshal(bodyRaw, &content) == nil {
+			out.topic.HasCanonical = true
 			if content.Explanation != "" {
 				out.topic.Summary = content.Explanation
 			}
