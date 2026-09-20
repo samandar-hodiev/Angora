@@ -19,6 +19,7 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/assessment"
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/auth"
+	"github.com/samandar-hodiev/engora/apps/api/internal/grammar"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
@@ -54,6 +55,7 @@ type Container struct {
 	Plans         *personalization.Service
 	Onboarding    *onboarding.Service
 	Assessment    *assessment.Service
+	GrammarTutor  grammar.Tutor
 }
 
 func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container, error) {
@@ -139,6 +141,14 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		MaxUploadBytes: cfg.Storage.MaxUploadBytes,
 	})
 	c.Onboarding.SetPlacement(c.Assessment)
+
+	// Grammar explanations rephrase content the product already owns, so they run on the
+	// cheaper model; tutoring and free-text analysis need the stronger one.
+	fastModel := cfg.AI.FastModel
+	if fastModel == "" {
+		fastModel = cfg.AI.Model
+	}
+	c.GrammarTutor = ai.NewGrammarTutor(c.AI, fastModel, cfg.AI.Model)
 
 	log.Info("container ready",
 		slog.String("env", string(cfg.App.Env)),

@@ -1,0 +1,751 @@
+{
+ "relations": [
+  {
+   "from": "past-simple",
+   "to": "regular-irregular-verbs",
+   "kind": "prerequisite",
+   "note": "You need V2 forms before you can use them",
+   "sort_order": 1
+  },
+  {
+   "from": "past-simple",
+   "to": "present-simple",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "past-simple",
+   "to": "past-continuous",
+   "kind": "related",
+   "note": "",
+   "sort_order": 2
+  },
+  {
+   "from": "past-simple",
+   "to": "present-perfect",
+   "kind": "compare",
+   "note": "Finished time vs time connected to now",
+   "sort_order": 1
+  },
+  {
+   "from": "past-simple",
+   "to": "past-continuous",
+   "kind": "compare",
+   "note": "The whole action vs the action in progress",
+   "sort_order": 2
+  },
+  {
+   "from": "past-simple",
+   "to": "past-perfect",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "present-simple",
+   "to": "present-continuous",
+   "kind": "compare",
+   "note": "Always vs right now",
+   "sort_order": 1
+  },
+  {
+   "from": "present-simple",
+   "to": "past-simple",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "present-simple",
+   "to": "adverbs-frequency",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "present-continuous",
+   "to": "present-simple",
+   "kind": "compare",
+   "note": "Right now vs always",
+   "sort_order": 1
+  },
+  {
+   "from": "present-continuous",
+   "to": "stative-verbs",
+   "kind": "related",
+   "note": "Some verbs are not used in the continuous",
+   "sort_order": 1
+  },
+  {
+   "from": "present-continuous",
+   "to": "present-continuous-future",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "present-perfect",
+   "to": "past-simple",
+   "kind": "compare",
+   "note": "Time connected to now vs finished time",
+   "sort_order": 1
+  },
+  {
+   "from": "present-perfect",
+   "to": "present-perfect-continuous",
+   "kind": "compare",
+   "note": "The result vs how long",
+   "sort_order": 2
+  },
+  {
+   "from": "present-perfect",
+   "to": "regular-irregular-verbs",
+   "kind": "prerequisite",
+   "note": "You need V3 forms",
+   "sort_order": 1
+  },
+  {
+   "from": "present-perfect",
+   "to": "present-perfect-continuous",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "past-continuous",
+   "to": "past-simple",
+   "kind": "compare",
+   "note": "In progress vs completed",
+   "sort_order": 1
+  },
+  {
+   "from": "past-continuous",
+   "to": "past-perfect",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "past-perfect",
+   "to": "past-simple",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "past-perfect",
+   "to": "past-perfect-continuous",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "future-will",
+   "to": "be-going-to",
+   "kind": "compare",
+   "note": "Deciding now vs already decided",
+   "sort_order": 1
+  },
+  {
+   "from": "be-going-to",
+   "to": "future-will",
+   "kind": "compare",
+   "note": "Already decided vs deciding now",
+   "sort_order": 1
+  },
+  {
+   "from": "be-going-to",
+   "to": "present-continuous-future",
+   "kind": "compare",
+   "note": "Intention vs fixed arrangement",
+   "sort_order": 2
+  },
+  {
+   "from": "a-an",
+   "to": "the",
+   "kind": "compare",
+   "note": "One of many vs the one we mean",
+   "sort_order": 1
+  },
+  {
+   "from": "a-an",
+   "to": "the",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "the",
+   "to": "a-an",
+   "kind": "compare",
+   "note": "The one we mean vs one of many",
+   "sort_order": 1
+  },
+  {
+   "from": "the",
+   "to": "zero-article",
+   "kind": "compare",
+   "note": "With the vs with nothing",
+   "sort_order": 2
+  },
+  {
+   "from": "the",
+   "to": "a-an-vs-the",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "zero-article",
+   "to": "the",
+   "kind": "compare",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "a-an-vs-the",
+   "to": "articles-geographical",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "articles-geographical",
+   "to": "the",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "zero-conditional",
+   "to": "first-conditional",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "first-conditional",
+   "to": "second-conditional",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "first-conditional",
+   "to": "second-conditional",
+   "kind": "compare",
+   "note": "Real future vs imagined present",
+   "sort_order": 1
+  },
+  {
+   "from": "second-conditional",
+   "to": "third-conditional",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "second-conditional",
+   "to": "past-simple",
+   "kind": "prerequisite",
+   "note": "The if-clause uses the past form",
+   "sort_order": 1
+  },
+  {
+   "from": "second-conditional",
+   "to": "third-conditional",
+   "kind": "compare",
+   "note": "Imagined now vs imagined past",
+   "sort_order": 1
+  },
+  {
+   "from": "third-conditional",
+   "to": "past-perfect",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "third-conditional",
+   "to": "mixed-conditionals",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "first-conditional",
+   "to": "unless-cond",
+   "kind": "related",
+   "note": "",
+   "sort_order": 2
+  },
+  {
+   "from": "present-passive",
+   "to": "past-passive",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "present-passive",
+   "to": "present-simple",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "past-passive",
+   "to": "future-passive",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "reported-statements",
+   "to": "backshift",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "reported-statements",
+   "to": "reported-questions",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "reported-questions",
+   "to": "indirect-questions",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "reported-questions",
+   "to": "reported-commands",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "defining-relative",
+   "to": "non-defining-relative",
+   "kind": "compare",
+   "note": "Identifying vs extra information",
+   "sort_order": 1
+  },
+  {
+   "from": "defining-relative",
+   "to": "who-which-that",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "defining-relative",
+   "to": "non-defining-relative",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "who-which-that",
+   "to": "whose",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "gerunds",
+   "to": "infinitives",
+   "kind": "compare",
+   "note": "-ing vs to + verb",
+   "sort_order": 1
+  },
+  {
+   "from": "verb-gerund",
+   "to": "verb-infinitive",
+   "kind": "compare",
+   "note": "Which verbs take which",
+   "sort_order": 1
+  },
+  {
+   "from": "gerund-vs-infinitive",
+   "to": "verb-gerund",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "gerund-vs-infinitive",
+   "to": "verb-infinitive",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 2
+  },
+  {
+   "from": "much-many",
+   "to": "countable-uncountable",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "much-many",
+   "to": "few-little",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "few-little",
+   "to": "a-few-a-little",
+   "kind": "compare",
+   "note": "Not enough vs some",
+   "sort_order": 1
+  },
+  {
+   "from": "a-few-a-little",
+   "to": "few-little",
+   "kind": "compare",
+   "note": "Some vs not enough",
+   "sort_order": 1
+  },
+  {
+   "from": "comparative",
+   "to": "superlative",
+   "kind": "next",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "comparative",
+   "to": "as-as",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "less-fewer",
+   "to": "countable-uncountable",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "question-tags",
+   "to": "yes-no-questions",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "indirect-questions",
+   "to": "wh-questions",
+   "kind": "prerequisite",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "indirect-questions",
+   "to": "question-word-order",
+   "kind": "compare",
+   "note": "No inversion vs inversion",
+   "sort_order": 1
+  },
+  {
+   "from": "must",
+   "to": "have-to",
+   "kind": "compare",
+   "note": "Personal obligation vs external rule",
+   "sort_order": 1
+  },
+  {
+   "from": "have-to",
+   "to": "must",
+   "kind": "compare",
+   "note": "External rule vs personal obligation",
+   "sort_order": 1
+  },
+  {
+   "from": "should",
+   "to": "ought-to",
+   "kind": "alternative",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "modal-perfects",
+   "to": "third-conditional",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "adverbs-frequency",
+   "to": "present-simple",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  },
+  {
+   "from": "participial-adjectives",
+   "to": "present-continuous",
+   "kind": "related",
+   "note": "",
+   "sort_order": 1
+  }
+ ],
+ "comparisons": [
+  {
+   "left": "past-simple",
+   "right": "present-perfect",
+   "summary": "Past Simple puts the action in finished time. Present Perfect connects it to now.",
+   "rows": [
+    {
+     "aspect": "Time",
+     "left": "Finished, and we know when",
+     "right": "Connected to now, or we do not say when"
+    },
+    {
+     "aspect": "Example",
+     "left": "I saw him yesterday.",
+     "right": "I have seen him."
+    },
+    {
+     "aspect": "Question",
+     "left": "When did you see him?",
+     "right": "Have you ever seen him?"
+    },
+    {
+     "aspect": "Signal words",
+     "left": "yesterday, last year, in 2020, ago",
+     "right": "already, ever, never, yet, just, since, for"
+    },
+    {
+     "aspect": "Wrong",
+     "left": "I have seen him yesterday.",
+     "right": "I saw him already."
+    }
+   ]
+  },
+  {
+   "left": "past-simple",
+   "right": "past-continuous",
+   "summary": "Past Simple is the whole action. Past Continuous is the action in progress around it.",
+   "rows": [
+    {
+     "aspect": "View",
+     "left": "The complete action",
+     "right": "The action in the middle"
+    },
+    {
+     "aspect": "Example",
+     "left": "I cooked dinner.",
+     "right": "I was cooking dinner."
+    },
+    {
+     "aspect": "Together",
+     "left": "The phone rang",
+     "right": "while I was cooking."
+    },
+    {
+     "aspect": "Signal words",
+     "left": "then, after that, at 8 o'clock",
+     "right": "while, as, at 8 o'clock (in progress)"
+    }
+   ]
+  },
+  {
+   "left": "present-simple",
+   "right": "present-continuous",
+   "summary": "Present Simple is what is always true. Present Continuous is what is happening around now.",
+   "rows": [
+    {
+     "aspect": "Meaning",
+     "left": "Habits, routines, facts",
+     "right": "Now, or a temporary period"
+    },
+    {
+     "aspect": "Example",
+     "left": "I work in Tashkent.",
+     "right": "I am working from home this week."
+    },
+    {
+     "aspect": "Signal words",
+     "left": "always, usually, every day",
+     "right": "now, at the moment, this week"
+    },
+    {
+     "aspect": "Stative verbs",
+     "left": "I know the answer.",
+     "right": "NOT: I am knowing the answer."
+    }
+   ]
+  },
+  {
+   "left": "few-little",
+   "right": "a-few-a-little",
+   "summary": "Few and little mean not enough. A few and a little mean some — enough to be useful.",
+   "rows": [
+    {
+     "aspect": "Feeling",
+     "left": "Negative: not enough",
+     "right": "Positive: some"
+    },
+    {
+     "aspect": "Countable",
+     "left": "Few people came.",
+     "right": "A few people came."
+    },
+    {
+     "aspect": "Uncountable",
+     "left": "I have little time.",
+     "right": "I have a little time."
+    },
+    {
+     "aspect": "Meaning",
+     "left": "Almost nobody / almost nothing",
+     "right": "Not many, but some"
+    }
+   ]
+  },
+  {
+   "left": "much-many",
+   "right": "less-fewer",
+   "summary": "Much and many go up; less and fewer go down. Both split the same way: uncountable versus countable.",
+   "rows": [
+    {
+     "aspect": "Uncountable",
+     "left": "much water",
+     "right": "less water"
+    },
+    {
+     "aspect": "Countable",
+     "left": "many bottles",
+     "right": "fewer bottles"
+    },
+    {
+     "aspect": "Question",
+     "left": "How much? How many?",
+     "right": "—"
+    },
+    {
+     "aspect": "Common mistake",
+     "left": "much bottles",
+     "right": "less bottles"
+    }
+   ]
+  },
+  {
+   "left": "first-conditional",
+   "right": "second-conditional",
+   "summary": "First Conditional is a real possibility. Second Conditional is imagining something that is not true now.",
+   "rows": [
+    {
+     "aspect": "Situation",
+     "left": "Real, possible future",
+     "right": "Imaginary or unlikely"
+    },
+    {
+     "aspect": "Form",
+     "left": "If + present simple, will + verb",
+     "right": "If + past simple, would + verb"
+    },
+    {
+     "aspect": "Example",
+     "left": "If it rains, I will stay home.",
+     "right": "If I had a car, I would drive."
+    },
+    {
+     "aspect": "Meaning",
+     "left": "It might really happen",
+     "right": "It is not the case now"
+    }
+   ]
+  },
+  {
+   "left": "must",
+   "right": "have-to",
+   "summary": "Must is obligation coming from the speaker. Have to is obligation coming from outside.",
+   "rows": [
+    {
+     "aspect": "Source",
+     "left": "The speaker decides",
+     "right": "A rule or situation decides"
+    },
+    {
+     "aspect": "Example",
+     "left": "I must call my mother.",
+     "right": "I have to wear a uniform."
+    },
+    {
+     "aspect": "Negative",
+     "left": "You mustn't smoke. (prohibited)",
+     "right": "You don't have to come. (not necessary)"
+    },
+    {
+     "aspect": "Past",
+     "left": "— (use had to)",
+     "right": "I had to leave early."
+    }
+   ]
+  },
+  {
+   "left": "gerunds",
+   "right": "infinitives",
+   "summary": "A gerund is a verb used as a noun. An infinitive is to + verb, usually pointing at a purpose or a result.",
+   "rows": [
+    {
+     "aspect": "Form",
+     "left": "verb + -ing",
+     "right": "to + base verb"
+    },
+    {
+     "aspect": "As subject",
+     "left": "Swimming is good for you.",
+     "right": "To swim every day takes time."
+    },
+    {
+     "aspect": "After verbs",
+     "left": "enjoy, avoid, finish, mind",
+     "right": "want, decide, hope, promise"
+    },
+    {
+     "aspect": "After prepositions",
+     "left": "good at swimming",
+     "right": "— (never after a preposition)"
+    }
+   ]
+  },
+  {
+   "left": "defining-relative",
+   "right": "non-defining-relative",
+   "summary": "A defining clause says which one. A non-defining clause adds information you could remove.",
+   "rows": [
+    {
+     "aspect": "Commas",
+     "left": "No commas",
+     "right": "Always commas"
+    },
+    {
+     "aspect": "Example",
+     "left": "The man who lives next door is a doctor.",
+     "right": "My father, who lives next door, is a doctor."
+    },
+    {
+     "aspect": "That",
+     "left": "Possible: the man that lives...",
+     "right": "Never: NOT my father, that lives..."
+    },
+    {
+     "aspect": "Remove it",
+     "left": "The sentence loses its meaning",
+     "right": "The sentence still works"
+    }
+   ]
+  }
+ ]
+}

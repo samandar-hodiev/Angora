@@ -82,7 +82,10 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	progress.NewModule(c.DB).RegisterRoutes(v1)
 	mistakes.NewModule(c.DB).RegisterRoutes(v1)
 	vocabulary.NewModule(c.DB).RegisterRoutes(v1)
-	grammar.NewModule(c.DB).RegisterRoutes(v1)
+	grammar.NewModule(grammar.Deps{
+		Pool: c.DB, Redis: c.Redis, Tutor: c.GrammarTutor,
+		Storage: c.Storage, Tracker: c.Analytics, Log: c.Log,
+	}).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
 	levels.NewModule(c.DB).RegisterRoutes(v1)
 	onboarding.NewHandler(c.Onboarding).RegisterRoutes(v1)

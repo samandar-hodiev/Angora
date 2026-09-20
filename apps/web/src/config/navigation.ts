@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BookOpenCheck,
   ChartLine,
   GraduationCap,
   House,
@@ -23,13 +24,15 @@ export interface NavItem {
 }
 
 export const homeNav: NavItem = { href: "/app/dashboard", label: "Home", icon: House };
+/** Its own section rather than a skill under Learn: grammar is a library, not a practice queue. */
+export const grammarNav: NavItem = { href: "/app/grammar", label: "Grammar", icon: BookOpenCheck };
 export const learnNav: NavItem = { href: "/app/learn", label: "Learn", icon: BookOpen };
 
 export const primaryNav: NavItem[] = [
-  { href: "/app/ai-coach", label: "AI Coach", icon: Sparkles },
   { href: "/app/ielts", label: "IELTS", icon: GraduationCap },
-  { href: "/app/progress", label: "Progress", icon: ChartLine },
+  { href: "/app/ai-coach", label: "AI Coach", icon: Sparkles },
   { href: "/app/vocabulary", label: "Vocabulary", icon: SpellCheck },
+  { href: "/app/progress", label: "Progress", icon: ChartLine },
   { href: "/app/mistakes", label: "Mistakes", icon: ListChecks },
 ];
 

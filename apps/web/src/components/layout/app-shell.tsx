@@ -25,7 +25,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/overlay";
-import { homeNav, isActivePath, learnNav, mobileNav, primaryNav, secondaryNav, skillHref, type NavItem } from "@/config/navigation";
+import { grammarNav, homeNav, isActivePath, learnNav, mobileNav, primaryNav, secondaryNav, skillHref, type NavItem } from "@/config/navigation";
 import { useIsAdmin } from "@/features/admin/api";
 import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
@@ -158,6 +158,7 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
     <nav aria-label="Main" className="relative flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
       <ul className="grid gap-0.5">
         <li>{link(homeNav)}</li>
+        <li>{link(grammarNav)}</li>
         <li>
           {link(learnNav)}
           <ul className="mt-0.5 grid gap-0.5">

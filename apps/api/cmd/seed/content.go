@@ -15,22 +15,6 @@ var topics = []topicSeed{
 	{"health", "Health"}, {"culture", "Culture & people"},
 }
 
-type grammarSeed struct {
-	slug, name, description, level string
-	order                          int
-}
-
-var grammarTopics = []grammarSeed{
-	{"present-simple", "Present Simple", "Habits, routines and facts.", "A1", 1},
-	{"past-simple", "Past Simple", "Finished actions at a specific time in the past.", "A2", 2},
-	{"articles", "Articles", "When to use a, an, the — or nothing.", "A2", 3},
-	{"present-perfect", "Present Perfect", "Experiences and past actions connected to now.", "B1", 4},
-	{"modal-verbs", "Modal Verbs", "Ability, obligation, advice and possibility.", "B1", 5},
-	{"conditionals", "Conditionals", "Real and hypothetical situations with if.", "B1", 6},
-	{"passive-voice", "Passive Voice", "Focusing on the action rather than who does it.", "B2", 7},
-	{"relative-clauses", "Relative Clauses", "Adding information with who, which and that.", "B2", 8},
-}
-
 type wordSeed struct {
 	term, pos, definition, ipa, level string
 	examples                          []string
@@ -137,14 +121,6 @@ func seedContent(ctx context.Context, pool *pgxpool.Pool) error {
 			return fmt.Errorf("topic %s: %w", t.slug, err)
 		}
 	}
-	for _, g := range grammarTopics {
-		if _, err := pool.Exec(ctx, `
-			INSERT INTO grammar_topics (slug, name, description, level_id, sort_order, status)
-			VALUES ($1, $2, $3, (SELECT id FROM levels WHERE code = $4), $5, 'published')
-			ON CONFLICT (slug) DO NOTHING`, g.slug, g.name, g.description, g.level, g.order); err != nil {
-			return fmt.Errorf("grammar %s: %w", g.slug, err)
-		}
-	}
 	for _, w := range words {
 		tags := w.tags
 		if tags == nil {
@@ -171,7 +147,7 @@ func seedContent(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 		inserted += int(tag.RowsAffected())
 	}
-	fmt.Printf("content ready: %d topics, %d grammar topics, %d words, %d content items (%d new)\n",
-		len(topics), len(grammarTopics), len(words), len(content), inserted)
+	fmt.Printf("content ready: %d topics, %d words, %d content items (%d new)\n",
+		len(topics), len(words), len(content), inserted)
 	return nil
 }

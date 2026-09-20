@@ -1,0 +1,4848 @@
+{
+ "topics": {
+  "past-simple": {
+   "content": {
+    "intro": "Past Simple is the tense for things that are over. You did them, they finished, and usually you know when.",
+    "explanation": "Use Past Simple for an action that started and finished in the past. The time is either stated (yesterday, last week, in 2020) or already clear to both people. Regular verbs add -ed. Irregular verbs have their own second form (V2) that has to be learned: go → went, see → saw, buy → bought.\n\nThe form is the same for every subject: I went, she went, they went. The only thing that changes is what happens in negatives and questions, where did takes the tense and the main verb goes back to its base form.",
+    "formulas": [
+     {
+      "label": "Affirmative",
+      "pattern": "Subject + V2",
+      "examples": [
+       "I worked late.",
+       "She went home.",
+       "They bought a car."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "Subject + did not (didn't) + V1",
+      "examples": [
+       "I didn't work late.",
+       "She didn't go home."
+      ]
+     },
+     {
+      "label": "Question",
+      "pattern": "Did + subject + V1 ?",
+      "examples": [
+       "Did you work late?",
+       "Did she go home?"
+      ]
+     },
+     {
+      "label": "Wh- question",
+      "pattern": "Wh- + did + subject + V1 ?",
+      "examples": [
+       "Where did you go?",
+       "What did she say?"
+      ]
+     }
+    ],
+    "usage": [
+     "Completed actions at a definite time in the past",
+     "A sequence of past events, in order",
+     "Past habits and states that are no longer true",
+     "Past events in a story or a report"
+    ],
+    "signal_words": [
+     "yesterday",
+     "last week",
+     "last year",
+     "two days ago",
+     "in 2020",
+     "when I was a child",
+     "then",
+     "after that"
+    ],
+    "examples": [
+     {
+      "text": "I visited London last summer.",
+      "note": "Finished, and we know when."
+     },
+     {
+      "text": "She studied medicine for six years.",
+      "note": "The whole period is over."
+     },
+     {
+      "text": "We woke up, had breakfast and left.",
+      "note": "A sequence, in order."
+     },
+     {
+      "text": "He didn't call me back.",
+      "note": "Negative: didn't + base form."
+     },
+     {
+      "text": "Did you enjoy the film?",
+      "note": "Question: did + base form."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "I didn't went to school.",
+      "right": "I didn't go to school.",
+      "why": "After didn't, use the base form. Did already carries the past.",
+      "rule": "negative-base-form"
+     },
+     {
+      "wrong": "Did you saw him?",
+      "right": "Did you see him?",
+      "why": "After did, use the base form.",
+      "rule": "question-base-form"
+     },
+     {
+      "wrong": "I have seen him yesterday.",
+      "right": "I saw him yesterday.",
+      "why": "With a finished past time like yesterday, use Past Simple, not Present Perfect.",
+      "rule": "vs-present-perfect"
+     },
+     {
+      "wrong": "She goed home.",
+      "right": "She went home.",
+      "why": "Go is irregular: its past form is went, not goed.",
+      "rule": "irregular-forms"
+     },
+     {
+      "wrong": "When you did arrive?",
+      "right": "When did you arrive?",
+      "why": "In a question, did comes before the subject.",
+      "rule": "question-word-order"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "I ___ to London yesterday.",
+     "payload": {
+      "options": [
+       "go",
+       "went",
+       "gone",
+       "going"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "affirmative-v2",
+     "explanation": "Past Simple affirmative uses V2: go → went.",
+     "difficulty": 0.2,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She ___ the answer.",
+     "payload": {
+      "options": [
+       "didn't knew",
+       "didn't know",
+       "not knew",
+       "don't knew"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "After didn't, the verb goes back to its base form.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "___ you finish the report?",
+     "payload": {
+      "options": [
+       "Do",
+       "Did",
+       "Does",
+       "Was"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "question-base-form",
+     "explanation": "A past question starts with did.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "They ___ dinner and then watched a film.",
+     "payload": {
+      "options": [
+       "have",
+       "had",
+       "has",
+       "having"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "affirmative-v2",
+     "explanation": "A sequence of finished past events takes Past Simple.",
+     "difficulty": 0.25,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "She ____ (go) to school yesterday.",
+     "payload": {
+      "hint": "go"
+     },
+     "answer": {
+      "accepted": [
+       "went"
+      ]
+     },
+     "target_rule": "irregular-forms",
+     "explanation": "Go is irregular: went.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "We ____ (not/see) anyone at the station.",
+     "payload": {
+      "hint": "not see"
+     },
+     "answer": {
+      "accepted": [
+       "didn't see",
+       "did not see"
+      ]
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "Negative: didn't + base form.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "____ he ____ (call) you last night?",
+     "payload": {
+      "hint": "call"
+     },
+     "answer": {
+      "accepted": [
+       "Did he call",
+       "did he call"
+      ]
+     },
+     "target_rule": "question-base-form",
+     "explanation": "Question: did + subject + base form.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She didn't went there.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She didn't go there.",
+       "She did not go there."
+      ]
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "After didn't, use the base form of the verb.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "Did you saw the email?",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "Did you see the email?"
+      ]
+     },
+     "target_rule": "question-base-form",
+     "explanation": "After did, use the base form: see, not saw.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I have visited Paris in 2019.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I visited Paris in 2019."
+      ]
+     },
+     "target_rule": "vs-present-perfect",
+     "explanation": "A finished past time (in 2019) needs Past Simple.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "ordering",
+     "prompt": "Put the words in order.",
+     "payload": {
+      "segments": [
+       "I",
+       "went",
+       "to",
+       "the",
+       "cinema",
+       "yesterday"
+      ]
+     },
+     "answer": {
+      "order": [
+       "I",
+       "went",
+       "to",
+       "the",
+       "cinema",
+       "yesterday"
+      ]
+     },
+     "target_rule": "question-word-order",
+     "explanation": "Subject + V2 + place + time.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "ordering",
+     "prompt": "Put the words in order.",
+     "payload": {
+      "segments": [
+       "Did",
+       "she",
+       "call",
+       "you",
+       "last",
+       "night"
+      ]
+     },
+     "answer": {
+      "order": [
+       "Did",
+       "she",
+       "call",
+       "you",
+       "last",
+       "night"
+      ]
+     },
+     "target_rule": "question-word-order",
+     "explanation": "Did + subject + base form.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Make it negative.",
+     "payload": {
+      "sentence": "I visited London.",
+      "instruction": "Make it negative."
+     },
+     "answer": {
+      "accepted": [
+       "I didn't visit London.",
+       "I did not visit London."
+      ]
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "Negative: didn't + base form.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Make it a question.",
+     "payload": {
+      "sentence": "She bought a new phone.",
+      "instruction": "Make it a question."
+     },
+     "answer": {
+      "accepted": [
+       "Did she buy a new phone?"
+      ]
+     },
+     "target_rule": "question-base-form",
+     "explanation": "Question: did + subject + base form.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Change it to the past.",
+     "payload": {
+      "sentence": "He works in a bank.",
+      "instruction": "Change it to the past."
+     },
+     "answer": {
+      "accepted": [
+       "He worked in a bank."
+      ]
+     },
+     "target_rule": "affirmative-v2",
+     "explanation": "Regular verb: add -ed.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "matching",
+     "prompt": "Match each verb with its past form.",
+     "payload": {
+      "left": [
+       "go",
+       "buy",
+       "see",
+       "write"
+      ],
+      "right": [
+       "went",
+       "bought",
+       "saw",
+       "wrote"
+      ]
+     },
+     "answer": {
+      "pairs": {
+       "0": 0,
+       "1": 1,
+       "2": 2,
+       "3": 3
+      }
+     },
+     "target_rule": "irregular-forms",
+     "explanation": "These four are irregular and have to be learned.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "short_answer",
+     "prompt": "What is the past form of 'take'?",
+     "payload": {},
+     "answer": {
+      "accepted": [
+       "took"
+      ]
+     },
+     "target_rule": "irregular-forms",
+     "explanation": "Take → took.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "Your friend asks what you did at the weekend. Which sentence fits best?",
+     "payload": {
+      "options": [
+       "I have gone to the mountains.",
+       "I went to the mountains.",
+       "I go to the mountains.",
+       "I was going to the mountains."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "vs-present-perfect",
+     "explanation": "The weekend is finished time, so Past Simple.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "Tell me what you did yesterday.",
+     "payload": {
+      "instruction": "Write 3-5 sentences about yesterday. Use Past Simple, including at least one negative sentence.",
+      "min_words": 25,
+      "max_words": 80
+     },
+     "answer": {
+      "target_forms": [
+       "past simple affirmative",
+       "past simple negative"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.6,
+     "tags": []
+    }
+   ]
+  },
+  "present-simple": {
+   "content": {
+    "intro": "Present Simple is the tense for things that are generally true: habits, routines and facts.",
+    "explanation": "Use Present Simple for what happens regularly or what is always true, not for what is happening at this exact moment. The form is the base verb, except with he, she and it, which add -s or -es.\n\nNegatives and questions use do or does, and once do/does appears, the main verb goes back to its base form: she works → she doesn't work.",
+    "formulas": [
+     {
+      "label": "Affirmative",
+      "pattern": "I / you / we / they + V1  ·  he / she / it + V1 + s",
+      "examples": [
+       "I work in Tashkent.",
+       "She works in Tashkent."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "Subject + do/does not + V1",
+      "examples": [
+       "They don't live here.",
+       "He doesn't live here."
+      ]
+     },
+     {
+      "label": "Question",
+      "pattern": "Do/Does + subject + V1 ?",
+      "examples": [
+       "Do you speak English?",
+       "Does she speak English?"
+      ]
+     }
+    ],
+    "usage": [
+     "Habits and routines",
+     "Facts and things that are always true",
+     "Timetables and schedules",
+     "Feelings and opinions with stative verbs"
+    ],
+    "signal_words": [
+     "always",
+     "usually",
+     "often",
+     "sometimes",
+     "never",
+     "every day",
+     "on Mondays",
+     "twice a week"
+    ],
+    "examples": [
+     {
+      "text": "I get up at seven.",
+      "note": "A routine."
+     },
+     {
+      "text": "Water boils at 100 degrees.",
+      "note": "A fact."
+     },
+     {
+      "text": "The train leaves at six.",
+      "note": "A timetable."
+     },
+     {
+      "text": "She doesn't eat meat.",
+      "note": "Negative with doesn't + base form."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "She work in a bank.",
+      "right": "She works in a bank.",
+      "why": "He, she and it add -s in the affirmative.",
+      "rule": "third-person-s"
+     },
+     {
+      "wrong": "He doesn't works here.",
+      "right": "He doesn't work here.",
+      "why": "Does already carries the -s, so the main verb is the base form.",
+      "rule": "negative-base-form"
+     },
+     {
+      "wrong": "Do she like coffee?",
+      "right": "Does she like coffee?",
+      "why": "With he, she and it, the question word is does.",
+      "rule": "question-auxiliary"
+     },
+     {
+      "wrong": "I am knowing the answer.",
+      "right": "I know the answer.",
+      "why": "Know is a stative verb and is not used in the continuous.",
+      "rule": "stative-verbs"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "She ___ in a hospital.",
+     "payload": {
+      "options": [
+       "work",
+       "works",
+       "working",
+       "is work"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "third-person-s",
+     "explanation": "He, she and it add -s.",
+     "difficulty": 0.2,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "They ___ television in the evening.",
+     "payload": {
+      "options": [
+       "watchs",
+       "watch",
+       "watches",
+       "watching"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "third-person-s",
+     "explanation": "They takes the base form.",
+     "difficulty": 0.2,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "He ___ coffee.",
+     "payload": {
+      "options": [
+       "doesn't likes",
+       "don't like",
+       "doesn't like",
+       "not likes"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "Doesn't + base form.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "___ your brother play football?",
+     "payload": {
+      "options": [
+       "Do",
+       "Does",
+       "Is",
+       "Are"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "question-auxiliary",
+     "explanation": "Your brother = he, so does.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "My sister ____ (study) at university.",
+     "payload": {
+      "hint": "study"
+     },
+     "answer": {
+      "accepted": [
+       "studies"
+      ]
+     },
+     "target_rule": "third-person-s",
+     "explanation": "Study → studies after she.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "We ____ (not/work) on Sundays.",
+     "payload": {
+      "hint": "not work"
+     },
+     "answer": {
+      "accepted": [
+       "don't work",
+       "do not work"
+      ]
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "We takes don't.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "He don't speak Russian.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "He doesn't speak Russian.",
+       "He does not speak Russian."
+      ]
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "He takes doesn't.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "Does she likes her job?",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "Does she like her job?"
+      ]
+     },
+     "target_rule": "question-auxiliary",
+     "explanation": "After does, use the base form.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "ordering",
+     "prompt": "Put the words in order.",
+     "payload": {
+      "segments": [
+       "I",
+       "usually",
+       "get",
+       "up",
+       "at",
+       "seven"
+      ]
+     },
+     "answer": {
+      "order": [
+       "I",
+       "usually",
+       "get",
+       "up",
+       "at",
+       "seven"
+      ]
+     },
+     "target_rule": "adverb-position",
+     "explanation": "Frequency adverbs go before the main verb.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Make it negative.",
+     "payload": {
+      "sentence": "She drinks tea.",
+      "instruction": "Make it negative."
+     },
+     "answer": {
+      "accepted": [
+       "She doesn't drink tea.",
+       "She does not drink tea."
+      ]
+     },
+     "target_rule": "negative-base-form",
+     "explanation": "Doesn't + base form.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are describing your daily routine. Which sentence fits?",
+     "payload": {
+      "options": [
+       "I am going to work at eight.",
+       "I go to work at eight.",
+       "I went to work at eight.",
+       "I have gone to work at eight."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "habits",
+     "explanation": "A routine takes Present Simple.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "Describe your typical day.",
+     "payload": {
+      "instruction": "Write 4-6 sentences about your normal day. Use Present Simple and at least two frequency adverbs.",
+      "min_words": 30,
+      "max_words": 90
+     },
+     "answer": {
+      "target_forms": [
+       "present simple",
+       "frequency adverbs"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.55,
+     "tags": []
+    }
+   ]
+  },
+  "present-continuous": {
+   "content": {
+    "intro": "Present Continuous is for what is happening now, or around now — not for what is always true.",
+    "explanation": "Use Present Continuous for an action in progress at this moment, or for a temporary situation around this period of time. It is built from am/is/are plus the -ing form.\n\nIt is also used for fixed future arrangements: I'm meeting Ali tomorrow. Some verbs — know, believe, want, need, belong — describe states rather than actions and are not normally used in the continuous.",
+    "formulas": [
+     {
+      "label": "Affirmative",
+      "pattern": "Subject + am/is/are + V-ing",
+      "examples": [
+       "I am reading.",
+       "She is working.",
+       "They are waiting."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "Subject + am/is/are + not + V-ing",
+      "examples": [
+       "I'm not reading.",
+       "She isn't working."
+      ]
+     },
+     {
+      "label": "Question",
+      "pattern": "Am/Is/Are + subject + V-ing ?",
+      "examples": [
+       "Are you reading?",
+       "Is she working?"
+      ]
+     }
+    ],
+    "usage": [
+     "Actions happening right now",
+     "Temporary situations around now",
+     "Changing situations",
+     "Fixed future arrangements"
+    ],
+    "signal_words": [
+     "now",
+     "right now",
+     "at the moment",
+     "currently",
+     "today",
+     "this week",
+     "these days",
+     "look!",
+     "listen!"
+    ],
+    "examples": [
+     {
+      "text": "I'm studying for an exam.",
+      "note": "Temporary, around now."
+     },
+     {
+      "text": "Look — it's raining.",
+      "note": "Happening at this moment."
+     },
+     {
+      "text": "Prices are rising.",
+      "note": "A changing situation."
+     },
+     {
+      "text": "We're meeting at six tomorrow.",
+      "note": "A fixed arrangement."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "I working now.",
+      "right": "I am working now.",
+      "why": "The continuous needs the verb be as well as the -ing form.",
+      "rule": "missing-be"
+     },
+     {
+      "wrong": "She is knowing the answer.",
+      "right": "She knows the answer.",
+      "why": "Know is a stative verb, so it takes the simple form.",
+      "rule": "stative-verbs"
+     },
+     {
+      "wrong": "I am go to work.",
+      "right": "I am going to work.",
+      "why": "After am/is/are, the verb takes -ing.",
+      "rule": "ing-form"
+     },
+     {
+      "wrong": "He is runing.",
+      "right": "He is running.",
+      "why": "Short verbs ending in one vowel + one consonant double the consonant.",
+      "rule": "ing-spelling"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "Be quiet — the baby ___.",
+     "payload": {
+      "options": [
+       "sleeps",
+       "is sleeping",
+       "sleep",
+       "slept"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "actions-now",
+     "explanation": "Happening right now.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I ___ a book at the moment.",
+     "payload": {
+      "options": [
+       "read",
+       "am reading",
+       "reads",
+       "have read"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "actions-now",
+     "explanation": "At the moment signals the continuous.",
+     "difficulty": 0.25,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She ___ the answer.",
+     "payload": {
+      "options": [
+       "is knowing",
+       "knows",
+       "is know",
+       "know"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "stative-verbs",
+     "explanation": "Know is stative.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "Look! It ____ (rain).",
+     "payload": {
+      "hint": "rain"
+     },
+     "answer": {
+      "accepted": [
+       "is raining",
+       "'s raining"
+      ]
+     },
+     "target_rule": "actions-now",
+     "explanation": "Right now: is + -ing.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "They ____ (not/work) today.",
+     "payload": {
+      "hint": "not work"
+     },
+     "answer": {
+      "accepted": [
+       "aren't working",
+       "are not working"
+      ]
+     },
+     "target_rule": "missing-be",
+     "explanation": "Negative: are + not + -ing.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I working in the garden.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I am working in the garden.",
+       "I'm working in the garden."
+      ]
+     },
+     "target_rule": "missing-be",
+     "explanation": "The continuous needs am/is/are.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "He is runing to the bus.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "He is running to the bus."
+      ]
+     },
+     "target_rule": "ing-spelling",
+     "explanation": "Run doubles the n: running.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She is wanting a new phone.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She wants a new phone."
+      ]
+     },
+     "target_rule": "stative-verbs",
+     "explanation": "Want is stative, so use the simple form.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Make it a question.",
+     "payload": {
+      "sentence": "She is watching TV.",
+      "instruction": "Make it a question."
+     },
+     "answer": {
+      "accepted": [
+       "Is she watching TV?"
+      ]
+     },
+     "target_rule": "actions-now",
+     "explanation": "Move is in front of the subject.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "Your friend calls and asks what you are doing. Which answer fits?",
+     "payload": {
+      "options": [
+       "I cook dinner.",
+       "I am cooking dinner.",
+       "I cooked dinner.",
+       "I have cooked dinner."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "actions-now",
+     "explanation": "Right now takes the continuous.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "What is happening around you right now?",
+     "payload": {
+      "instruction": "Write 3-5 sentences about what you and the people near you are doing at this moment.",
+      "min_words": 25,
+      "max_words": 70
+     },
+     "answer": {
+      "target_forms": [
+       "present continuous"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.55,
+     "tags": []
+    }
+   ]
+  },
+  "present-perfect": {
+   "content": {
+    "intro": "Present Perfect links the past to now. The action happened before, but what matters is the situation today.",
+    "explanation": "Use Present Perfect when the past action still matters now: an experience you have had, a change that has happened, or something that started in the past and is still going on. It is built from have/has plus the third form of the verb (V3, the past participle).\n\nThe key rule: do not use it with a finished past time. If you say when it happened — yesterday, last year, in 2020 — English switches to Past Simple.",
+    "formulas": [
+     {
+      "label": "Affirmative",
+      "pattern": "Subject + have/has + V3",
+      "examples": [
+       "I have finished.",
+       "She has gone home."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "Subject + have/has not + V3",
+      "examples": [
+       "I haven't finished.",
+       "She hasn't arrived."
+      ]
+     },
+     {
+      "label": "Question",
+      "pattern": "Have/Has + subject + V3 ?",
+      "examples": [
+       "Have you finished?",
+       "Has she arrived?"
+      ]
+     }
+    ],
+    "usage": [
+     "Life experiences, without saying when",
+     "A past action with a result you can see now",
+     "Something that started in the past and continues",
+     "Recent news, often with just"
+    ],
+    "signal_words": [
+     "ever",
+     "never",
+     "already",
+     "yet",
+     "just",
+     "so far",
+     "recently",
+     "since 2020",
+     "for three years"
+    ],
+    "examples": [
+     {
+      "text": "I have been to Japan.",
+      "note": "An experience. We do not say when."
+     },
+     {
+      "text": "She has lost her keys.",
+      "note": "The result is now: she cannot get in."
+     },
+     {
+      "text": "We have lived here for ten years.",
+      "note": "Started in the past, still true."
+     },
+     {
+      "text": "Have you finished yet?",
+      "note": "Yet in a question."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "I have seen him yesterday.",
+      "right": "I saw him yesterday.",
+      "why": "Yesterday is finished time, so Past Simple.",
+      "rule": "no-finished-time"
+     },
+     {
+      "wrong": "She has went home.",
+      "right": "She has gone home.",
+      "why": "Present Perfect takes V3 (gone), not V2 (went).",
+      "rule": "v3-form"
+     },
+     {
+      "wrong": "I am here since Monday.",
+      "right": "I have been here since Monday.",
+      "why": "Something continuing from the past takes Present Perfect.",
+      "rule": "since-for"
+     },
+     {
+      "wrong": "He has arrived already?",
+      "right": "Has he arrived already?",
+      "why": "In a question, has comes before the subject.",
+      "rule": "question-word-order"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "I ___ never ___ to Japan.",
+     "payload": {
+      "options": [
+       "have / been",
+       "has / been",
+       "have / went",
+       "am / been"
+      ]
+     },
+     "answer": {
+      "correct_index": 0
+     },
+     "target_rule": "v3-form",
+     "explanation": "Present Perfect: have + V3.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She ___ her keys, so she can't get in.",
+     "payload": {
+      "options": [
+       "lost",
+       "has lost",
+       "loses",
+       "is losing"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "result-now",
+     "explanation": "The result matters now.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "We ___ here since 2015.",
+     "payload": {
+      "options": [
+       "live",
+       "are living",
+       "have lived",
+       "lived"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "since-for",
+     "explanation": "Started in the past, still true.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "___ you finished your homework yet?",
+     "payload": {
+      "options": [
+       "Did",
+       "Have",
+       "Are",
+       "Has"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "question-word-order",
+     "explanation": "Have + you + V3.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "He ____ (not/finish) the report yet.",
+     "payload": {
+      "hint": "not finish"
+     },
+     "answer": {
+      "accepted": [
+       "hasn't finished",
+       "has not finished"
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "Hasn't + V3.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "I ____ (know) her for ten years.",
+     "payload": {
+      "hint": "know"
+     },
+     "answer": {
+      "accepted": [
+       "have known",
+       "'ve known"
+      ]
+     },
+     "target_rule": "since-for",
+     "explanation": "A state continuing to now.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I have visited Rome last year.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I visited Rome last year."
+      ]
+     },
+     "target_rule": "no-finished-time",
+     "explanation": "Last year is finished time: use Past Simple.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She has went to the shop.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She has gone to the shop."
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "Go → gone in the Present Perfect.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I am working here since March.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I have worked here since March.",
+       "I have been working here since March."
+      ]
+     },
+     "target_rule": "since-for",
+     "explanation": "Since March needs a perfect form.",
+     "difficulty": 0.7,
+     "tags": []
+    },
+    {
+     "type": "ordering",
+     "prompt": "Put the words in order.",
+     "payload": {
+      "segments": [
+       "Have",
+       "you",
+       "ever",
+       "been",
+       "to",
+       "London"
+      ]
+     },
+     "answer": {
+      "order": [
+       "Have",
+       "you",
+       "ever",
+       "been",
+       "to",
+       "London"
+      ]
+     },
+     "target_rule": "question-word-order",
+     "explanation": "Have + subject + ever + V3.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Rewrite it with 'just'.",
+     "payload": {
+      "sentence": "She finished the book.",
+      "instruction": "Rewrite it with 'just'."
+     },
+     "answer": {
+      "accepted": [
+       "She has just finished the book.",
+       "She's just finished the book."
+      ]
+     },
+     "target_rule": "result-now",
+     "explanation": "Just + Present Perfect for recent news.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are telling a friend about your travels, without saying when. Which fits?",
+     "payload": {
+      "options": [
+       "I went to Italy.",
+       "I have been to Italy.",
+       "I am going to Italy.",
+       "I was going to Italy."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "no-finished-time",
+     "explanation": "An experience with no stated time takes Present Perfect.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "What have you achieved this year?",
+     "payload": {
+      "instruction": "Write 3-5 sentences about what you have done or achieved recently. Use Present Perfect.",
+      "min_words": 25,
+      "max_words": 80
+     },
+     "answer": {
+      "target_forms": [
+       "present perfect"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.65,
+     "tags": []
+    }
+   ]
+  },
+  "past-continuous": {
+   "content": {
+    "intro": "Past Continuous shows an action in the middle of happening at a moment in the past.",
+    "explanation": "Use Past Continuous for an action that was already going on at a past moment. It very often meets a Past Simple action: the long action is the background, the short action interrupts it.\n\nIt is built from was/were plus the -ing form. Was goes with I, he, she and it; were goes with you, we and they.",
+    "formulas": [
+     {
+      "label": "Affirmative",
+      "pattern": "Subject + was/were + V-ing",
+      "examples": [
+       "I was cooking.",
+       "They were waiting."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "Subject + was/were + not + V-ing",
+      "examples": [
+       "I wasn't cooking.",
+       "They weren't waiting."
+      ]
+     },
+     {
+      "label": "Question",
+      "pattern": "Was/Were + subject + V-ing ?",
+      "examples": [
+       "Were you waiting?",
+       "Was she cooking?"
+      ]
+     },
+     {
+      "label": "With Past Simple",
+      "pattern": "Past Continuous + when + Past Simple",
+      "examples": [
+       "I was cooking when the phone rang."
+      ]
+     }
+    ],
+    "usage": [
+     "An action in progress at a past moment",
+     "A long action interrupted by a short one",
+     "Two actions happening at the same time",
+     "Setting the scene in a story"
+    ],
+    "signal_words": [
+     "while",
+     "as",
+     "when",
+     "at 8 o'clock",
+     "all day",
+     "at that moment"
+    ],
+    "examples": [
+     {
+      "text": "At nine o'clock I was still working.",
+      "note": "In progress at that moment."
+     },
+     {
+      "text": "The phone rang while I was cooking.",
+      "note": "Short action interrupts a long one."
+     },
+     {
+      "text": "She was reading and he was cooking.",
+      "note": "Two actions at the same time."
+     },
+     {
+      "text": "The sun was shining and the birds were singing.",
+      "note": "Setting the scene."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "I was cook dinner.",
+      "right": "I was cooking dinner.",
+      "why": "After was/were the verb takes -ing.",
+      "rule": "ing-form"
+     },
+     {
+      "wrong": "They was waiting.",
+      "right": "They were waiting.",
+      "why": "They takes were, not was.",
+      "rule": "was-were"
+     },
+     {
+      "wrong": "While I cooked, the phone was ringing.",
+      "right": "While I was cooking, the phone rang.",
+      "why": "The long background action takes the continuous; the short one takes Past Simple.",
+      "rule": "interrupted-action"
+     },
+     {
+      "wrong": "I was knowing the answer.",
+      "right": "I knew the answer.",
+      "why": "Know is stative and is not used in the continuous.",
+      "rule": "stative-verbs"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "I ___ dinner when you called.",
+     "payload": {
+      "options": [
+       "cooked",
+       "was cooking",
+       "cook",
+       "have cooked"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "interrupted-action",
+     "explanation": "The long action takes the continuous.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "They ___ for the bus at eight.",
+     "payload": {
+      "options": [
+       "was waiting",
+       "were waiting",
+       "waited",
+       "are waiting"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "was-were",
+     "explanation": "They takes were.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "While she ___, the lights went out.",
+     "payload": {
+      "options": [
+       "reads",
+       "was reading",
+       "read",
+       "has read"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "interrupted-action",
+     "explanation": "While + the continuous.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "We ____ (watch) a film when the power went off.",
+     "payload": {
+      "hint": "watch"
+     },
+     "answer": {
+      "accepted": [
+       "were watching"
+      ]
+     },
+     "target_rule": "interrupted-action",
+     "explanation": "Long action: were + -ing.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "He ____ (not/listen) to me.",
+     "payload": {
+      "hint": "not listen"
+     },
+     "answer": {
+      "accepted": [
+       "wasn't listening",
+       "was not listening"
+      ]
+     },
+     "target_rule": "was-were",
+     "explanation": "He takes wasn't.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I was cook when he arrived.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I was cooking when he arrived."
+      ]
+     },
+     "target_rule": "ing-form",
+     "explanation": "After was, the verb takes -ing.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "They was playing football.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "They were playing football."
+      ]
+     },
+     "target_rule": "was-were",
+     "explanation": "They takes were.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Join them with 'when'.",
+     "payload": {
+      "sentence": "I was reading. The phone rang.",
+      "instruction": "Join them with 'when'."
+     },
+     "answer": {
+      "accepted": [
+       "I was reading when the phone rang."
+      ]
+     },
+     "target_rule": "interrupted-action",
+     "explanation": "The long action first, then when + the short one.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "ordering",
+     "prompt": "Put the words in order.",
+     "payload": {
+      "segments": [
+       "What",
+       "were",
+       "you",
+       "doing",
+       "at",
+       "ten"
+      ]
+     },
+     "answer": {
+      "order": [
+       "What",
+       "were",
+       "you",
+       "doing",
+       "at",
+       "ten"
+      ]
+     },
+     "target_rule": "question-word-order",
+     "explanation": "Wh- + were + subject + -ing.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are describing the moment an accident happened. Which fits?",
+     "payload": {
+      "options": [
+       "I crossed the road.",
+       "I was crossing the road.",
+       "I have crossed the road.",
+       "I cross the road."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "interrupted-action",
+     "explanation": "The action was in progress at that moment.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "Describe a moment when something interrupted you.",
+     "payload": {
+      "instruction": "Write 3-5 sentences. Use Past Continuous for the long action and Past Simple for what interrupted it.",
+      "min_words": 25,
+      "max_words": 80
+     },
+     "answer": {
+      "target_forms": [
+       "past continuous",
+       "past simple"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.65,
+     "tags": []
+    }
+   ]
+  },
+  "the": {
+   "content": {
+    "intro": "The is the definite article: we use it when both people know exactly which one is meant.",
+    "explanation": "Use the when the thing is already identified — because it was mentioned before, because the situation makes it obvious, or because there is only one of it.\n\nThe does not change for singular, plural, countable or uncountable: the book, the books, the water. What decides it is not the noun but whether the listener already knows which one.",
+    "formulas": [
+     {
+      "label": "Second mention",
+      "pattern": "a / an ... then the",
+      "examples": [
+       "I bought a book. The book was excellent."
+      ]
+     },
+     {
+      "label": "Only one",
+      "pattern": "the + unique thing",
+      "examples": [
+       "the sun",
+       "the president",
+       "the first time"
+      ]
+     },
+     {
+      "label": "Made specific",
+      "pattern": "the + noun + which one",
+      "examples": [
+       "the man in the blue coat",
+       "the keys on the table"
+      ]
+     }
+    ],
+    "usage": [
+     "Something mentioned before",
+     "Something obvious from the situation",
+     "Something there is only one of",
+     "Superlatives and ordinals",
+     "Groups of islands, rivers, seas and some countries"
+    ],
+    "signal_words": [
+     "the same",
+     "the only",
+     "the first",
+     "the best",
+     "the one"
+    ],
+    "examples": [
+     {
+      "text": "Can you close the door?",
+      "note": "We both know which door."
+     },
+     {
+      "text": "The sun rose at six.",
+      "note": "There is only one."
+     },
+     {
+      "text": "She is the best student in the class.",
+      "note": "Superlatives take the."
+     },
+     {
+      "text": "I met a woman. The woman was a doctor.",
+      "note": "Second mention."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "I love the music.",
+      "right": "I love music.",
+      "why": "Talking about something in general takes no article.",
+      "rule": "general-no-article"
+     },
+     {
+      "wrong": "She is best student.",
+      "right": "She is the best student.",
+      "why": "Superlatives always take the.",
+      "rule": "superlatives"
+     },
+     {
+      "wrong": "I go to the work by bus.",
+      "right": "I go to work by bus.",
+      "why": "Work, home, school and bed take no article in these phrases.",
+      "rule": "fixed-phrases"
+     },
+     {
+      "wrong": "The Everest is very high.",
+      "right": "Everest is very high.",
+      "why": "Single mountains take no article, though ranges do: the Alps.",
+      "rule": "geographical"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "Could you open ___ window, please?",
+     "payload": {
+      "options": [
+       "a",
+       "an",
+       "the",
+       "—"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "situation-obvious",
+     "explanation": "We both know which window.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She is ___ tallest girl in her class.",
+     "payload": {
+      "options": [
+       "a",
+       "an",
+       "the",
+       "—"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "superlatives",
+     "explanation": "Superlatives take the.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I love ___ music.",
+     "payload": {
+      "options": [
+       "a",
+       "the",
+       "—",
+       "an"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "general-no-article",
+     "explanation": "Music in general takes no article.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I saw ___ film last night. ___ film was terrible.",
+     "payload": {
+      "options": [
+       "the / A",
+       "a / The",
+       "a / A",
+       "the / The"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "second-mention",
+     "explanation": "First mention a, second mention the.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "___ sun is very bright today.",
+     "payload": {
+      "hint": "article"
+     },
+     "answer": {
+      "accepted": [
+       "The"
+      ]
+     },
+     "target_rule": "only-one",
+     "explanation": "There is only one sun.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "I go to ____ work at eight.",
+     "payload": {
+      "hint": "work"
+     },
+     "answer": {
+      "accepted": [
+       "work"
+      ]
+     },
+     "target_rule": "fixed-phrases",
+     "explanation": "Go to work takes no article.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She is the doctor, not a teacher.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She is a doctor, not a teacher."
+      ]
+     },
+     "target_rule": "second-mention",
+     "explanation": "A job takes a/an, not the.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "The Everest is the highest mountain.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "Everest is the highest mountain."
+      ]
+     },
+     "target_rule": "geographical",
+     "explanation": "Single mountains take no article.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I like the dogs.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I like dogs."
+      ]
+     },
+     "target_rule": "general-no-article",
+     "explanation": "Dogs in general takes no article.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are in a room with one door and you want it closed. What do you say?",
+     "payload": {
+      "options": [
+       "Close a door.",
+       "Close the door.",
+       "Close door.",
+       "Close one door."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "situation-obvious",
+     "explanation": "There is only one door and we both know it.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "Describe your room.",
+     "payload": {
+      "instruction": "Write 4-6 sentences describing a room you know well. Use the where the thing is already identified, and a/an for new things.",
+      "min_words": 30,
+      "max_words": 90
+     },
+     "answer": {
+      "target_forms": [
+       "definite article",
+       "indefinite article"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.6,
+     "tags": []
+    }
+   ]
+  },
+  "a-an": {
+   "content": {
+    "intro": "A and an introduce one thing for the first time, when it does not matter which one.",
+    "explanation": "Use a or an with a singular countable noun that the listener does not yet know about. The choice between them is about sound, not spelling: a before a consonant sound, an before a vowel sound.\n\nThat is why it is an hour (the h is silent) but a university (it starts with a 'y' sound).",
+    "formulas": [
+     {
+      "label": "Before a consonant sound",
+      "pattern": "a + noun",
+      "examples": [
+       "a book",
+       "a university",
+       "a European city"
+      ]
+     },
+     {
+      "label": "Before a vowel sound",
+      "pattern": "an + noun",
+      "examples": [
+       "an apple",
+       "an hour",
+       "an honest man"
+      ]
+     },
+     {
+      "label": "Jobs",
+      "pattern": "be + a/an + job",
+      "examples": [
+       "She is a doctor.",
+       "He is an engineer."
+      ]
+     }
+    ],
+    "usage": [
+     "Introducing something for the first time",
+     "One of many, when it does not matter which",
+     "Jobs and roles",
+     "Describing what something is"
+    ],
+    "signal_words": [
+     "one",
+     "a certain",
+     "some (singular)"
+    ],
+    "examples": [
+     {
+      "text": "I need a pen.",
+      "note": "Any pen will do."
+     },
+     {
+      "text": "She is an architect.",
+      "note": "Jobs take a/an."
+     },
+     {
+      "text": "We waited for an hour.",
+      "note": "Silent h, so an."
+     },
+     {
+      "text": "He bought a house.",
+      "note": "First mention."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "She is teacher.",
+      "right": "She is a teacher.",
+      "why": "A singular job always takes a or an.",
+      "rule": "jobs"
+     },
+     {
+      "wrong": "I waited for a hour.",
+      "right": "I waited for an hour.",
+      "why": "Hour begins with a vowel sound: the h is silent.",
+      "rule": "vowel-sound"
+     },
+     {
+      "wrong": "He is an university student.",
+      "right": "He is a university student.",
+      "why": "University begins with a 'yoo' sound, which is a consonant sound.",
+      "rule": "vowel-sound"
+     },
+     {
+      "wrong": "I bought a rice.",
+      "right": "I bought rice.",
+      "why": "Rice is uncountable and does not take a/an.",
+      "rule": "countable-only"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "She is ___ engineer.",
+     "payload": {
+      "options": [
+       "a",
+       "an",
+       "the",
+       "—"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "vowel-sound",
+     "explanation": "Engineer starts with a vowel sound.",
+     "difficulty": 0.25,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "We waited for ___ hour.",
+     "payload": {
+      "options": [
+       "a",
+       "an",
+       "the",
+       "—"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "vowel-sound",
+     "explanation": "The h in hour is silent.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "He is ___ university student.",
+     "payload": {
+      "options": [
+       "a",
+       "an",
+       "the",
+       "—"
+      ]
+     },
+     "answer": {
+      "correct_index": 0
+     },
+     "target_rule": "vowel-sound",
+     "explanation": "University starts with a 'yoo' sound.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I bought ___ rice.",
+     "payload": {
+      "options": [
+       "a",
+       "an",
+       "the",
+       "—"
+      ]
+     },
+     "answer": {
+      "correct_index": 3
+     },
+     "target_rule": "countable-only",
+     "explanation": "Rice is uncountable.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "My father is ___ doctor.",
+     "payload": {
+      "hint": "article"
+     },
+     "answer": {
+      "accepted": [
+       "a"
+      ]
+     },
+     "target_rule": "jobs",
+     "explanation": "Jobs take a/an.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "She gave me ___ honest answer.",
+     "payload": {
+      "hint": "article"
+     },
+     "answer": {
+      "accepted": [
+       "an"
+      ]
+     },
+     "target_rule": "vowel-sound",
+     "explanation": "Honest has a silent h.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She is nurse.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She is a nurse."
+      ]
+     },
+     "target_rule": "jobs",
+     "explanation": "A singular job takes a.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "It took a hour.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "It took an hour."
+      ]
+     },
+     "target_rule": "vowel-sound",
+     "explanation": "An hour: the h is silent.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "matching",
+     "prompt": "Match each word with a or an.",
+     "payload": {
+      "left": [
+       "apple",
+       "book",
+       "hour",
+       "university"
+      ],
+      "right": [
+       "an",
+       "a",
+       "an",
+       "a"
+      ]
+     },
+     "answer": {
+      "pairs": {
+       "0": 0,
+       "1": 1,
+       "2": 2,
+       "3": 3
+      }
+     },
+     "target_rule": "vowel-sound",
+     "explanation": "It depends on the sound, not the letter.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You walk into a shop and want any pen at all. What do you say?",
+     "payload": {
+      "options": [
+       "I need the pen.",
+       "I need a pen.",
+       "I need pen.",
+       "I need pens."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "first-mention",
+     "explanation": "Any one will do, so a.",
+     "difficulty": 0.4,
+     "tags": []
+    }
+   ]
+  },
+  "first-conditional": {
+   "content": {
+    "intro": "First Conditional talks about a real possibility in the future and what will happen if it comes true.",
+    "explanation": "Use First Conditional when the situation might genuinely happen. The if-clause takes the present simple — even though it is about the future — and the result clause takes will.\n\nThe two halves can go in either order. When the if-clause comes first it is followed by a comma; when it comes second there is no comma.",
+    "formulas": [
+     {
+      "label": "Standard",
+      "pattern": "If + present simple, will + base verb",
+      "examples": [
+       "If it rains, I will stay home."
+      ]
+     },
+     {
+      "label": "Reversed",
+      "pattern": "will + base verb + if + present simple",
+      "examples": [
+       "I will stay home if it rains."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "If + present simple, won't + base verb",
+      "examples": [
+       "If you don't hurry, we won't catch the train."
+      ]
+     }
+    ],
+    "usage": [
+     "Real possibilities in the future",
+     "Warnings and promises",
+     "Offers and threats",
+     "Cause and effect that has not happened yet"
+    ],
+    "signal_words": [
+     "if",
+     "unless",
+     "when",
+     "as soon as",
+     "in case",
+     "provided that"
+    ],
+    "examples": [
+     {
+      "text": "If I finish early, I'll call you.",
+      "note": "A real possibility."
+     },
+     {
+      "text": "If you touch that, you'll burn yourself.",
+      "note": "A warning."
+     },
+     {
+      "text": "She won't pass unless she studies.",
+      "note": "Unless = if not."
+     },
+     {
+      "text": "I'll help you if you ask.",
+      "note": "No comma when if comes second."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "If it will rain, I will stay home.",
+      "right": "If it rains, I will stay home.",
+      "why": "The if-clause never takes will, even though it is about the future.",
+      "rule": "no-will-in-if"
+     },
+     {
+      "wrong": "If you will come, I am happy.",
+      "right": "If you come, I will be happy.",
+      "why": "Present simple in the if-clause, will in the result.",
+      "rule": "no-will-in-if"
+     },
+     {
+      "wrong": "If she studies she will pass.",
+      "right": "If she studies, she will pass.",
+      "why": "When the if-clause comes first, it takes a comma.",
+      "rule": "comma-rule"
+     },
+     {
+      "wrong": "Unless you don't hurry, we'll be late.",
+      "right": "Unless you hurry, we'll be late.",
+      "why": "Unless already means if not, so do not add another negative.",
+      "rule": "unless"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "If it ___ tomorrow, we'll cancel the trip.",
+     "payload": {
+      "options": [
+       "will rain",
+       "rains",
+       "rained",
+       "is raining"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "no-will-in-if",
+     "explanation": "The if-clause takes the present simple.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "If you study hard, you ___ the exam.",
+     "payload": {
+      "options": [
+       "pass",
+       "passed",
+       "will pass",
+       "would pass"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "will-in-result",
+     "explanation": "The result clause takes will.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She won't come ___ you invite her.",
+     "payload": {
+      "options": [
+       "if",
+       "unless",
+       "when",
+       "although"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "unless",
+     "explanation": "Unless = if not.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "If he ____ (call), tell him I'm busy.",
+     "payload": {
+      "hint": "call"
+     },
+     "answer": {
+      "accepted": [
+       "calls"
+      ]
+     },
+     "target_rule": "no-will-in-if",
+     "explanation": "Present simple in the if-clause.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "We ____ (miss) the bus if we don't leave now.",
+     "payload": {
+      "hint": "miss"
+     },
+     "answer": {
+      "accepted": [
+       "will miss",
+       "'ll miss"
+      ]
+     },
+     "target_rule": "will-in-result",
+     "explanation": "Will in the result clause.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "If it will snow, we will stay at home.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "If it snows, we will stay at home."
+      ]
+     },
+     "target_rule": "no-will-in-if",
+     "explanation": "No will in the if-clause.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "Unless you don't study, you will fail.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "Unless you study, you will fail."
+      ]
+     },
+     "target_rule": "unless",
+     "explanation": "Unless already means if not.",
+     "difficulty": 0.7,
+     "tags": []
+    },
+    {
+     "type": "ordering",
+     "prompt": "Put the words in order.",
+     "payload": {
+      "segments": [
+       "If",
+       "you",
+       "come",
+       "early",
+       "we",
+       "will",
+       "have",
+       "time"
+      ]
+     },
+     "answer": {
+      "order": [
+       "If",
+       "you",
+       "come",
+       "early",
+       "we",
+       "will",
+       "have",
+       "time"
+      ]
+     },
+     "target_rule": "comma-rule",
+     "explanation": "If-clause first, then the result.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Rewrite it with 'if'.",
+     "payload": {
+      "sentence": "Study hard and you will pass.",
+      "instruction": "Rewrite it with 'if'."
+     },
+     "answer": {
+      "accepted": [
+       "If you study hard, you will pass.",
+       "If you study hard you will pass."
+      ]
+     },
+     "target_rule": "will-in-result",
+     "explanation": "If + present simple, will + verb.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "Your friend might visit tomorrow. Which sentence fits?",
+     "payload": {
+      "options": [
+       "If you came, I would cook.",
+       "If you come, I will cook.",
+       "If you had come, I would have cooked.",
+       "If you will come, I cook."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "no-will-in-if",
+     "explanation": "A real possibility takes First Conditional.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "What will you do if your plans change?",
+     "payload": {
+      "instruction": "Write 3-5 sentences about real possibilities this week and what you will do. Use First Conditional.",
+      "min_words": 25,
+      "max_words": 80
+     },
+     "answer": {
+      "target_forms": [
+       "first conditional"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.6,
+     "tags": []
+    }
+   ]
+  },
+  "second-conditional": {
+   "content": {
+    "intro": "Second Conditional imagines something that is not true now, and says what would happen if it were.",
+    "explanation": "Use Second Conditional for an unreal or very unlikely present or future situation. The if-clause takes the past simple — not because it is about the past, but because English uses a past form to signal distance from reality — and the result clause takes would.\n\nWith the verb be, formal English uses were for every subject: if I were you, if he were here.",
+    "formulas": [
+     {
+      "label": "Standard",
+      "pattern": "If + past simple, would + base verb",
+      "examples": [
+       "If I had a car, I would drive to work."
+      ]
+     },
+     {
+      "label": "With be",
+      "pattern": "If + subject + were, would + base verb",
+      "examples": [
+       "If I were you, I would apologise."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "If + didn't + base verb, wouldn't + base verb",
+      "examples": [
+       "If I didn't work, I wouldn't earn anything."
+      ]
+     }
+    ],
+    "usage": [
+     "Imaginary present situations",
+     "Very unlikely future situations",
+     "Giving advice with 'If I were you'",
+     "Dreams and hypothetical choices"
+    ],
+    "signal_words": [
+     "if",
+     "would",
+     "wouldn't",
+     "if I were you",
+     "imagine",
+     "suppose"
+    ],
+    "examples": [
+     {
+      "text": "If I won the lottery, I'd travel the world.",
+      "note": "Very unlikely."
+     },
+     {
+      "text": "If I were you, I'd take the job.",
+      "note": "Advice."
+     },
+     {
+      "text": "If she spoke French, she would apply.",
+      "note": "She does not speak French."
+     },
+     {
+      "text": "What would you do if you lost your phone?",
+      "note": "Hypothetical question."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "If I would have money, I would travel.",
+      "right": "If I had money, I would travel.",
+      "why": "The if-clause takes the past simple, never would.",
+      "rule": "no-would-in-if"
+     },
+     {
+      "wrong": "If I was you, I would go.",
+      "right": "If I were you, I would go.",
+      "why": "In this fixed advice pattern, English uses were for every subject.",
+      "rule": "were-subjunctive"
+     },
+     {
+      "wrong": "If he studied, he will pass.",
+      "right": "If he studied, he would pass.",
+      "why": "Second Conditional pairs the past simple with would, not will.",
+      "rule": "would-in-result"
+     },
+     {
+      "wrong": "If I had a car yesterday, I would drive.",
+      "right": "If I had had a car yesterday, I would have driven.",
+      "why": "A past unreal situation needs the Third Conditional.",
+      "rule": "vs-third"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "If I ___ more time, I would learn Spanish.",
+     "payload": {
+      "options": [
+       "have",
+       "had",
+       "would have",
+       "will have"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "no-would-in-if",
+     "explanation": "The if-clause takes the past simple.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "If I ___ you, I'd apologise.",
+     "payload": {
+      "options": [
+       "was",
+       "am",
+       "were",
+       "would be"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "were-subjunctive",
+     "explanation": "If I were you is the fixed advice form.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She ___ move abroad if she got the job.",
+     "payload": {
+      "options": [
+       "will",
+       "would",
+       "won't",
+       "is"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "would-in-result",
+     "explanation": "The result clause takes would.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "If he ____ (know) the answer, he would tell us.",
+     "payload": {
+      "hint": "know"
+     },
+     "answer": {
+      "accepted": [
+       "knew"
+      ]
+     },
+     "target_rule": "no-would-in-if",
+     "explanation": "Past simple in the if-clause.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "What ____ you ____ (do) if you lost your passport?",
+     "payload": {
+      "hint": "do"
+     },
+     "answer": {
+      "accepted": [
+       "would you do"
+      ]
+     },
+     "target_rule": "would-in-result",
+     "explanation": "Would + base verb.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "If I would have a car, I would drive.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "If I had a car, I would drive."
+      ]
+     },
+     "target_rule": "no-would-in-if",
+     "explanation": "No would in the if-clause.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "If she studied, she will pass.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "If she studied, she would pass."
+      ]
+     },
+     "target_rule": "would-in-result",
+     "explanation": "Past simple pairs with would.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Rewrite it as a Second Conditional.",
+     "payload": {
+      "sentence": "I don't have a car, so I take the bus.",
+      "instruction": "Rewrite it as a Second Conditional."
+     },
+     "answer": {
+      "accepted": [
+       "If I had a car, I wouldn't take the bus.",
+       "If I had a car, I would not take the bus."
+      ]
+     },
+     "target_rule": "would-in-result",
+     "explanation": "Imagine the opposite of what is true.",
+     "difficulty": 0.75,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "Your friend asks for advice about a job offer. Which fits?",
+     "payload": {
+      "options": [
+       "If I am you, I take it.",
+       "If I were you, I'd take it.",
+       "If I will be you, I take it.",
+       "If I had been you, I'd have taken it."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "were-subjunctive",
+     "explanation": "Advice about now takes If I were you.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "free_writing",
+     "prompt": "What would you do with a free year?",
+     "payload": {
+      "instruction": "Write 3-5 sentences imagining a year with no work or study. Use Second Conditional.",
+      "min_words": 25,
+      "max_words": 80
+     },
+     "answer": {
+      "target_forms": [
+       "second conditional"
+      ]
+     },
+     "target_rule": "free-production",
+     "explanation": "",
+     "difficulty": 0.65,
+     "tags": []
+    }
+   ]
+  },
+  "present-passive": {
+   "content": {
+    "intro": "The passive puts the action first and the person who does it second — or leaves them out entirely.",
+    "explanation": "Use the passive when who did something is unknown, obvious or simply not the point. English builds it from the verb be plus the third form of the main verb (V3).\n\nIf you do want to name the doer, add by: The bridge was built by the Romans. Most of the time in the passive, you do not.",
+    "formulas": [
+     {
+      "label": "Affirmative",
+      "pattern": "Subject + am/is/are + V3",
+      "examples": [
+       "English is spoken here.",
+       "These cars are made in Japan."
+      ]
+     },
+     {
+      "label": "Negative",
+      "pattern": "Subject + am/is/are + not + V3",
+      "examples": [
+       "The office isn't cleaned on Sundays."
+      ]
+     },
+     {
+      "label": "Question",
+      "pattern": "Am/Is/Are + subject + V3 ?",
+      "examples": [
+       "Is the report written every week?"
+      ]
+     },
+     {
+      "label": "With the doer",
+      "pattern": "... + by + doer",
+      "examples": [
+       "The letters are delivered by a courier."
+      ]
+     }
+    ],
+    "usage": [
+     "When the doer is unknown or unimportant",
+     "Processes and instructions",
+     "Formal, academic and news writing",
+     "When the action matters more than who did it"
+    ],
+    "signal_words": [
+     "by",
+     "is made",
+     "are produced",
+     "is known",
+     "it is said"
+    ],
+    "examples": [
+     {
+      "text": "Rice is grown in many countries.",
+      "note": "Who grows it is not the point."
+     },
+     {
+      "text": "The room is cleaned every day.",
+      "note": "A routine process."
+     },
+     {
+      "text": "These phones are made in Korea.",
+      "note": "The action matters, not the maker."
+     },
+     {
+      "text": "The results are announced by the committee.",
+      "note": "The doer is named with by."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "The room is clean every day.",
+      "right": "The room is cleaned every day.",
+      "why": "The passive needs the third form: cleaned, not clean.",
+      "rule": "v3-form"
+     },
+     {
+      "wrong": "English speaks here.",
+      "right": "English is spoken here.",
+      "why": "English does not do the speaking, so the sentence must be passive.",
+      "rule": "missing-be"
+     },
+     {
+      "wrong": "The books are wrote by students.",
+      "right": "The books are written by students.",
+      "why": "Write → written (V3), not wrote (V2).",
+      "rule": "v3-form"
+     },
+     {
+      "wrong": "This car made in Germany.",
+      "right": "This car is made in Germany.",
+      "why": "The passive always needs a form of be.",
+      "rule": "missing-be"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "English ___ in many countries.",
+     "payload": {
+      "options": [
+       "speaks",
+       "is spoken",
+       "is speaking",
+       "spoke"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "missing-be",
+     "explanation": "The passive: is + V3.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "These shoes ___ in Italy.",
+     "payload": {
+      "options": [
+       "make",
+       "are made",
+       "is made",
+       "making"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "missing-be",
+     "explanation": "These shoes is plural: are made.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "The office ___ on Sundays.",
+     "payload": {
+      "options": [
+       "isn't clean",
+       "doesn't clean",
+       "isn't cleaned",
+       "not cleaned"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "v3-form",
+     "explanation": "Negative passive: isn't + V3.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "Coffee ____ (grow) in Brazil.",
+     "payload": {
+      "hint": "grow"
+     },
+     "answer": {
+      "accepted": [
+       "is grown"
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "Passive: is + grown.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "The reports ____ (write) every month.",
+     "payload": {
+      "hint": "write"
+     },
+     "answer": {
+      "accepted": [
+       "are written"
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "Write → written.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "The room is clean every morning.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "The room is cleaned every morning."
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "The passive needs cleaned.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "These cars made in Japan.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "These cars are made in Japan."
+      ]
+     },
+     "target_rule": "missing-be",
+     "explanation": "The passive needs a form of be.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Make it passive.",
+     "payload": {
+      "sentence": "Someone cleans the office every day.",
+      "instruction": "Make it passive."
+     },
+     "answer": {
+      "accepted": [
+       "The office is cleaned every day."
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "Drop the vague doer and use is + V3.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Make it passive.",
+     "payload": {
+      "sentence": "They produce these phones in Korea.",
+      "instruction": "Make it passive."
+     },
+     "answer": {
+      "accepted": [
+       "These phones are produced in Korea."
+      ]
+     },
+     "target_rule": "v3-form",
+     "explanation": "The object becomes the subject.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are writing a factual report and the person who did it is unknown. Which fits?",
+     "payload": {
+      "options": [
+       "Somebody stole the documents.",
+       "The documents were stolen.",
+       "The documents stole.",
+       "Somebody has the documents stolen."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "missing-be",
+     "explanation": "The passive keeps the focus on the action.",
+     "difficulty": 0.6,
+     "tags": []
+    }
+   ]
+  },
+  "reported-statements": {
+   "content": {
+    "intro": "Reported speech is how you say what someone else said, without quoting them word for word.",
+    "explanation": "When you report what someone said, the tense usually moves one step back — this is called backshift — because the moment of speaking is now in the past. Pronouns and time words shift too: I becomes he or she, today becomes that day, tomorrow becomes the next day.\n\nSay and tell are both used, but tell needs a person after it: he told me, not he told that.",
+    "formulas": [
+     {
+      "label": "Basic",
+      "pattern": "Subject + said (that) + backshifted clause",
+      "examples": [
+       "\"I am tired.\" → He said (that) he was tired."
+      ]
+     },
+     {
+      "label": "With tell",
+      "pattern": "Subject + told + person + (that) + clause",
+      "examples": [
+       "\"I'll call you.\" → She told me she would call me."
+      ]
+     },
+     {
+      "label": "Backshift",
+      "pattern": "present → past · past → past perfect · will → would",
+      "examples": [
+       "\"I work here.\" → He said he worked there."
+      ]
+     }
+    ],
+    "usage": [
+     "Repeating what someone said",
+     "Reporting news and messages",
+     "Writing about interviews and conversations",
+     "Distancing yourself from a claim"
+    ],
+    "signal_words": [
+     "said",
+     "told",
+     "explained",
+     "mentioned",
+     "that",
+     "the day before",
+     "the next day"
+    ],
+    "examples": [
+     {
+      "text": "\"I am busy.\" → She said she was busy.",
+      "note": "Present → past."
+     },
+     {
+      "text": "\"I saw him.\" → He said he had seen him.",
+      "note": "Past → past perfect."
+     },
+     {
+      "text": "\"I'll help.\" → She said she would help.",
+      "note": "Will → would."
+     },
+     {
+      "text": "He told me he lived in Tashkent.",
+      "note": "Tell needs a person."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "He said me he was tired.",
+      "right": "He told me he was tired.",
+      "why": "Say does not take a person directly; tell does.",
+      "rule": "say-vs-tell"
+     },
+     {
+      "wrong": "She told that she was late.",
+      "right": "She said that she was late.",
+      "why": "Tell needs a person: she told me that...",
+      "rule": "say-vs-tell"
+     },
+     {
+      "wrong": "He said he is tired.",
+      "right": "He said he was tired.",
+      "why": "The tense shifts back one step after a past reporting verb.",
+      "rule": "backshift"
+     },
+     {
+      "wrong": "She said she will come tomorrow.",
+      "right": "She said she would come the next day.",
+      "why": "Will becomes would, and tomorrow becomes the next day.",
+      "rule": "time-shift"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "\"I am tired.\" → He said he ___ tired.",
+     "payload": {
+      "options": [
+       "is",
+       "was",
+       "has been",
+       "will be"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "backshift",
+     "explanation": "Present → past.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She ___ me she was leaving.",
+     "payload": {
+      "options": [
+       "said",
+       "told",
+       "says",
+       "spoke"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "say-vs-tell",
+     "explanation": "Tell takes a person.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "\"I'll call you.\" → He said he ___ call me.",
+     "payload": {
+      "options": [
+       "will",
+       "would",
+       "can",
+       "is going to"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "backshift",
+     "explanation": "Will → would.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "\"I live in Paris.\" → She said she ____ in Paris.",
+     "payload": {
+      "hint": "live"
+     },
+     "answer": {
+      "accepted": [
+       "lived"
+      ]
+     },
+     "target_rule": "backshift",
+     "explanation": "Present → past.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "\"I saw him.\" → He said he ____ him.",
+     "payload": {
+      "hint": "see"
+     },
+     "answer": {
+      "accepted": [
+       "had seen"
+      ]
+     },
+     "target_rule": "backshift",
+     "explanation": "Past → past perfect.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "He said me that he was busy.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "He told me that he was busy.",
+       "He said that he was busy."
+      ]
+     },
+     "target_rule": "say-vs-tell",
+     "explanation": "Say does not take a person directly.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She told that she was late.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She said that she was late.",
+       "She told me that she was late."
+      ]
+     },
+     "target_rule": "say-vs-tell",
+     "explanation": "Tell needs a person.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Report it.",
+     "payload": {
+      "sentence": "\"I am studying English.\" (she said)",
+      "instruction": "Report it."
+     },
+     "answer": {
+      "accepted": [
+       "She said she was studying English.",
+       "She said that she was studying English."
+      ]
+     },
+     "target_rule": "backshift",
+     "explanation": "Present continuous → past continuous.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Report it.",
+     "payload": {
+      "sentence": "\"We will come tomorrow.\" (they said)",
+      "instruction": "Report it."
+     },
+     "answer": {
+      "accepted": [
+       "They said they would come the next day.",
+       "They said that they would come the next day."
+      ]
+     },
+     "target_rule": "time-shift",
+     "explanation": "Will → would, tomorrow → the next day.",
+     "difficulty": 0.75,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "Your colleague said 'I can't come to the meeting.' How do you report it?",
+     "payload": {
+      "options": [
+       "She said she can't come.",
+       "She said she couldn't come.",
+       "She told she couldn't come.",
+       "She said me she couldn't come."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "backshift",
+     "explanation": "Can → could after a past reporting verb.",
+     "difficulty": 0.6,
+     "tags": []
+    }
+   ]
+  },
+  "defining-relative": {
+   "content": {
+    "intro": "A defining relative clause tells you which person or thing is meant. Without it, the sentence does not identify anything.",
+    "explanation": "A defining relative clause is joined to the noun it describes with who, which, that, whose, where or when. It is essential: remove it and you no longer know which one is being talked about.\n\nIt takes no commas. And when the relative pronoun is the object of the clause, it can be dropped altogether: the book (that) I read.",
+    "formulas": [
+     {
+      "label": "People",
+      "pattern": "noun + who / that + clause",
+      "examples": [
+       "The woman who lives next door is a doctor."
+      ]
+     },
+     {
+      "label": "Things",
+      "pattern": "noun + which / that + clause",
+      "examples": [
+       "The book which won the prize is excellent."
+      ]
+     },
+     {
+      "label": "Pronoun dropped",
+      "pattern": "noun + clause (object only)",
+      "examples": [
+       "The film we watched was long."
+      ]
+     }
+    ],
+    "usage": [
+     "Saying which person or thing you mean",
+     "Combining two short sentences into one",
+     "Defining a term",
+     "Adding essential detail without a new sentence"
+    ],
+    "signal_words": [
+     "who",
+     "which",
+     "that",
+     "whose",
+     "where",
+     "when"
+    ],
+    "examples": [
+     {
+      "text": "The man who called you is my brother.",
+      "note": "Which man? The one who called."
+     },
+     {
+      "text": "This is the house that Jack built.",
+      "note": "That for things."
+     },
+     {
+      "text": "The people I met were friendly.",
+      "note": "Object pronoun dropped."
+     },
+     {
+      "text": "The café where we met has closed.",
+      "note": "Where for places."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "The man which lives here is kind.",
+      "right": "The man who lives here is kind.",
+      "why": "Which is for things; people take who or that.",
+      "rule": "who-vs-which"
+     },
+     {
+      "wrong": "The book, that I read, was good.",
+      "right": "The book that I read was good.",
+      "why": "A defining clause takes no commas.",
+      "rule": "no-commas"
+     },
+     {
+      "wrong": "The woman who she called me is my aunt.",
+      "right": "The woman who called me is my aunt.",
+      "why": "Who is already the subject, so do not add another one.",
+      "rule": "no-double-subject"
+     },
+     {
+      "wrong": "The place which I was born is small.",
+      "right": "The place where I was born is small.",
+      "why": "A place takes where when it is not the object of the verb.",
+      "rule": "where-when"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "The woman ___ lives next door is a nurse.",
+     "payload": {
+      "options": [
+       "which",
+       "who",
+       "whose",
+       "where"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "who-vs-which",
+     "explanation": "People take who.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "This is the book ___ won the prize.",
+     "payload": {
+      "options": [
+       "who",
+       "which",
+       "whose",
+       "when"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "who-vs-which",
+     "explanation": "Things take which or that.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "That's the café ___ we first met.",
+     "payload": {
+      "options": [
+       "which",
+       "that",
+       "where",
+       "who"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "where-when",
+     "explanation": "A place takes where.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I know a man ___ brother is a pilot.",
+     "payload": {
+      "options": [
+       "who",
+       "which",
+       "whose",
+       "that"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "whose",
+     "explanation": "Whose shows possession.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "The film ____ we watched last night was terrible.",
+     "payload": {
+      "hint": "relative pronoun"
+     },
+     "answer": {
+      "accepted": [
+       "that",
+       "which"
+      ]
+     },
+     "target_rule": "who-vs-which",
+     "explanation": "Things take that or which.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "The man which called you is waiting.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "The man who called you is waiting.",
+       "The man that called you is waiting."
+      ]
+     },
+     "target_rule": "who-vs-which",
+     "explanation": "People take who or that.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "The woman who she works here is my boss.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "The woman who works here is my boss."
+      ]
+     },
+     "target_rule": "no-double-subject",
+     "explanation": "Who is already the subject.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "The book, that I bought, was expensive.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "The book that I bought was expensive."
+      ]
+     },
+     "target_rule": "no-commas",
+     "explanation": "A defining clause takes no commas.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Join them with a relative clause.",
+     "payload": {
+      "sentence": "I met a man. He speaks five languages.",
+      "instruction": "Join them with a relative clause."
+     },
+     "answer": {
+      "accepted": [
+       "I met a man who speaks five languages.",
+       "I met a man that speaks five languages."
+      ]
+     },
+     "target_rule": "who-vs-which",
+     "explanation": "Replace he with who.",
+     "difficulty": 0.65,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You want to say which of several bags is yours. Which fits?",
+     "payload": {
+      "options": [
+       "The bag, which is red, is mine.",
+       "The bag which is red is mine.",
+       "The bag is red and mine.",
+       "The bag where is red is mine."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "no-commas",
+     "explanation": "Identifying which one means no commas.",
+     "difficulty": 0.65,
+     "tags": []
+    }
+   ]
+  },
+  "gerund-vs-infinitive": {
+   "content": {
+    "intro": "Some verbs are followed by -ing, some by to + verb, and a few change meaning depending on which you choose.",
+    "explanation": "There is no rule that predicts which verb takes which: the pattern has to be learned with the verb. Enjoy, avoid, finish, mind and suggest take the gerund. Want, decide, hope, promise and agree take the infinitive.\n\nA small group takes both with a real change in meaning. Stop doing means you end the activity; stop to do means you pause in order to do something else. Remember doing is a memory of the past; remember to do is not forgetting a duty.",
+    "formulas": [
+     {
+      "label": "Verb + gerund",
+      "pattern": "enjoy / avoid / finish / mind / suggest + V-ing",
+      "examples": [
+       "I enjoy reading.",
+       "She avoided answering."
+      ]
+     },
+     {
+      "label": "Verb + infinitive",
+      "pattern": "want / decide / hope / promise + to + V",
+      "examples": [
+       "I want to leave.",
+       "He decided to stay."
+      ]
+     },
+     {
+      "label": "After a preposition",
+      "pattern": "preposition + V-ing",
+      "examples": [
+       "good at swimming",
+       "instead of waiting"
+      ]
+     },
+     {
+      "label": "Change of meaning",
+      "pattern": "stop / remember / forget / try + either",
+      "examples": [
+       "I stopped smoking. / I stopped to smoke."
+      ]
+     }
+    ],
+    "usage": [
+     "Choosing the right form after a verb",
+     "After prepositions, always -ing",
+     "As the subject of a sentence",
+     "Where the choice changes the meaning"
+    ],
+    "signal_words": [
+     "enjoy",
+     "avoid",
+     "want",
+     "decide",
+     "stop",
+     "remember",
+     "forget",
+     "try"
+    ],
+    "examples": [
+     {
+      "text": "I enjoy cooking.",
+      "note": "Enjoy always takes -ing."
+     },
+     {
+      "text": "She decided to move.",
+      "note": "Decide always takes the infinitive."
+     },
+     {
+      "text": "He is good at drawing.",
+      "note": "After a preposition: -ing."
+     },
+     {
+      "text": "I stopped buying coffee.",
+      "note": "I no longer buy it."
+     },
+     {
+      "text": "I stopped to buy coffee.",
+      "note": "I paused in order to buy it."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "I enjoy to read.",
+      "right": "I enjoy reading.",
+      "why": "Enjoy is always followed by the gerund.",
+      "rule": "verb-gerund"
+     },
+     {
+      "wrong": "I want reading that book.",
+      "right": "I want to read that book.",
+      "why": "Want is always followed by the infinitive.",
+      "rule": "verb-infinitive"
+     },
+     {
+      "wrong": "She is good at to swim.",
+      "right": "She is good at swimming.",
+      "why": "After a preposition, English always uses -ing.",
+      "rule": "after-preposition"
+     },
+     {
+      "wrong": "I'm looking forward to see you.",
+      "right": "I'm looking forward to seeing you.",
+      "why": "Here to is a preposition, not part of an infinitive.",
+      "rule": "after-preposition"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "I enjoy ___ in the evening.",
+     "payload": {
+      "options": [
+       "to read",
+       "reading",
+       "read",
+       "to reading"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "verb-gerund",
+     "explanation": "Enjoy takes the gerund.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She decided ___ abroad.",
+     "payload": {
+      "options": [
+       "moving",
+       "to move",
+       "move",
+       "moved"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "verb-infinitive",
+     "explanation": "Decide takes the infinitive.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "He is interested in ___ Japanese.",
+     "payload": {
+      "options": [
+       "learn",
+       "to learn",
+       "learning",
+       "learned"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "after-preposition",
+     "explanation": "After a preposition: -ing.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I'm looking forward to ___ you.",
+     "payload": {
+      "options": [
+       "see",
+       "seeing",
+       "saw",
+       "to see"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "after-preposition",
+     "explanation": "To here is a preposition.",
+     "difficulty": 0.75,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "On the way home I stopped ___ some bread.",
+     "payload": {
+      "options": [
+       "buying",
+       "to buy",
+       "buy",
+       "bought"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "change-of-meaning",
+     "explanation": "Stopped in order to buy: infinitive.",
+     "difficulty": 0.7,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "Would you mind ____ (open) the window?",
+     "payload": {
+      "hint": "open"
+     },
+     "answer": {
+      "accepted": [
+       "opening"
+      ]
+     },
+     "target_rule": "verb-gerund",
+     "explanation": "Mind takes the gerund.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "They promised ____ (help) us.",
+     "payload": {
+      "hint": "help"
+     },
+     "answer": {
+      "accepted": [
+       "to help"
+      ]
+     },
+     "target_rule": "verb-infinitive",
+     "explanation": "Promise takes the infinitive.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I avoid to eat late.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I avoid eating late."
+      ]
+     },
+     "target_rule": "verb-gerund",
+     "explanation": "Avoid takes the gerund.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She is good at to cook.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She is good at cooking."
+      ]
+     },
+     "target_rule": "after-preposition",
+     "explanation": "After at, use -ing.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "matching",
+     "prompt": "Match each verb with the form that follows it.",
+     "payload": {
+      "left": [
+       "enjoy",
+       "want",
+       "avoid",
+       "hope"
+      ],
+      "right": [
+       "doing",
+       "to do",
+       "doing",
+       "to do"
+      ]
+     },
+     "answer": {
+      "pairs": {
+       "0": 0,
+       "1": 1,
+       "2": 2,
+       "3": 3
+      }
+     },
+     "target_rule": "verb-gerund",
+     "explanation": "Enjoy and avoid take -ing; want and hope take to.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You used to smoke and you gave it up. Which sentence says that?",
+     "payload": {
+      "options": [
+       "I stopped to smoke.",
+       "I stopped smoking.",
+       "I stopped smoke.",
+       "I stopped to smoking."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "change-of-meaning",
+     "explanation": "Stop + -ing means you ended the activity.",
+     "difficulty": 0.7,
+     "tags": []
+    }
+   ]
+  },
+  "much-many": {
+   "content": {
+    "intro": "Much goes with things you cannot count; many goes with things you can.",
+    "explanation": "Much is used with uncountable nouns — water, money, time, information — and many with plural countable nouns — bottles, coins, hours, facts.\n\nIn positive statements both sound formal, so everyday English usually prefers a lot of, which works with either kind. Much and many are most natural in questions and negatives.",
+    "formulas": [
+     {
+      "label": "Uncountable",
+      "pattern": "much + uncountable noun",
+      "examples": [
+       "How much water?",
+       "I don't have much time."
+      ]
+     },
+     {
+      "label": "Countable",
+      "pattern": "many + plural noun",
+      "examples": [
+       "How many bottles?",
+       "There aren't many people."
+      ]
+     },
+     {
+      "label": "Either",
+      "pattern": "a lot of + any noun",
+      "examples": [
+       "a lot of water",
+       "a lot of bottles"
+      ]
+     }
+    ],
+    "usage": [
+     "Asking about quantity",
+     "Negative statements about quantity",
+     "Formal positive statements",
+     "Comparing amounts"
+    ],
+    "signal_words": [
+     "how much",
+     "how many",
+     "too much",
+     "too many",
+     "so many",
+     "not much"
+    ],
+    "examples": [
+     {
+      "text": "How much does it cost?",
+      "note": "Money is uncountable."
+     },
+     {
+      "text": "How many people came?",
+      "note": "People is countable."
+     },
+     {
+      "text": "I don't have much free time.",
+      "note": "Negative + uncountable."
+     },
+     {
+      "text": "There were a lot of cars.",
+      "note": "A lot of in a positive statement."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "How much people came?",
+      "right": "How many people came?",
+      "why": "People is countable, so it takes many.",
+      "rule": "countable-many"
+     },
+     {
+      "wrong": "I don't have many money.",
+      "right": "I don't have much money.",
+      "why": "Money is uncountable, so it takes much.",
+      "rule": "uncountable-much"
+     },
+     {
+      "wrong": "How many informations do you need?",
+      "right": "How much information do you need?",
+      "why": "Information is uncountable and has no plural.",
+      "rule": "uncountable-much"
+     },
+     {
+      "wrong": "There are too much cars.",
+      "right": "There are too many cars.",
+      "why": "Cars is plural countable, so too many.",
+      "rule": "countable-many"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "How ___ water do you drink a day?",
+     "payload": {
+      "options": [
+       "many",
+       "much",
+       "a lot",
+       "few"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "uncountable-much",
+     "explanation": "Water is uncountable.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "How ___ students are in the class?",
+     "payload": {
+      "options": [
+       "much",
+       "many",
+       "a little",
+       "less"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "countable-many",
+     "explanation": "Students is countable.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I don't have ___ time today.",
+     "payload": {
+      "options": [
+       "many",
+       "much",
+       "a lot",
+       "few"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "uncountable-much",
+     "explanation": "Time is uncountable.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "There were too ___ people at the concert.",
+     "payload": {
+      "options": [
+       "much",
+       "many",
+       "a little",
+       "less"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "countable-many",
+     "explanation": "People is countable.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "How ____ (much/many) information do you have?",
+     "payload": {
+      "hint": "much or many"
+     },
+     "answer": {
+      "accepted": [
+       "much"
+      ]
+     },
+     "target_rule": "uncountable-much",
+     "explanation": "Information is uncountable.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "She doesn't have ____ (much/many) friends here.",
+     "payload": {
+      "hint": "much or many"
+     },
+     "answer": {
+      "accepted": [
+       "many"
+      ]
+     },
+     "target_rule": "countable-many",
+     "explanation": "Friends is countable.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "How much people were there?",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "How many people were there?"
+      ]
+     },
+     "target_rule": "countable-many",
+     "explanation": "People is countable.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "I don't have many money.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "I don't have much money."
+      ]
+     },
+     "target_rule": "uncountable-much",
+     "explanation": "Money is uncountable.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "matching",
+     "prompt": "Match each noun with much or many.",
+     "payload": {
+      "left": [
+       "water",
+       "books",
+       "advice",
+       "cars"
+      ],
+      "right": [
+       "much",
+       "many",
+       "much",
+       "many"
+      ]
+     },
+     "answer": {
+      "pairs": {
+       "0": 0,
+       "1": 1,
+       "2": 2,
+       "3": 3
+      }
+     },
+     "target_rule": "uncountable-much",
+     "explanation": "Uncountable → much, countable → many.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are asking the price of something. Which fits?",
+     "payload": {
+      "options": [
+       "How many is it?",
+       "How much is it?",
+       "How many does it?",
+       "How much are it?"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "uncountable-much",
+     "explanation": "Price is uncountable.",
+     "difficulty": 0.35,
+     "tags": []
+    }
+   ]
+  },
+  "question-tags": {
+   "content": {
+    "intro": "A question tag is the short question added to the end of a statement to check or confirm it.",
+    "explanation": "The tag mirrors the statement and flips it: a positive statement takes a negative tag, a negative statement takes a positive one. The tag reuses the auxiliary from the statement — or do/does/did if there isn't one — and the subject becomes a pronoun.\n\nIntonation changes the meaning: falling, you are confirming something you believe; rising, you are genuinely asking.",
+    "formulas": [
+     {
+      "label": "Positive → negative tag",
+      "pattern": "You are ready, aren't you?",
+      "examples": [
+       "She works here, doesn't she?",
+       "They came, didn't they?"
+      ]
+     },
+     {
+      "label": "Negative → positive tag",
+      "pattern": "You aren't ready, are you?",
+      "examples": [
+       "He doesn't smoke, does he?",
+       "It wasn't easy, was it?"
+      ]
+     },
+     {
+      "label": "No auxiliary",
+      "pattern": "use do / does / did",
+      "examples": [
+       "You like coffee, don't you?"
+      ]
+     },
+     {
+      "label": "I am",
+      "pattern": "aren't I?",
+      "examples": [
+       "I'm late, aren't I?"
+      ]
+     }
+    ],
+    "usage": [
+     "Checking something you believe is true",
+     "Inviting agreement",
+     "Softening a statement",
+     "Making conversation"
+    ],
+    "signal_words": [
+     "isn't it",
+     "aren't you",
+     "don't you",
+     "didn't he",
+     "right"
+    ],
+    "examples": [
+     {
+      "text": "It's cold today, isn't it?",
+      "note": "Positive statement, negative tag."
+     },
+     {
+      "text": "You don't drive, do you?",
+      "note": "Negative statement, positive tag."
+     },
+     {
+      "text": "She finished the report, didn't she?",
+      "note": "Past simple: didn't."
+     },
+     {
+      "text": "I'm next, aren't I?",
+      "note": "The one irregular tag."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "You are coming, aren't you coming?",
+      "right": "You are coming, aren't you?",
+      "why": "The tag is only the auxiliary and a pronoun.",
+      "rule": "tag-form"
+     },
+     {
+      "wrong": "She works here, doesn't it?",
+      "right": "She works here, doesn't she?",
+      "why": "The pronoun must match the subject.",
+      "rule": "pronoun-match"
+     },
+     {
+      "wrong": "It's cold, is it?",
+      "right": "It's cold, isn't it?",
+      "why": "A positive statement takes a negative tag.",
+      "rule": "polarity"
+     },
+     {
+      "wrong": "I'm late, amn't I?",
+      "right": "I'm late, aren't I?",
+      "why": "English has no amn't; the fixed form is aren't I.",
+      "rule": "am-i"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "It's a beautiful day, ___?",
+     "payload": {
+      "options": [
+       "is it",
+       "isn't it",
+       "doesn't it",
+       "it is"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "polarity",
+     "explanation": "Positive statement → negative tag.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "You don't eat meat, ___?",
+     "payload": {
+      "options": [
+       "do you",
+       "don't you",
+       "are you",
+       "you do"
+      ]
+     },
+     "answer": {
+      "correct_index": 0
+     },
+     "target_rule": "polarity",
+     "explanation": "Negative statement → positive tag.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "She finished the report, ___?",
+     "payload": {
+      "options": [
+       "didn't she",
+       "doesn't she",
+       "isn't she",
+       "hasn't she"
+      ]
+     },
+     "answer": {
+      "correct_index": 0
+     },
+     "target_rule": "tag-form",
+     "explanation": "Past simple takes didn't.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "I'm next in the queue, ___?",
+     "payload": {
+      "options": [
+       "amn't I",
+       "aren't I",
+       "am I",
+       "isn't I"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "am-i",
+     "explanation": "The fixed form is aren't I.",
+     "difficulty": 0.7,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "They live in Samarkand, ____?",
+     "payload": {
+      "hint": "tag"
+     },
+     "answer": {
+      "accepted": [
+       "don't they"
+      ]
+     },
+     "target_rule": "tag-form",
+     "explanation": "Present simple takes don't.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "He hasn't called yet, ____?",
+     "payload": {
+      "hint": "tag"
+     },
+     "answer": {
+      "accepted": [
+       "has he"
+      ]
+     },
+     "target_rule": "polarity",
+     "explanation": "Negative → positive tag.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She works here, doesn't it?",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She works here, doesn't she?"
+      ]
+     },
+     "target_rule": "pronoun-match",
+     "explanation": "The pronoun must match she.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "It's cold, is it?",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "It's cold, isn't it?"
+      ]
+     },
+     "target_rule": "polarity",
+     "explanation": "A positive statement takes a negative tag.",
+     "difficulty": 0.55,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Add a question tag.",
+     "payload": {
+      "sentence": "You can swim.",
+      "instruction": "Add a question tag."
+     },
+     "answer": {
+      "accepted": [
+       "You can swim, can't you?"
+      ]
+     },
+     "target_rule": "tag-form",
+     "explanation": "Reuse can, make it negative.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are fairly sure your friend is Turkish and want them to confirm. Which fits?",
+     "payload": {
+      "options": [
+       "Are you Turkish?",
+       "You are Turkish, aren't you?",
+       "You aren't Turkish, aren't you?",
+       "You are Turkish, are you?"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "polarity",
+     "explanation": "A tag invites confirmation.",
+     "difficulty": 0.55,
+     "tags": []
+    }
+   ]
+  },
+  "comparative": {
+   "content": {
+    "intro": "Comparatives say that one thing has more of a quality than another.",
+    "explanation": "Short adjectives add -er: tall → taller, big → bigger, happy → happier. Longer adjectives take more in front: more expensive, more interesting. Either way, the second thing is introduced by than.\n\nA few are irregular and have to be learned: good → better, bad → worse, far → further.",
+    "formulas": [
+     {
+      "label": "Short adjectives",
+      "pattern": "adjective + er + than",
+      "examples": [
+       "He is taller than me.",
+       "Today is hotter than yesterday."
+      ]
+     },
+     {
+      "label": "Long adjectives",
+      "pattern": "more + adjective + than",
+      "examples": [
+       "This is more expensive than that."
+      ]
+     },
+     {
+      "label": "Irregular",
+      "pattern": "better / worse / further",
+      "examples": [
+       "This one is better than the other."
+      ]
+     },
+     {
+      "label": "Emphasis",
+      "pattern": "much / far / a bit + comparative",
+      "examples": [
+       "It is much better.",
+       "It's a bit colder."
+      ]
+     }
+    ],
+    "usage": [
+     "Comparing two things",
+     "Describing change over time",
+     "Making a preference clear",
+     "Expressing degree with much or a bit"
+    ],
+    "signal_words": [
+     "than",
+     "more",
+     "less",
+     "much",
+     "far",
+     "a bit",
+     "even"
+    ],
+    "examples": [
+     {
+      "text": "My brother is older than me.",
+      "note": "Short adjective + -er."
+     },
+     {
+      "text": "This book is more interesting than that one.",
+      "note": "Long adjective + more."
+     },
+     {
+      "text": "The weather is getting warmer.",
+      "note": "Describing change."
+     },
+     {
+      "text": "His English is much better now.",
+      "note": "Much + comparative for emphasis."
+     }
+    ],
+    "common_mistakes": [
+     {
+      "wrong": "She is more taller than me.",
+      "right": "She is taller than me.",
+      "why": "Use -er or more, never both.",
+      "rule": "double-comparative"
+     },
+     {
+      "wrong": "This is more cheap than that.",
+      "right": "This is cheaper than that.",
+      "why": "Cheap is short, so it takes -er.",
+      "rule": "short-adjective"
+     },
+     {
+      "wrong": "He is taller that me.",
+      "right": "He is taller than me.",
+      "why": "Comparisons take than, not that.",
+      "rule": "than"
+     },
+     {
+      "wrong": "This film is more good.",
+      "right": "This film is better.",
+      "why": "Good is irregular: better.",
+      "rule": "irregular"
+     }
+    ]
+   },
+   "questions": [
+    {
+     "type": "multiple_choice",
+     "prompt": "My sister is ___ than me.",
+     "payload": {
+      "options": [
+       "tall",
+       "taller",
+       "more tall",
+       "tallest"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "short-adjective",
+     "explanation": "Short adjective + -er.",
+     "difficulty": 0.25,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "This phone is ___ than that one.",
+     "payload": {
+      "options": [
+       "expensiver",
+       "more expensive",
+       "most expensive",
+       "expensive"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "long-adjective",
+     "explanation": "Long adjective + more.",
+     "difficulty": 0.3,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "Her English is ___ than mine.",
+     "payload": {
+      "options": [
+       "gooder",
+       "more good",
+       "better",
+       "best"
+      ]
+     },
+     "answer": {
+      "correct_index": 2
+     },
+     "target_rule": "irregular",
+     "explanation": "Good → better.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "multiple_choice",
+     "prompt": "Today is much ___ than yesterday.",
+     "payload": {
+      "options": [
+       "cold",
+       "colder",
+       "more cold",
+       "coldest"
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "short-adjective",
+     "explanation": "Cold takes -er.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "This road is ____ (safe) than the motorway.",
+     "payload": {
+      "hint": "safe"
+     },
+     "answer": {
+      "accepted": [
+       "safer"
+      ]
+     },
+     "target_rule": "short-adjective",
+     "explanation": "Safe → safer.",
+     "difficulty": 0.35,
+     "tags": []
+    },
+    {
+     "type": "fill_blank",
+     "prompt": "The test was ____ (difficult) than I expected.",
+     "payload": {
+      "hint": "difficult"
+     },
+     "answer": {
+      "accepted": [
+       "more difficult"
+      ]
+     },
+     "target_rule": "long-adjective",
+     "explanation": "Difficult takes more.",
+     "difficulty": 0.4,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "She is more taller than her brother.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "She is taller than her brother."
+      ]
+     },
+     "target_rule": "double-comparative",
+     "explanation": "Never use -er and more together.",
+     "difficulty": 0.5,
+     "tags": []
+    },
+    {
+     "type": "error_correction",
+     "prompt": "Correct the mistake.",
+     "payload": {
+      "sentence": "This one is cheaper that the other.",
+      "instruction": "Rewrite the sentence correctly."
+     },
+     "answer": {
+      "accepted": [
+       "This one is cheaper than the other."
+      ]
+     },
+     "target_rule": "than",
+     "explanation": "Comparisons take than.",
+     "difficulty": 0.45,
+     "tags": []
+    },
+    {
+     "type": "transformation",
+     "prompt": "Compare them in one sentence.",
+     "payload": {
+      "sentence": "My old phone was slow. My new phone is fast.",
+      "instruction": "Compare them in one sentence."
+     },
+     "answer": {
+      "accepted": [
+       "My new phone is faster than my old phone.",
+       "My new phone is faster than my old one."
+      ]
+     },
+     "target_rule": "short-adjective",
+     "explanation": "Fast → faster + than.",
+     "difficulty": 0.6,
+     "tags": []
+    },
+    {
+     "type": "contextual",
+     "prompt": "You are recommending one of two restaurants. Which fits?",
+     "payload": {
+      "options": [
+       "This one is more good.",
+       "This one is better.",
+       "This one is the better.",
+       "This one is gooder."
+      ]
+     },
+     "answer": {
+      "correct_index": 1
+     },
+     "target_rule": "irregular",
+     "explanation": "Good → better.",
+     "difficulty": 0.4,
+     "tags": []
+    }
+   ]
+  }
+ }
+}

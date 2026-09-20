@@ -1,6 +1,7 @@
 // Command seed loads development data. It refuses to run when APP_ENV=production.
 //
-//	go run ./cmd/seed content                 sample learning content (topics, tasks, passages, words, grammar)
+//	go run ./cmd/seed content                 learning content and the grammar curriculum
+//	go run ./cmd/seed grammar                 the grammar curriculum on its own
 //	go run ./cmd/seed demo [email] [password] a demo learner with progress, mistakes, vocabulary and history
 //	go run ./cmd/seed promote EMAIL           give an existing account the ADMIN role
 //
@@ -28,7 +29,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: seed content | demo [email] [password] | promote EMAIL")
+		return errors.New("usage: seed content | grammar | demo [email] [password] | promote EMAIL")
 	}
 	for _, f := range []string{".env", "../../.env"} {
 		if _, err := os.Stat(f); err == nil {
@@ -52,8 +53,13 @@ func run(args []string) error {
 	defer pool.Close()
 
 	switch args[0] {
+	case "grammar":
+		return seedGrammar(ctx, pool)
 	case "content":
 		if err := seedContent(ctx, pool); err != nil {
+			return err
+		}
+		if err := seedGrammar(ctx, pool); err != nil {
 			return err
 		}
 		return seedPlacement(ctx, pool)

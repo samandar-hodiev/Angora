@@ -1,0 +1,3057 @@
+{
+ "categories": [
+  {
+   "slug": "articles",
+   "name": "Articles",
+   "description": "When to use a, an, the — or nothing at all.",
+   "topics": [
+    {
+     "slug": "a-an",
+     "name": "A / An",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.15,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "a",
+      "an",
+      "indefinite article",
+      "a or an",
+      "vowel sound"
+     ],
+     "group": "",
+     "description": "The indefinite article for one non-specific thing."
+    },
+    {
+     "slug": "the",
+     "name": "The",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.25,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "the",
+      "definite article",
+      "the article",
+      "specific"
+     ],
+     "group": "",
+     "description": "The definite article for something both speakers know."
+    },
+    {
+     "slug": "zero-article",
+     "name": "Zero Article",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "zero article",
+      "no article",
+      "without article",
+      "plural general"
+     ],
+     "group": "",
+     "description": "When English uses no article at all."
+    },
+    {
+     "slug": "a-an-vs-the",
+     "name": "A / An vs The",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "a vs the",
+      "an vs the",
+      "a or the",
+      "first mention"
+     ],
+     "group": "",
+     "description": "First mention versus something already known."
+    },
+    {
+     "slug": "articles-geographical",
+     "name": "Articles with geographical names",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "the with countries",
+      "the netherlands",
+      "rivers",
+      "mountains",
+      "geographical"
+     ],
+     "group": "",
+     "description": "Why it is the Alps but Mount Everest."
+    },
+    {
+     "slug": "articles-institutions",
+     "name": "Articles with institutions",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "go to school",
+      "in hospital",
+      "at university",
+      "institutions"
+     ],
+     "group": "",
+     "description": "In hospital versus in the hospital."
+    },
+    {
+     "slug": "articles-abstract",
+     "name": "Articles with abstract nouns",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "abstract nouns",
+      "happiness",
+      "the life",
+      "love"
+     ],
+     "group": "",
+     "description": "Abstract nouns usually take no article."
+    },
+    {
+     "slug": "articles-proper",
+     "name": "Articles with proper nouns",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "proper nouns",
+      "names",
+      "the united states",
+      "titles"
+     ],
+     "group": "",
+     "description": "Names that take the, and names that do not."
+    }
+   ]
+  },
+  {
+   "slug": "nouns",
+   "name": "Nouns",
+   "description": "Counting, pluralising and possessing things.",
+   "topics": [
+    {
+     "slug": "singular-plural",
+     "name": "Singular & Plural",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.15,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "plural",
+      "singular",
+      "-s",
+      "one or many"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "regular-plurals",
+     "name": "Regular Plurals",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.15,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "regular plural",
+      "add s",
+      "es",
+      "ies"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "irregular-plurals",
+     "name": "Irregular Plurals",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.45,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "irregular plural",
+      "children",
+      "feet",
+      "mice",
+      "men"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "countable-uncountable",
+     "name": "Countable & Uncountable Nouns",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "countable",
+      "uncountable",
+      "mass noun",
+      "information",
+      "advice"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "possessive-nouns",
+     "name": "Possessive Nouns",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "possessive",
+      "apostrophe s",
+      "'s",
+      "of"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "compound-nouns",
+     "name": "Compound Nouns",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "compound noun",
+      "two nouns",
+      "bus stop"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "collective-nouns",
+     "name": "Collective Nouns",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "collective noun",
+      "team",
+      "group",
+      "family is or are"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "pronouns",
+   "name": "Pronouns",
+   "description": "Words that stand in for people and things.",
+   "topics": [
+    {
+     "slug": "subject-pronouns",
+     "name": "Subject Pronouns",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.1,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "subject pronoun",
+      "i you he she it we they"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "object-pronouns",
+     "name": "Object Pronouns",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.15,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "object pronoun",
+      "me him her us them"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "possessive-pronouns",
+     "name": "Possessive Pronouns",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "possessive pronoun",
+      "mine yours his hers ours theirs"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "possessive-adjectives",
+     "name": "Possessive Adjectives",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.25,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "possessive adjective",
+      "my your his her its our their"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "reflexive-pronouns",
+     "name": "Reflexive Pronouns",
+     "level": "B1",
+     "cefr_levels": [
+      "B1"
+     ],
+     "difficulty": 0.45,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "reflexive",
+      "myself",
+      "yourself",
+      "themselves",
+      "-self"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "demonstrative-pronouns",
+     "name": "Demonstrative Pronouns",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.2,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "demonstrative",
+      "this that these those"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "indefinite-pronouns",
+     "name": "Indefinite Pronouns",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "indefinite pronoun",
+      "someone",
+      "anybody",
+      "nothing",
+      "everything"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "relative-pronouns",
+     "name": "Relative Pronouns",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "relative pronoun",
+      "who which that whose"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "determiners",
+   "name": "Determiners & Quantifiers",
+   "description": "How much, how many and which one.",
+   "topics": [
+    {
+     "slug": "this-that-these-those",
+     "name": "This / That / These / Those",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.2,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "this that these those",
+      "near far",
+      "demonstrative determiner"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "some-any",
+     "name": "Some / Any",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "some",
+      "any",
+      "some or any",
+      "questions negatives"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "much-many",
+     "name": "Much / Many",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "much",
+      "many",
+      "much or many",
+      "how much how many"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "few-little",
+     "name": "Few / Little",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "few",
+      "little",
+      "few or little",
+      "not enough"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "a-few-a-little",
+     "name": "A Few / A Little",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "a few",
+      "a little",
+      "a few vs few",
+      "some"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "each-every",
+     "name": "Each / Every",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "each",
+      "every",
+      "each or every"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "both-either-neither",
+     "name": "Both / Either / Neither",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "both",
+      "either",
+      "neither",
+      "two things"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "all-whole",
+     "name": "All / Whole",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "all",
+      "whole",
+      "all the or the whole"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "enough",
+     "name": "Enough",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "enough",
+      "not enough",
+      "too"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "several",
+     "name": "Several",
+     "level": "B1",
+     "cefr_levels": [
+      "B1"
+     ],
+     "difficulty": 0.45,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "several",
+      "a number of",
+      "more than a few"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "tenses",
+   "name": "Tenses & Aspects",
+   "description": "When an action happens, and how it is seen.",
+   "topics": [
+    {
+     "slug": "present-simple",
+     "name": "Present Simple",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.2,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "present simple",
+      "habits",
+      "routines",
+      "facts",
+      "do does",
+      "third person s"
+     ],
+     "group": "Present",
+     "description": "Habits, routines and facts."
+    },
+    {
+     "slug": "present-continuous",
+     "name": "Present Continuous",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "present continuous",
+      "present progressive",
+      "-ing",
+      "am is are",
+      "right now"
+     ],
+     "group": "Present",
+     "description": "Actions happening now or around now."
+    },
+    {
+     "slug": "present-perfect",
+     "name": "Present Perfect",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 18,
+     "ielts_relevant": true,
+     "keywords": [
+      "present perfect",
+      "have has",
+      "been",
+      "ever never",
+      "already yet",
+      "experience"
+     ],
+     "group": "Present",
+     "description": "Past actions connected to now."
+    },
+    {
+     "slug": "present-perfect-continuous",
+     "name": "Present Perfect Continuous",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "present perfect continuous",
+      "have been -ing",
+      "for since",
+      "duration"
+     ],
+     "group": "Present",
+     "description": "How long something has been going on."
+    },
+    {
+     "slug": "past-simple",
+     "name": "Past Simple",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "past simple",
+      "past tense",
+      "v2",
+      "did",
+      "didn't",
+      "yesterday",
+      "second form"
+     ],
+     "group": "Past",
+     "description": "Finished actions at a definite past time."
+    },
+    {
+     "slug": "past-continuous",
+     "name": "Past Continuous",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.45,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "past continuous",
+      "past progressive",
+      "was were -ing",
+      "while",
+      "interrupted"
+     ],
+     "group": "Past",
+     "description": "An action in progress at a past moment."
+    },
+    {
+     "slug": "past-perfect",
+     "name": "Past Perfect",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "past perfect",
+      "had done",
+      "v3",
+      "before that",
+      "earlier past"
+     ],
+     "group": "Past",
+     "description": "The past before the past."
+    },
+    {
+     "slug": "past-perfect-continuous",
+     "name": "Past Perfect Continuous",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "past perfect continuous",
+      "had been -ing",
+      "duration before past"
+     ],
+     "group": "Past",
+     "description": "How long something had been going on."
+    },
+    {
+     "slug": "future-will",
+     "name": "Will",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "will",
+      "future",
+      "won't",
+      "predictions",
+      "decisions",
+      "shall"
+     ],
+     "group": "Future",
+     "description": "Predictions, offers and instant decisions."
+    },
+    {
+     "slug": "be-going-to",
+     "name": "Be Going To",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "going to",
+      "gonna",
+      "plans",
+      "intentions",
+      "evidence"
+     ],
+     "group": "Future",
+     "description": "Plans and things you can already see coming."
+    },
+    {
+     "slug": "present-continuous-future",
+     "name": "Present Continuous for Future",
+     "level": "B1",
+     "cefr_levels": [
+      "B1"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "present continuous future",
+      "arrangements",
+      "diary",
+      "fixed plans"
+     ],
+     "group": "Future",
+     "description": "Fixed arrangements already in the diary."
+    },
+    {
+     "slug": "future-continuous",
+     "name": "Future Continuous",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "future continuous",
+      "will be -ing",
+      "this time tomorrow"
+     ],
+     "group": "Future",
+     "description": "In progress at a moment in the future."
+    },
+    {
+     "slug": "future-perfect",
+     "name": "Future Perfect",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "future perfect",
+      "will have done",
+      "by then",
+      "by 2030"
+     ],
+     "group": "Future",
+     "description": "Finished before a future point."
+    },
+    {
+     "slug": "future-perfect-continuous",
+     "name": "Future Perfect Continuous",
+     "level": "C1",
+     "cefr_levels": [
+      "C1"
+     ],
+     "difficulty": 0.85,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "future perfect continuous",
+      "will have been -ing"
+     ],
+     "group": "Future",
+     "description": "Duration up to a future point."
+    }
+   ]
+  },
+  {
+   "slug": "modals",
+   "name": "Modal Verbs",
+   "description": "Ability, obligation, advice and possibility.",
+   "topics": [
+    {
+     "slug": "can-could",
+     "name": "Can / Could",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.25,
+     "estimated_minutes": 12,
+     "ielts_relevant": false,
+     "keywords": [
+      "can",
+      "could",
+      "ability",
+      "permission",
+      "requests"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "may-might",
+     "name": "May / Might",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "may",
+      "might",
+      "possibility",
+      "maybe",
+      "perhaps"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "must",
+     "name": "Must",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "must",
+      "obligation",
+      "mustn't",
+      "certainty"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "have-to",
+     "name": "Have To",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "have to",
+      "had to",
+      "don't have to",
+      "external obligation"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "should",
+     "name": "Should",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "should",
+      "shouldn't",
+      "advice",
+      "ought"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "ought-to",
+     "name": "Ought To",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "ought to",
+      "should",
+      "advice"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "need-neednt",
+     "name": "Need / Needn't",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "need",
+      "needn't",
+      "don't need to",
+      "necessity"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "would",
+     "name": "Would",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "would",
+      "'d",
+      "hypothetical",
+      "polite requests",
+      "used to"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "shall",
+     "name": "Shall",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "shall",
+      "offers",
+      "suggestions",
+      "formal future"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "modal-perfects",
+     "name": "Modal Perfects",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "must have",
+      "should have",
+      "could have",
+      "might have",
+      "modal perfect",
+      "regret"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "verbs",
+   "name": "Verbs",
+   "description": "How verbs behave before tense gets involved.",
+   "topics": [
+    {
+     "slug": "regular-irregular-verbs",
+     "name": "Regular / Irregular Verbs",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 12,
+     "ielts_relevant": false,
+     "keywords": [
+      "irregular verbs",
+      "regular verbs",
+      "-ed",
+      "v2 v3",
+      "verb forms",
+      "went gone"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "transitive-intransitive",
+     "name": "Transitive / Intransitive Verbs",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "transitive",
+      "intransitive",
+      "object",
+      "verb patterns"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "state-action-verbs",
+     "name": "State / Action Verbs",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "state verbs",
+      "action verbs",
+      "dynamic",
+      "non-continuous"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "stative-verbs",
+     "name": "Stative Verbs",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "stative verbs",
+      "know like want",
+      "not continuous",
+      "i'm loving it"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "phrasal-verbs",
+     "name": "Phrasal Verbs",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "phrasal verbs",
+      "give up",
+      "look after",
+      "separable",
+      "particle"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "causative-verbs",
+     "name": "Causative Verbs",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "causative",
+      "have something done",
+      "get something done",
+      "make let"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "adjectives",
+   "name": "Adjectives",
+   "description": "Describing things, and comparing them.",
+   "topics": [
+    {
+     "slug": "adjective-order",
+     "name": "Adjective Order",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "adjective order",
+      "order of adjectives",
+      "big old red"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "comparative-adj",
+     "name": "Comparative",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "comparative",
+      "-er",
+      "more than",
+      "bigger"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "superlative-adj",
+     "name": "Superlative",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "superlative",
+      "-est",
+      "the most",
+      "best"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "participial-adjectives",
+     "name": "Participial Adjectives",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "-ing adjectives",
+      "-ed adjectives",
+      "boring bored",
+      "interesting interested"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "compound-adjectives",
+     "name": "Compound Adjectives",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "compound adjective",
+      "well-known",
+      "hyphen",
+      "two-year-old"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "adverbs",
+   "name": "Adverbs",
+   "description": "How, when, where and how much.",
+   "topics": [
+    {
+     "slug": "adverbs-frequency",
+     "name": "Adverbs of Frequency",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "always",
+      "usually",
+      "sometimes",
+      "never",
+      "frequency",
+      "how often"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adverbs-manner",
+     "name": "Adverbs of Manner",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "adverbs of manner",
+      "-ly",
+      "quickly",
+      "carefully",
+      "how"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adverbs-place",
+     "name": "Adverbs of Place",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "adverbs of place",
+      "here there everywhere"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adverbs-time",
+     "name": "Adverbs of Time",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "adverbs of time",
+      "yesterday",
+      "soon",
+      "already"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adverbs-degree",
+     "name": "Adverbs of Degree",
+     "level": "B1",
+     "cefr_levels": [
+      "B1"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "adverbs of degree",
+      "very",
+      "quite",
+      "extremely",
+      "too"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "sentence-adverbs",
+     "name": "Sentence Adverbs",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "sentence adverbs",
+      "fortunately",
+      "obviously",
+      "however"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "position-of-adverbs",
+     "name": "Position of Adverbs",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "adverb position",
+      "word order adverbs",
+      "mid position"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "prepositions",
+   "name": "Prepositions",
+   "description": "The small words that decide the meaning.",
+   "topics": [
+    {
+     "slug": "prepositions-time",
+     "name": "Prepositions of Time",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "in on at time",
+      "prepositions of time",
+      "at 5",
+      "on monday",
+      "in july"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "prepositions-place",
+     "name": "Prepositions of Place",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "in on at place",
+      "prepositions of place",
+      "under",
+      "between"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "prepositions-movement",
+     "name": "Prepositions of Movement",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "prepositions of movement",
+      "to into",
+      "across",
+      "through"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "prepositions-after-verbs",
+     "name": "Prepositions after Verbs",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "dependent prepositions",
+      "depend on",
+      "listen to",
+      "verb preposition"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "prepositions-after-adjectives",
+     "name": "Prepositions after Adjectives",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "adjective preposition",
+      "good at",
+      "interested in",
+      "afraid of"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "prepositional-phrases",
+     "name": "Prepositional Phrases",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "prepositional phrase",
+      "in advance",
+      "on time",
+      "by chance"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "conjunctions",
+   "name": "Conjunctions",
+   "description": "Joining ideas into one sentence.",
+   "topics": [
+    {
+     "slug": "and-but-or",
+     "name": "And / But / Or",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.15,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "and",
+      "but",
+      "or",
+      "linking words"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "because-so",
+     "name": "Because / So",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.3,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "because",
+      "so",
+      "reason",
+      "result",
+      "cause"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "although-though",
+     "name": "Although / Though",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "although",
+      "though",
+      "even though",
+      "contrast",
+      "concession"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "while-whereas",
+     "name": "While / Whereas",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "while",
+      "whereas",
+      "contrast",
+      "comparing"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "unless-conj",
+     "name": "Unless",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "unless",
+      "if not",
+      "condition"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "since-conj",
+     "name": "Since",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "since",
+      "because",
+      "from a time",
+      "for since"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "as-conj",
+     "name": "As",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "as",
+      "because",
+      "while",
+      "like or as"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "despite-in-spite-of",
+     "name": "Despite / In Spite Of",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "despite",
+      "in spite of",
+      "although",
+      "contrast",
+      "despite of"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "conditionals",
+   "name": "Conditionals",
+   "description": "Real and imagined situations with if.",
+   "topics": [
+    {
+     "slug": "zero-conditional",
+     "name": "Zero Conditional",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "zero conditional",
+      "if present present",
+      "facts",
+      "always true"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "first-conditional",
+     "name": "First Conditional",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.45,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "first conditional",
+      "if will",
+      "real future",
+      "1st conditional"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "second-conditional",
+     "name": "Second Conditional",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "second conditional",
+      "if past would",
+      "imaginary",
+      "2nd conditional",
+      "if i were"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "third-conditional",
+     "name": "Third Conditional",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "third conditional",
+      "if had would have",
+      "regret",
+      "past unreal",
+      "3rd conditional"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "mixed-conditionals",
+     "name": "Mixed Conditionals",
+     "level": "C1",
+     "cefr_levels": [
+      "C1",
+      "C2"
+     ],
+     "difficulty": 0.9,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "mixed conditional",
+      "past condition present result"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "unless-cond",
+     "name": "Unless in conditionals",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "unless",
+      "if not",
+      "negative condition"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "provided-providing",
+     "name": "Provided / Providing",
+     "level": "C1",
+     "cefr_levels": [
+      "C1"
+     ],
+     "difficulty": 0.85,
+     "estimated_minutes": 6,
+     "ielts_relevant": true,
+     "keywords": [
+      "provided that",
+      "providing",
+      "on condition that"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "as-long-as",
+     "name": "As Long As",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 6,
+     "ielts_relevant": true,
+     "keywords": [
+      "as long as",
+      "so long as",
+      "condition"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "passive",
+   "name": "Passive Voice",
+   "description": "Putting the action, not the doer, first.",
+   "topics": [
+    {
+     "slug": "present-passive",
+     "name": "Present Passive",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "present passive",
+      "is made",
+      "are done",
+      "passive present simple"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "past-passive",
+     "name": "Past Passive",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "past passive",
+      "was built",
+      "were made"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "future-passive",
+     "name": "Future Passive",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "future passive",
+      "will be done"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "modal-passive",
+     "name": "Modal Passive",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "modal passive",
+      "must be done",
+      "can be seen"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "perfect-passive",
+     "name": "Perfect Passive",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "perfect passive",
+      "has been done",
+      "had been built"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "get-passive",
+     "name": "Get Passive",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "get passive",
+      "got broken",
+      "informal passive"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "reported-speech",
+   "name": "Reported Speech",
+   "description": "Saying what someone else said.",
+   "topics": [
+    {
+     "slug": "reported-statements",
+     "name": "Reported Statements",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "reported speech",
+      "indirect speech",
+      "he said that",
+      "told me"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "reported-questions",
+     "name": "Reported Questions",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "reported questions",
+      "asked if",
+      "indirect question",
+      "word order"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "reported-commands",
+     "name": "Reported Commands",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "reported commands",
+      "told me to",
+      "asked me to"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "backshift",
+     "name": "Backshift",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "backshift",
+      "tense change",
+      "said",
+      "one tense back"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "reporting-verbs",
+     "name": "Reporting Verbs",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "reporting verbs",
+      "admit",
+      "suggest",
+      "refuse",
+      "claim"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "relative-clauses",
+   "name": "Relative Clauses",
+   "description": "Adding information inside a sentence.",
+   "topics": [
+    {
+     "slug": "defining-relative",
+     "name": "Defining Relative Clauses",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "defining relative clause",
+      "who which that",
+      "identifying",
+      "no commas"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "non-defining-relative",
+     "name": "Non-defining Relative Clauses",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "non-defining",
+      "commas",
+      "extra information",
+      "which"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "who-which-that",
+     "name": "Who / Which / That",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "who",
+      "which",
+      "that",
+      "which or that"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "whose",
+     "name": "Whose",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "whose",
+      "possessive relative"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "where-when",
+     "name": "Where / When",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.55,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "where",
+      "when",
+      "relative adverbs",
+      "the place where"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "reduced-relative",
+     "name": "Reduced Relative Clauses",
+     "level": "C1",
+     "cefr_levels": [
+      "C1",
+      "C2"
+     ],
+     "difficulty": 0.9,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "reduced relative",
+      "participle clause",
+      "the man standing"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "gerunds-infinitives",
+   "name": "Gerunds & Infinitives",
+   "description": "When a verb becomes -ing, and when it takes to.",
+   "topics": [
+    {
+     "slug": "gerunds",
+     "name": "Gerunds",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "gerund",
+      "-ing",
+      "verb as noun",
+      "swimming is"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "infinitives",
+     "name": "Infinitives",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "infinitive",
+      "to do",
+      "to + verb"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "verb-gerund",
+     "name": "Verb + Gerund",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "enjoy doing",
+      "avoid",
+      "finish",
+      "verb + ing"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "verb-infinitive",
+     "name": "Verb + Infinitive",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "want to",
+      "decide to",
+      "hope to",
+      "verb + infinitive"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "verb-object-infinitive",
+     "name": "Verb + Object + Infinitive",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "tell someone to",
+      "want someone to",
+      "ask him to"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "gerund-vs-infinitive",
+     "name": "Gerund vs Infinitive",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 15,
+     "ielts_relevant": true,
+     "keywords": [
+      "gerund vs infinitive",
+      "stop doing stop to",
+      "remember doing",
+      "-ing or to"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "comparisons",
+   "name": "Comparisons",
+   "description": "More, less, and the same.",
+   "topics": [
+    {
+     "slug": "comparative",
+     "name": "Comparative",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "comparative",
+      "-er than",
+      "more than"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "superlative",
+     "name": "Superlative",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "superlative",
+      "the most",
+      "-est",
+      "the best"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "as-as",
+     "name": "As ... As",
+     "level": "B1",
+     "cefr_levels": [
+      "B1"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "as as",
+      "as tall as",
+      "not as as",
+      "same"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "less-fewer",
+     "name": "Less / Fewer",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "less",
+      "fewer",
+      "less or fewer",
+      "countable"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "more-most",
+     "name": "More / Most",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "more",
+      "most",
+      "more than"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "the-the",
+     "name": "The ... The ...",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "the more the better",
+      "double comparative",
+      "the the"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "questions-negation",
+   "name": "Questions & Negation",
+   "description": "Asking, and saying no.",
+   "topics": [
+    {
+     "slug": "yes-no-questions",
+     "name": "Yes / No Questions",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.2,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "yes no questions",
+      "do you",
+      "are you",
+      "auxiliary"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "wh-questions",
+     "name": "Wh Questions",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.25,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "wh questions",
+      "what where when why how",
+      "question words"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "question-tags",
+     "name": "Question Tags",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "question tags",
+      "isn't it",
+      "don't you",
+      "tag questions"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "indirect-questions",
+     "name": "Indirect Questions",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 12,
+     "ielts_relevant": true,
+     "keywords": [
+      "indirect questions",
+      "could you tell me",
+      "polite questions",
+      "word order"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "negative-forms",
+     "name": "Negative Forms",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.25,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "negative",
+      "don't",
+      "doesn't",
+      "not",
+      "didn't"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "double-negatives",
+     "name": "Double Negatives",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "double negative",
+      "don't know nothing"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "sentence-structure",
+   "name": "Sentence Structure",
+   "description": "What a sentence is made of.",
+   "topics": [
+    {
+     "slug": "subject",
+     "name": "Subject",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.2,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "subject",
+      "who does it"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "predicate",
+     "name": "Predicate",
+     "level": "A2",
+     "cefr_levels": [
+      "A2"
+     ],
+     "difficulty": 0.35,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "predicate",
+      "verb phrase"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "objects",
+     "name": "Objects",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.45,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "object",
+      "direct object",
+      "indirect object"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "complements",
+     "name": "Complements",
+     "level": "B2",
+     "cefr_levels": [
+      "B2"
+     ],
+     "difficulty": 0.7,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "complement",
+      "subject complement",
+      "linking verb"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "simple-sentences",
+     "name": "Simple Sentences",
+     "level": "A1",
+     "cefr_levels": [
+      "A1"
+     ],
+     "difficulty": 0.2,
+     "estimated_minutes": 6,
+     "ielts_relevant": false,
+     "keywords": [
+      "simple sentence",
+      "one clause"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "compound-sentences",
+     "name": "Compound Sentences",
+     "level": "B1",
+     "cefr_levels": [
+      "B1"
+     ],
+     "difficulty": 0.5,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "compound sentence",
+      "and but so",
+      "two clauses"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "complex-sentences",
+     "name": "Complex Sentences",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "complex sentence",
+      "subordinate clause",
+      "because although"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "compound-complex",
+     "name": "Compound-Complex Sentences",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.8,
+     "estimated_minutes": 8,
+     "ielts_relevant": true,
+     "keywords": [
+      "compound complex sentence"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "clauses",
+   "name": "Clauses",
+   "description": "The building blocks inside a sentence.",
+   "topics": [
+    {
+     "slug": "noun-clauses",
+     "name": "Noun Clauses",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "noun clause",
+      "that clause",
+      "what he said"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adverbial-clauses",
+     "name": "Adverbial Clauses",
+     "level": "B2",
+     "cefr_levels": [
+      "B2",
+      "C1"
+     ],
+     "difficulty": 0.75,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "adverbial clause",
+      "when because although"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "relative-clauses-overview",
+     "name": "Relative Clauses",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "relative clause",
+      "who which that"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "conditional-clauses",
+     "name": "Conditional Clauses",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.65,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "conditional clause",
+      "if clause"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "slug": "word-order",
+   "name": "Word Order",
+   "description": "The order English insists on.",
+   "topics": [
+    {
+     "slug": "basic-word-order",
+     "name": "Basic Word Order",
+     "level": "A1",
+     "cefr_levels": [
+      "A1",
+      "A2"
+     ],
+     "difficulty": 0.25,
+     "estimated_minutes": 10,
+     "ielts_relevant": false,
+     "keywords": [
+      "word order",
+      "svo",
+      "subject verb object"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adjective-order-wo",
+     "name": "Adjective Order",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "adjective order",
+      "order of adjectives"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "adverb-position",
+     "name": "Adverb Position",
+     "level": "B1",
+     "cefr_levels": [
+      "B1",
+      "B2"
+     ],
+     "difficulty": 0.6,
+     "estimated_minutes": 8,
+     "ielts_relevant": false,
+     "keywords": [
+      "adverb position",
+      "where to put adverbs"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "question-word-order",
+     "name": "Question Word Order",
+     "level": "A2",
+     "cefr_levels": [
+      "A2",
+      "B1"
+     ],
+     "difficulty": 0.4,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "question word order",
+      "auxiliary first",
+      "inversion questions"
+     ],
+     "group": "",
+     "description": ""
+    },
+    {
+     "slug": "inversion",
+     "name": "Inversion",
+     "level": "C1",
+     "cefr_levels": [
+      "C1",
+      "C2"
+     ],
+     "difficulty": 0.9,
+     "estimated_minutes": 10,
+     "ielts_relevant": true,
+     "keywords": [
+      "inversion",
+      "never have i",
+      "not only",
+      "emphatic"
+     ],
+     "group": "",
+     "description": ""
+    }
+   ]
+  }
+ ]
+}

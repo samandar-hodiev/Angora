@@ -93,8 +93,12 @@ type AuthConfig struct {
 }
 
 type AIConfig struct {
-	Provider      string
-	Model         string
+	Provider string
+	Model    string
+	// Model routing. Not every AI task is the same size of job: rewriting a known grammar
+	// rule for an A2 learner is cheap work, analysing free text is not. Both default to
+	// Model, so a single AI_MODEL still configures everything.
+	FastModel     string
 	OpenAIAPIKey  string
 	OpenAIBaseURL string
 }
@@ -168,6 +172,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		AI: AIConfig{
 			Provider:      strings.ToLower(r.str("AI_PROVIDER", "mock")),
 			Model:         r.str("AI_MODEL", ""),
+			FastModel:     r.str("AI_FAST_MODEL", ""),
 			OpenAIAPIKey:  r.str("OPENAI_API_KEY", ""),
 			OpenAIBaseURL: r.str("OPENAI_BASE_URL", "https://api.openai.com/v1"),
 		},
