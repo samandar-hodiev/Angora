@@ -1,78 +1,70 @@
 "use client";
 
-import { Ban, CreditCard, Eye, RotateCcw, UserRound, Users } from "lucide-react";
+import { Ban, RotateCcw, ShieldCheck, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { EmptyState } from "@/components/common/states";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { isApiError } from "@/lib/api";
 
 import { DataTable, Pagination, type Column } from "../components/data-table";
+import { LiveDataState } from "../components/live-state";
 import {
   ActionMenu,
   ConfirmDialog,
   FilterBar,
   FilterSelect,
   LearnerAvatar,
-  LearnerStatusBadge,
   LevelBadge,
   OwnerPageHeader,
-  PlanBadge,
   SearchInput,
   SectionCard,
 } from "../components/primitives";
-import { useLearners, useUpdateLearnerPlan, useUpdateLearnerStatus } from "../hooks";
-import { formatDate, formatNumber, formatRelative, planLabels } from "../lib/format";
-import { MOCK_TODAY } from "../lib/mock";
-import type { CEFRLevel, Learner, LearnerStatus, PlanCode, PlanFilter } from "../types";
-import { cefrLevels, planCodes } from "../types";
+import { useLiveLearners, usePlans, useRoles, useSetLearnerStatus, useSetUserRole } from "../hooks";
+import { formatDate, formatNumber, formatRelative } from "../lib/format";
+import type { AccountStatus, CEFRLevel, LiveLearnerRow } from "../types";
+import { cefrLevels } from "../types";
 
-const PAGE_SIZE = 20;
-const NOW = `${MOCK_TODAY}T12:00:00Z`;
+/**
+ * Learner management, on the real accounts table.
+ *
+ * Suspension here is not a UI state: the API sets the account status and revokes the
+ * refresh tokens, so the session cannot be renewed. Role changes are the same — the
+ * permission set the API enforces is what moves.
+ */
 
-const planOptions = [
-  { value: "all" as const, label: "All plans" },
-  ...planCodes.map((plan) => ({ value: plan, label: planLabels[plan] })),
-];
+const statusStyles: Record<AccountStatus, string> = {
+  active: "border-transparent bg-success/15 text-success",
+  suspended: "border-transparent bg-error/15 text-error",
+  deleted: "border-transparent bg-surface-active text-fg-muted line-through",
+};
 
-const levelOptions = [{ value: "all" as const, label: "All levels" }, ...cefrLevels.map((level) => ({ value: level, label: level }))];
-
-const statusOptions = [
-  { value: "all" as const, label: "All statuses" },
-  { value: "active" as const, label: "Active" },
-  { value: "suspended" as const, label: "Suspended" },
-  { value: "pending" as const, label: "Pending" },
-  { value: "archived" as const, label: "Archived" },
-];
-
-const sortOptions = [
-  { value: "joined" as const, label: "Newest first" },
-  { value: "last_active" as const, label: "Recently active" },
-  { value: "name" as const, label: "Name A–Z" },
-];
+const now = () => new Date().toISOString();
 
 export function LearnersView() {
   const [search, setSearch] = useState("");
-  const [plan, setPlan] = useState<PlanFilter>("all");
+  const [plan, setPlan] = useState("all");
   const [level, setLevel] = useState<CEFRLevel | "all">("all");
-  const [status, setStatus] = useState<LearnerStatus | "all">("all");
-  const [sort, setSort] = useState<"joined" | "last_active" | "name">("joined");
+  const [status, setStatus] = useState<AccountStatus | "all">("all");
+  const [sort, setSort] = useState("joined");
   const [page, setPage] = useState(1);
 
-  const [planChange, setPlanChange] = useState<Learner | null>(null);
-  const [nextPlan, setNextPlan] = useState<PlanCode>("premium");
-  const [suspending, setSuspending] = useState<Learner | null>(null);
+  const [suspending, setSuspending] = useState<LiveLearnerRow | null>(null);
+  const [reason, setReason] = useState("");
+  const [roleFor, setRoleFor] = useState<LiveLearnerRow | null>(null);
+  const [nextRole, setNextRole] = useState("USER");
 
-  const query = useMemo(
-    () => ({ search, plan, level, status, sort, page, page_size: PAGE_SIZE }),
-    [search, plan, level, status, sort, page],
-  );
-  const learners = useLearners(query);
-  const updatePlan = useUpdateLearnerPlan();
-  const updateStatus = useUpdateLearnerStatus();
+  const query = useMemo(() => ({ search, plan, level, status, sort, page }), [search, plan, level, status, sort, page]);
+  const learners = useLiveLearners(query);
+  const plans = usePlans();
+  const roles = useRoles();
+  const setStatusMutation = useSetLearnerStatus();
+  const setRoleMutation = useSetUserRole();
 
   function reset() {
     setSearch("");
@@ -83,17 +75,39 @@ export function LearnersView() {
     setPage(1);
   }
 
-  const columns: Column<Learner>[] = [
+  function changeStatus(learner: LiveLearnerRow, next: "active" | "suspended", why?: string) {
+    setStatusMutation.mutate(
+      { id: learner.id, status: next, reason: why },
+      {
+        onSuccess: () =>
+          toast({
+            title: next === "suspended" ? `${learner.email} suspended` : `${learner.email} reactivated`,
+            description: next === "suspended" ? "Their sessions were revoked." : undefined,
+            variant: "success",
+          }),
+        onError: (error) =>
+          toast({
+            title: "That change was refused",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
+      },
+    );
+    setSuspending(null);
+    setReason("");
+  }
+
+  const columns: Column<LiveLearnerRow>[] = [
     {
       key: "learner",
       header: "Learner",
-      width: "18rem",
+      width: "20rem",
       cell: (learner) => (
         <div className="flex min-w-0 items-center gap-2.5">
-          <LearnerAvatar name={learner.name} avatarUrl={learner.avatar_url} size="sm" />
+          <LearnerAvatar name={learner.display_name || learner.email} avatarUrl={learner.avatar_url} size="sm" />
           <div className="grid min-w-0">
             <Link href={`/owner/learners/${learner.id}`} className="truncate font-medium hover:underline">
-              {learner.name}
+              {learner.display_name || learner.email}
             </Link>
             <span className="truncate text-caption text-fg-muted">{learner.email}</span>
           </div>
@@ -101,20 +115,49 @@ export function LearnersView() {
       ),
     },
     {
-      key: "phone",
-      header: "Phone",
-      hideBelow: "xl",
-      cell: (learner) => <span className="text-fg-secondary tabular-nums">{learner.phone ?? "—"}</span>,
+      key: "plan",
+      header: "Plan",
+      cell: (learner) => <Badge variant="outline">{learner.plan_name}</Badge>,
     },
     {
-      key: "age",
-      header: "Age",
-      hideBelow: "xl",
-      cell: (learner) => <span className="tabular-nums">{learner.age ?? "—"}</span>,
+      key: "level",
+      header: "Level",
+      hideBelow: "md",
+      cell: (learner) =>
+        learner.current_level ? <LevelBadge level={learner.current_level} /> : <span className="text-fg-muted">—</span>,
     },
-    { key: "level", header: "Level", hideBelow: "sm", cell: (learner) => <LevelBadge level={learner.level} /> },
-    { key: "plan", header: "Plan", cell: (learner) => <PlanBadge plan={learner.plan} /> },
-    { key: "status", header: "Status", hideBelow: "md", cell: (learner) => <LearnerStatusBadge status={learner.status} /> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (learner) => (
+        <span className="flex items-center gap-1.5">
+          <Badge className={statusStyles[learner.status]}>{learner.status}</Badge>
+          {learner.role !== "USER" && (
+            <Badge variant="secondary" className="gap-1">
+              <ShieldCheck className="size-3" aria-hidden />
+              {learner.role.toLowerCase().replace("_", " ")}
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "onboarded",
+      header: "Onboarding",
+      hideBelow: "xl",
+      cell: (learner) =>
+        learner.onboarded ? (
+          <span className="text-success">Complete</span>
+        ) : (
+          <span className="text-fg-muted">Unfinished</span>
+        ),
+    },
+    {
+      key: "streak",
+      header: "Streak",
+      hideBelow: "xl",
+      cell: (learner) => <span className="tabular-nums">{learner.streak_days > 0 ? `${learner.streak_days}d` : "—"}</span>,
+    },
     {
       key: "joined",
       header: "Joined",
@@ -123,9 +166,13 @@ export function LearnersView() {
     },
     {
       key: "active",
-      header: "Last active",
+      header: "Last seen",
       hideBelow: "md",
-      cell: (learner) => <span className="text-fg-muted">{formatRelative(learner.last_active_at, NOW)}</span>,
+      cell: (learner) => (
+        <span className="text-fg-muted">
+          {learner.last_active_at ? formatRelative(learner.last_active_at, now()) : "Never"}
+        </span>
+      ),
     },
     {
       key: "actions",
@@ -135,33 +182,26 @@ export function LearnersView() {
       width: "3rem",
       cell: (learner) => (
         <ActionMenu
-          label={`Actions for ${learner.name}`}
+          label={`Actions for ${learner.email}`}
           items={[
-            { label: "View profile", icon: UserRound, href: `/owner/learners/${learner.id}` },
+            { label: "Open profile", icon: UserRound, href: `/owner/learners/${learner.id}` },
             {
-              label: "Change plan",
-              icon: CreditCard,
+              label: "Change role",
+              icon: ShieldCheck,
               separatorBefore: true,
               onSelect: () => {
-                setNextPlan(learner.plan === "free" ? "premium" : learner.plan === "premium" ? "unlimited" : "free");
-                setPlanChange(learner);
+                setNextRole(learner.role);
+                setRoleFor(learner);
               },
             },
             learner.status === "suspended"
-              ? { label: "Reactivate", icon: RotateCcw, onSelect: () => reactivate(learner) }
+              ? { label: "Reactivate", icon: RotateCcw, onSelect: () => changeStatus(learner, "active") }
               : { label: "Suspend account", icon: Ban, destructive: true, onSelect: () => setSuspending(learner) },
           ]}
         />
       ),
     },
   ];
-
-  function reactivate(learner: Learner) {
-    updateStatus.mutate(
-      { id: learner.id, status: "active" },
-      { onSuccess: () => toast({ title: `${learner.name} reactivated`, variant: "success" }) },
-    );
-  }
 
   const total = learners.data?.total ?? 0;
 
@@ -171,17 +211,9 @@ export function LearnersView() {
         title="Learners"
         description="Every account on the platform, with plan, level and activity."
         breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Learners" }]}
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/owner/analytics">
-              <Eye aria-hidden />
-              Analytics
-            </Link>
-          </Button>
-        }
       />
 
-      <FilterBar onReset={reset} resultLabel={learners.isPending ? undefined : `${formatNumber(total)} learners`}>
+      <FilterBar onReset={reset} resultLabel={learners.isPending ? undefined : `${formatNumber(total)} accounts`}>
         <SearchInput
           value={search}
           onChange={(value) => {
@@ -189,12 +221,15 @@ export function LearnersView() {
             setPage(1);
           }}
           label="Search learners"
-          placeholder="Search by name or email"
+          placeholder="Search name or email"
         />
         <FilterSelect
           label="Plan"
           value={plan}
-          options={planOptions}
+          options={[
+            { value: "all", label: "All plans" },
+            ...(plans.data ?? []).map((p) => ({ value: p.code, label: p.name })),
+          ]}
           onChange={(value) => {
             setPlan(value);
             setPage(1);
@@ -203,7 +238,7 @@ export function LearnersView() {
         <FilterSelect
           label="Level"
           value={level}
-          options={levelOptions}
+          options={[{ value: "all" as const, label: "All levels" }, ...cefrLevels.map((l) => ({ value: l, label: l }))]}
           onChange={(value) => {
             setLevel(value);
             setPage(1);
@@ -212,100 +247,132 @@ export function LearnersView() {
         <FilterSelect
           label="Status"
           value={status}
-          options={statusOptions}
+          options={[
+            { value: "all" as const, label: "All statuses" },
+            { value: "active" as const, label: "Active" },
+            { value: "suspended" as const, label: "Suspended" },
+            { value: "deleted" as const, label: "Deleted" },
+          ]}
           onChange={(value) => {
             setStatus(value);
             setPage(1);
           }}
         />
-        <FilterSelect label="Sort" value={sort} options={sortOptions} onChange={setSort} />
+        <FilterSelect
+          label="Sort"
+          value={sort}
+          options={[
+            { value: "joined", label: "Newest first" },
+            { value: "last_active", label: "Recently active" },
+            { value: "email", label: "Email A–Z" },
+          ]}
+          onChange={setSort}
+        />
       </FilterBar>
 
-      <SectionCard title="All learners" description="Click a row to open the full profile" bodyClassName="p-0">
-        <DataTable
-          caption="Learner accounts"
-          columns={columns}
-          rows={learners.data?.items ?? []}
-          rowKey={(learner) => learner.id}
-          isLoading={learners.isPending}
-          isError={learners.isError}
-          error={learners.error}
-          onRetry={() => void learners.refetch()}
-          minWidth="62rem"
-          empty={
-            <EmptyState
-              icon={Users}
-              title="No learners match these filters"
-              description="Try another plan or status, or clear the search."
-              action={
-                <Button variant="outline" size="sm" onClick={reset}>
-                  Clear filters
-                </Button>
+      <SectionCard title="All learners" description="Live from the platform database" bodyClassName="p-0">
+        {learners.isError ? (
+          <div className="p-4">
+            <LiveDataState error={learners.error} onRetry={() => void learners.refetch()} />
+          </div>
+        ) : (
+          <>
+            <DataTable
+              caption="Learner accounts"
+              columns={columns}
+              rows={learners.data?.items ?? []}
+              rowKey={(learner) => learner.id}
+              isLoading={learners.isPending}
+              minWidth="68rem"
+              empty={
+                <div className="grid justify-items-center gap-3 py-6 text-center">
+                  <Users className="size-8 text-fg-muted" aria-hidden />
+                  <div>
+                    <p className="text-h4">No accounts match these filters</p>
+                    <p className="text-body-sm text-fg-secondary">Clear the filters to see everyone.</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={reset}>
+                    Clear filters
+                  </Button>
+                </div>
               }
             />
-          }
-        />
-        <Pagination
-          page={learners.data?.page ?? 1}
-          totalPages={learners.data?.total_pages ?? 1}
-          total={total}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPage}
-          label="learners"
-        />
+            <Pagination
+              page={learners.data?.page ?? 1}
+              totalPages={learners.data?.total_pages ?? 1}
+              total={total}
+              pageSize={20}
+              onPageChange={setPage}
+              label="accounts"
+            />
+          </>
+        )}
       </SectionCard>
-
-      <ConfirmDialog
-        open={planChange !== null}
-        onOpenChange={(open) => !open && setPlanChange(null)}
-        title={planChange ? `Change ${planChange.name}'s plan?` : ""}
-        description="The learner keeps their progress; only what they can reach changes."
-        confirmLabel="Change plan"
-        loading={updatePlan.isPending}
-        onConfirm={() => {
-          if (!planChange) return;
-          updatePlan.mutate(
-            { id: planChange.id, plan: nextPlan },
-            {
-              onSuccess: () =>
-                toast({ title: `${planChange.name} moved to ${planLabels[nextPlan]}`, variant: "success" }),
-            },
-          );
-          setPlanChange(null);
-        }}
-      >
-        <div className="grid gap-1.5">
-          <Label htmlFor="next-plan">New plan</Label>
-          <NativeSelect id="next-plan" value={nextPlan} onChange={(event) => setNextPlan(event.target.value as PlanCode)}>
-            {planCodes.map((code) => (
-              <option key={code} value={code}>
-                {planLabels[code]}
-              </option>
-            ))}
-          </NativeSelect>
-          <p className="text-caption text-fg-muted">
-            Mock change — billing is untouched until the payment provider is connected.
-          </p>
-        </div>
-      </ConfirmDialog>
 
       <ConfirmDialog
         open={suspending !== null}
         onOpenChange={(open) => !open && setSuspending(null)}
-        title={suspending ? `Suspend ${suspending.name}?` : ""}
-        description="They will be signed out and cannot open lessons until the account is reactivated."
+        title={suspending ? `Suspend ${suspending.email}?` : ""}
+        description="Their sessions are revoked immediately and they cannot sign in again until the account is reactivated."
         confirmLabel="Suspend"
         destructive
-        loading={updateStatus.isPending}
+        loading={setStatusMutation.isPending}
+        onConfirm={() => suspending && changeStatus(suspending, "suspended", reason)}
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="suspend-reason">Reason (recorded in the audit log)</Label>
+          <Textarea
+            id="suspend-reason"
+            rows={2}
+            value={reason}
+            placeholder="Abusive content in speaking submissions"
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={roleFor !== null}
+        onOpenChange={(open) => !open && setRoleFor(null)}
+        title={roleFor ? `Change role for ${roleFor.email}` : ""}
+        description="A role is a bundle of permissions the API enforces on every request."
+        confirmLabel="Change role"
+        loading={setRoleMutation.isPending}
         onConfirm={() => {
-          if (!suspending) return;
-          updateStatus.mutate(
-            { id: suspending.id, status: "suspended" },
-            { onSuccess: () => toast({ title: `${suspending.name} suspended`, variant: "success" }) },
+          if (!roleFor) return;
+          setRoleMutation.mutate(
+            { id: roleFor.id, role: nextRole },
+            {
+              onSuccess: () => toast({ title: `${roleFor.email} is now ${nextRole}`, variant: "success" }),
+              onError: (error) =>
+                toast({
+                  title: "That change was refused",
+                  description: isApiError(error) ? error.message : undefined,
+                  variant: "error",
+                }),
+            },
           );
-          setSuspending(null);
+          setRoleFor(null);
         }}
-      />
+      >
+        <div className="grid gap-2">
+          <Label htmlFor="next-role">Role</Label>
+          <NativeSelect id="next-role" value={nextRole} onChange={(event) => setNextRole(event.target.value)}>
+            {(roles.data ?? []).map((role) => (
+              <option key={role.role} value={role.role}>
+                {role.role}
+              </option>
+            ))}
+          </NativeSelect>
+          <ul className="grid gap-0.5 rounded-lg border bg-surface-hover p-3 text-caption text-fg-muted">
+            {(roles.data ?? []).find((role) => role.role === nextRole)?.permissions.map((permission) => (
+              <li key={permission}>
+                <code className="font-mono">{permission}</code>
+              </li>
+            )) ?? <li>No permissions</li>}
+          </ul>
+        </div>
+      </ConfirmDialog>
     </>
   );
 }

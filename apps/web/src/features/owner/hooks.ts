@@ -359,3 +359,78 @@ export function useAuditLogs(query: { action?: string; entity?: string; days?: n
     placeholderData: keepPreviousData,
   });
 }
+
+// ---- Learners, analytics and AI monitoring (live API) -----------------------------------------
+
+export function useLiveLearners(query: { search?: string; plan?: string; level?: string; status?: string; sort?: string; page?: number }) {
+  return useQuery({
+    queryKey: queryKeys.owner.liveLearners(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.getLiveLearners(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useLiveLearner(id: string) {
+  return useQuery({
+    queryKey: queryKeys.owner.liveLearner(id),
+    queryFn: () => assessmentApi.getLiveLearner(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useSetLearnerStatus() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: { id: string; status: "active" | "suspended"; reason?: string }) =>
+      assessmentApi.setLearnerStatus(id, status, reason),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useSetUserRole() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) => assessmentApi.setUserRole(id, role),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useRoles() {
+  return useQuery({ queryKey: queryKeys.owner.roles, queryFn: assessmentApi.getRoles, staleTime: 10 * 60_000 });
+}
+
+export function useAnalyticsOverview(days: number) {
+  return useQuery({
+    queryKey: queryKeys.owner.analytics(days),
+    queryFn: () => assessmentApi.getAnalyticsOverview(days),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useGrowthSeries(days: number) {
+  return useQuery({
+    queryKey: queryKeys.owner.growthSeries(days),
+    queryFn: () => assessmentApi.getGrowth(days),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAIFailures(days: number, page: number) {
+  return useQuery({
+    queryKey: queryKeys.owner.aiFailures(days, page),
+    queryFn: () => assessmentApi.getAIFailures(days, page),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAIQuality(days: number) {
+  return useQuery({ queryKey: queryKeys.owner.aiQuality(days), queryFn: () => assessmentApi.getAIQuality(days) });
+}
+
+export function useAIUsage(days: number) {
+  return useQuery({
+    queryKey: queryKeys.owner.aiUsage(days),
+    queryFn: () => assessmentApi.getAIUsage(days),
+    placeholderData: keepPreviousData,
+  });
+}

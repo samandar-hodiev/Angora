@@ -139,6 +139,22 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.DELETE("/plans/:id/entitlements/:key", billing, m.deletePlanEntitlement)
 
 	g.GET("/audit-logs", authz.RequirePermission(authz.PermAuditRead), m.auditLog)
+
+	// Learners. Reading a record and changing one are different permissions: support can do
+	// both, an analyst only the first.
+	usersRead := authz.RequirePermission(authz.PermUsersRead)
+	usersManage := authz.RequirePermission(authz.PermUsersManage)
+	g.GET("/learners", usersRead, m.learners)
+	g.GET("/learners/:id", usersRead, m.learner)
+	g.POST("/learners/:id/status", usersManage, m.setLearnerStatus)
+	g.POST("/learners/:id/role", usersManage, m.setUserRole)
+	g.GET("/roles", usersRead, m.roles)
+
+	// Analytics and AI monitoring.
+	g.GET("/analytics/overview", usersRead, m.analyticsOverview)
+	g.GET("/analytics/growth", usersRead, m.growth)
+	g.GET("/ai/failures", authz.RequirePermission(authz.PermAIUsageRead), m.aiFailures)
+	g.GET("/ai/quality", authz.RequirePermission(authz.PermAIUsageRead), m.aiQuality)
 }
 
 func (m *Module) overview(c *gin.Context) {

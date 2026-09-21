@@ -1,6 +1,8 @@
 import {
   BookOpen,
   ClipboardList,
+  ScrollText,
+  Sparkles,
   CreditCard,
   FileStack,
   Headphones,
@@ -69,6 +71,8 @@ export const ownerNav: OwnerNavSection[] = [
       { href: "/owner/learners", label: "Learners", icon: Users },
       { href: "/owner/paywall", label: "Paywall", icon: CreditCard },
       { href: "/owner/settings", label: "Settings", icon: Settings },
+      { href: "/owner/ai", label: "AI", icon: Sparkles },
+      { href: "/owner/audit", label: "Audit log", icon: ScrollText },
     ],
   },
 ];

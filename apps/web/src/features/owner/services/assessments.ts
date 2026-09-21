@@ -12,7 +12,15 @@
 import { apiClient } from "@/lib/api";
 
 import type {
+  AIFailureRow,
+  AIQualityRow,
+  AnalyticsOverview,
   AuditRow,
+  GrowthPoint,
+  ISODate,
+  LiveLearnerDetail,
+  LiveLearnerRow,
+  RoleInfo,
   EntitlementRow,
   LimitPeriod,
   PlanRow,
@@ -149,4 +157,74 @@ export async function getAuditLogs(query: { action?: string; entity?: string; da
     query: { action: query.action, entity: query.entity, days: query.days, page: query.page, page_size: 25 },
   });
   return paged(result, 25);
+}
+
+// ---- Learners, analytics and AI monitoring ----------------------------------------------------
+
+export async function getLiveLearners(query: {
+  search?: string;
+  plan?: string;
+  level?: string;
+  status?: string;
+  sort?: string;
+  page?: number;
+}): Promise<Paged<LiveLearnerRow>> {
+  const result = await apiClient.getPage<LiveLearnerRow>("/admin/learners", {
+    query: {
+      search: query.search || undefined,
+      plan: query.plan === "all" ? undefined : query.plan,
+      level: query.level === "all" ? undefined : query.level,
+      status: query.status === "all" ? undefined : query.status,
+      sort: query.sort,
+      page: query.page,
+      page_size: 20,
+    },
+  });
+  return paged(result, 20);
+}
+
+export function getLiveLearner(id: string): Promise<LiveLearnerDetail> {
+  return apiClient.get<LiveLearnerDetail>(`/admin/learners/${id}`);
+}
+
+export function setLearnerStatus(id: string, status: "active" | "suspended", reason?: string): Promise<unknown> {
+  return apiClient.post(`/admin/learners/${id}/status`, { status, reason });
+}
+
+export function setUserRole(id: string, role: string): Promise<unknown> {
+  return apiClient.post(`/admin/learners/${id}/role`, { role });
+}
+
+export function getRoles(): Promise<RoleInfo[]> {
+  return apiClient.get<RoleInfo[]>("/admin/roles");
+}
+
+export function getAnalyticsOverview(days: number): Promise<AnalyticsOverview> {
+  return apiClient.get<AnalyticsOverview>("/admin/analytics/overview", { query: { days } });
+}
+
+export function getGrowth(days: number): Promise<{ days: number; points: GrowthPoint[] }> {
+  return apiClient.get("/admin/analytics/growth", { query: { days } });
+}
+
+export async function getAIFailures(days: number, page: number): Promise<Paged<AIFailureRow>> {
+  const result = await apiClient.getPage<AIFailureRow>("/admin/ai/failures", {
+    query: { days, page, page_size: 20 },
+  });
+  return paged(result, 20);
+}
+
+export function getAIQuality(days: number): Promise<{ days: number; rows: AIQualityRow[] }> {
+  return apiClient.get("/admin/ai/quality", { query: { days } });
+}
+
+/** The AI cost and usage report that already existed on the API. */
+export function getAIUsage(days: number): Promise<{
+  days: number;
+  totals: { requests: number; failed: number; cost_usd: number; avg_latency_ms: number; input_tokens: number; output_tokens: number; audio_seconds: number };
+  by_task: { key: string; requests: number; failed: number; cost_usd: number; avg_latency_ms: number }[];
+  by_model: { key: string; provider?: string; model?: string; requests: number; cost_usd: number }[];
+  daily: { date: ISODate; cost_usd: number; requests: number }[];
+}> {
+  return apiClient.get("/admin/ai-usage", { query: { days } });
 }

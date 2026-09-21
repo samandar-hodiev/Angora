@@ -7,6 +7,8 @@
 package authz
 
 import (
+	"sort"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -19,7 +21,30 @@ type Role string
 const (
 	RoleUser  Role = "USER"
 	RoleAdmin Role = "ADMIN"
+	// Operator roles. They exist so the people who run the platform are not all given the
+	// same key: an editor who publishes lessons has no reason to be able to change prices,
+	// and support staff have no reason to be able to change either.
+	RoleContentManager Role = "CONTENT_MANAGER"
+	RoleSupport        Role = "SUPPORT"
+	RoleAnalyst        Role = "ANALYST"
 )
+
+// Roles is every role this build knows, in ascending order of reach. The console lists them
+// with their permissions so whoever grants access can see what it carries.
+func Roles() []Role {
+	return []Role{RoleUser, RoleAnalyst, RoleSupport, RoleContentManager, RoleAdmin}
+}
+
+// PermissionsFor returns the permissions a role grants, sorted, for display and for tests.
+func PermissionsFor(r Role) []Permission {
+	set := rolePermissions[r]
+	out := make([]Permission, 0, len(set))
+	for p := range set {
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
 
 type Permission string
 
@@ -46,6 +71,31 @@ var learner = []Permission{
 
 var rolePermissions = map[Role]map[Permission]struct{}{
 	RoleUser: setOf(learner...),
+
+	// Reads the platform, changes nothing.
+	RoleAnalyst: setOf(append(learner,
+		PermUsersRead,
+		PermAIUsageRead,
+		PermAssessmentsRead,
+		PermSystemRead,
+	)...),
+
+	// Answers learners: can look them up and suspend an abusive account, cannot touch
+	// pricing, content or assessments.
+	RoleSupport: setOf(append(learner,
+		PermUsersRead,
+		PermUsersManage,
+		PermSystemRead,
+	)...),
+
+	// Owns what learners study. No access to billing or accounts.
+	RoleContentManager: setOf(append(learner,
+		PermContentRead,
+		PermContentManage,
+		PermAssessmentsRead,
+		PermAssessmentsManage,
+	)...),
+
 	RoleAdmin: setOf(append(learner,
 		PermContentManage,
 		PermAssessmentsRead,

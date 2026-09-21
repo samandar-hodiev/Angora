@@ -682,3 +682,194 @@ export interface AuditRow {
   metadata: Record<string, unknown>;
   created_at: ISODate;
 }
+
+// ---- Learners, analytics and AI monitoring (live API) ----------------------------------------
+
+/** Mirrors apps/api/internal/admin/learners.go and insights.go. */
+
+export type AccountStatus = "active" | "suspended" | "deleted";
+
+export interface LiveLearnerRow {
+  id: UUID;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  phone: string | null;
+  status: AccountStatus;
+  role: string;
+  plan_code: string;
+  plan_name: string;
+  current_level: CEFRLevel | null;
+  streak_days: number;
+  joined_at: ISODate;
+  last_active_at: ISODate | null;
+  onboarded: boolean;
+}
+
+/** The kinds of level statement the platform keeps apart. */
+export type LevelKind = "self_reported" | "placement_start" | "assessed" | "estimated";
+
+export interface LevelStatement {
+  kind: LevelKind;
+  cefr: CEFRLevel;
+  source_type: string;
+  confidence: number | null;
+  created_at: ISODate;
+}
+
+export interface LiveSkillProgress {
+  skill: string;
+  skill_name: string;
+  estimated_level: CEFRLevel | null;
+  score: number;
+  sessions: number;
+  last_practiced_at: ISODate | null;
+}
+
+export interface LiveWeakness {
+  category: string;
+  skill: string | null;
+  severity: number;
+  evidence_count: number;
+  status: "active" | "improving" | "resolved";
+  first_detected_at: ISODate;
+  last_detected_at: ISODate;
+}
+
+export interface LearnerAssessment {
+  id: UUID;
+  kind: string;
+  status: AttemptStatus;
+  overall_cefr: CEFRLevel | null;
+  overall_score: number | null;
+  started_at: ISODate;
+  completed_at: ISODate | null;
+}
+
+export interface LiveSubscription {
+  plan_code: string;
+  plan_name: string;
+  status: string;
+  price_cents: number;
+  currency: string;
+  provider: string;
+  started_at: ISODate | null;
+  renews_at: ISODate | null;
+  cancel_at_period_end: boolean;
+}
+
+export interface LearnerUsage {
+  entitlement: string;
+  used: number;
+  period_start: ISODate;
+}
+
+export interface LiveLearnerDetail extends LiveLearnerRow {
+  native_language: string | null;
+  timezone: string;
+  target_level: CEFRLevel | null;
+  daily_goal_minutes: number;
+  learning_goals: string[];
+  levels: LevelStatement[];
+  skills: LiveSkillProgress[];
+  weaknesses: LiveWeakness[];
+  assessments: LearnerAssessment[];
+  subscription: LiveSubscription | null;
+  usage: LearnerUsage[];
+  ai_cost_usd_30d: number;
+  ai_requests_30d: number;
+}
+
+export interface GrowthPoint {
+  date: ISODate;
+  new: number;
+  total: number;
+  active: number;
+  paying: number;
+}
+
+export interface PlanSlice {
+  plan_code: string;
+  plan_name: string;
+  learners: number;
+  mrr_cents: number;
+}
+
+export interface SkillActivity {
+  skill: string;
+  sessions: number;
+  learners: number;
+}
+
+export interface ContentTypeCount {
+  type: string;
+  total: number;
+  published: number;
+  review: number;
+  draft: number;
+}
+
+export interface AnalyticsOverview {
+  days: number;
+  learners: {
+    total: number;
+    new: number;
+    active_today: number;
+    active_week: number;
+    active_30d: number;
+    suspended: number;
+    onboarded: number;
+  };
+  monetization: {
+    paying: number;
+    mrr_cents: number;
+    currency: string;
+    conversion_rate: number;
+    new_paid: number;
+    cancelled: number;
+  };
+  learning: {
+    level_distribution: QuestionBucket[];
+    skill_activity: SkillActivity[];
+    top_weaknesses: QuestionBucket[];
+    assessments_completed: number;
+  };
+  content: ContentTypeCount[];
+  ai: {
+    requests: number;
+    failed: number;
+    cost_usd: number;
+    avg_latency_ms: number;
+    cost_usd_per_paying_learner: number;
+  };
+  plans: PlanSlice[];
+}
+
+export interface AIFailureRow {
+  id: UUID;
+  user_id: UUID | null;
+  email: string | null;
+  task: string;
+  provider: string;
+  model: string;
+  status: string;
+  error_code: string;
+  latency_ms: number;
+  created_at: ISODate;
+}
+
+export interface AIQualityRow {
+  analysis_type: string;
+  analysis_version: string;
+  model_version: string;
+  prompt_version: string;
+  rubric_version: string;
+  count: number;
+  failed: number;
+  avg_score: number | null;
+}
+
+export interface RoleInfo {
+  role: string;
+  permissions: string[];
+}

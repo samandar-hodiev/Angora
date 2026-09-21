@@ -76,3 +76,58 @@ func TestRequireAuthenticated(t *testing.T) {
 		t.Errorf("user: %d, want 200", got)
 	}
 }
+
+// The point of splitting ADMIN into operator roles is that each one is missing something.
+// These are the boundaries the product depends on, stated as tests so a future edit to the
+// permission table cannot quietly widen a role.
+func TestOperatorRoleBoundaries(t *testing.T) {
+	cases := []struct {
+		role  Role
+		perm  Permission
+		grant bool
+		why   string
+	}{
+		{RoleContentManager, PermContentManage, true, "a content manager publishes lessons"},
+		{RoleContentManager, PermAssessmentsManage, true, "a content manager owns the question bank"},
+		{RoleContentManager, PermSubscriptionsManage, false, "an editor must not be able to change prices"},
+		{RoleContentManager, PermUsersRead, false, "an editor has no reason to read learner records"},
+
+		{RoleSupport, PermUsersRead, true, "support looks learners up"},
+		{RoleSupport, PermUsersManage, true, "support can suspend an abusive account"},
+		{RoleSupport, PermSubscriptionsManage, false, "support must not be able to change billing"},
+		{RoleSupport, PermContentManage, false, "support does not edit lessons"},
+
+		{RoleAnalyst, PermUsersRead, true, "an analyst reads the platform"},
+		{RoleAnalyst, PermAIUsageRead, true, "an analyst reads AI cost"},
+		{RoleAnalyst, PermUsersManage, false, "an analyst changes nothing about an account"},
+		{RoleAnalyst, PermContentManage, false, "an analyst does not edit content"},
+		{RoleAnalyst, PermAssessmentsManage, false, "an analyst does not edit questions"},
+
+		{RoleUser, PermUsersRead, false, "a learner cannot read other learners"},
+		{RoleUser, PermContentManage, false, "a learner cannot publish content"},
+		{RoleUser, PermAuditRead, false, "a learner cannot read the audit log"},
+
+		{RoleAdmin, PermSubscriptionsManage, true, "the owner role keeps full access"},
+		{RoleAdmin, PermAuditRead, true, "the owner role keeps full access"},
+	}
+
+	for _, tc := range cases {
+		if got := Can(tc.role, tc.perm); got != tc.grant {
+			t.Errorf("Can(%s, %s) = %v, want %v — %s", tc.role, tc.perm, got, tc.grant, tc.why)
+		}
+	}
+}
+
+func TestRolesAreAllValidAndListed(t *testing.T) {
+	for _, r := range Roles() {
+		if !r.Valid() {
+			t.Errorf("Roles() lists %s, which has no permission set", r)
+		}
+		if len(PermissionsFor(r)) == 0 {
+			t.Errorf("%s grants nothing", r)
+		}
+	}
+	if Can("MADE_UP_ROLE", PermContentRead) {
+		t.Error("an unknown role must grant nothing")
+	}
+}
