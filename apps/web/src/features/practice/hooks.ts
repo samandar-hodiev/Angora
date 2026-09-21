@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/query/keys";
 
-import { practiceApi, speakingApi, writingApi, type PracticeAnswer, type PracticeSkill } from "./api";
+import { coachApi, ieltsApi, practiceApi, speakingApi, writingApi, type PracticeAnswer, type PracticeSkill } from "./api";
 
 export function usePracticeSets(skill: PracticeSkill) {
   return useQuery({ queryKey: queryKeys.practice.sets(skill), queryFn: () => practiceApi.sets(skill) });
@@ -71,5 +71,33 @@ export function useSubmitSpeaking() {
       void client.invalidateQueries({ queryKey: queryKeys.practice.speakingSessions });
       void client.invalidateQueries({ queryKey: queryKeys.progress.overview });
     },
+  });
+}
+
+export function useIELTSExams() {
+  return useQuery({ queryKey: queryKeys.practice.ieltsExams, queryFn: ieltsApi.exams });
+}
+
+export function useIELTSAttempts() {
+  return useQuery({ queryKey: queryKeys.practice.ieltsAttempts, queryFn: ieltsApi.attempts });
+}
+
+export function useStartIELTSExam() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ieltsApi.start,
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.practice.ieltsAttempts }),
+  });
+}
+
+export function useCoachConversations() {
+  return useQuery({ queryKey: queryKeys.practice.coachConversations, queryFn: coachApi.conversations });
+}
+
+export function useSendCoachMessage() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: coachApi.send,
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.practice.coachConversations }),
   });
 }

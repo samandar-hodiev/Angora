@@ -41,6 +41,9 @@ export const queryKeys = {
     writingSubmissions: ["practice", "writing", "submissions"] as const,
     speakingTasks: ["practice", "speaking", "tasks"] as const,
     speakingSessions: ["practice", "speaking", "sessions"] as const,
+    ieltsExams: ["practice", "ielts", "exams"] as const,
+    ieltsAttempts: ["practice", "ielts", "attempts"] as const,
+    coachConversations: ["practice", "coach", "conversations"] as const,
   },
   grammar: {
     all: ["grammar"] as const,

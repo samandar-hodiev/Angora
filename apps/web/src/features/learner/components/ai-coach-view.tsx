@@ -1,16 +1,14 @@
 "use client";
 
-import { MessageCircle, Send } from "lucide-react";
-
 import { PageHeader, SectionTitle } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { AIInsight, RecommendationCard } from "@/components/learning/cards";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { contentHref, skillHref } from "@/config/navigation";
 import { EntitlementGate } from "@/features/subscription/components/subscription-views";
+
+import { CoachChat } from "./coach-chat";
 import { useFeature } from "@/features/subscription/hooks";
 import { formatCategory } from "@/lib/learning-format";
 
@@ -74,20 +72,7 @@ export function AICoachView() {
       <section aria-labelledby="chat-title" className="mt-10">
         <SectionTitle id="chat-title" title="Ask your coach" />
         <EntitlementGate feature="ai_coach.chat">
-          <div className="grid gap-4 rounded-xl border bg-surface p-5">
-            <div className="grid min-h-40 place-items-center rounded-lg bg-surface-hover p-6 text-center">
-              <div className="grid justify-items-center gap-2">
-                <MessageCircle className="size-5 text-fg-muted" aria-hidden />
-                <p className="text-body-sm text-fg-secondary">Conversations with your coach arrive in a later release.</p>
-              </div>
-            </div>
-            <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-              <Input disabled placeholder="Ask about grammar, vocabulary or your plan…" aria-label="Message your coach" />
-              <Button disabled type="submit">
-                <Send aria-hidden /> Send
-              </Button>
-            </form>
-          </div>
+          <CoachChat />
         </EntitlementGate>
       </section>
     </>

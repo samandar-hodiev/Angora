@@ -48,6 +48,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/exams", m.exams)
 	g.GET("/exams/:slug", m.exam)
 	g.POST("/exams/:slug/attempts", m.startAttempt)
+	g.GET("/attempts", m.attempts)
 	g.GET("/attempts/:id", m.attempt)
 	g.POST("/attempts/:id/sections/:skill", m.submitSection)
 	g.POST("/attempts/:id/complete", m.completeAttempt)
@@ -335,6 +336,47 @@ func (m *Module) completeAttempt(c *gin.Context) {
 		return
 	}
 	m.respondWithAttempt(c, attemptID, p.UserID)
+}
+
+// attempts is the learner's own history: the bands page reads the latest completed sitting
+// from here rather than keeping a separate copy of their scores.
+func (m *Module) attempts(c *gin.Context) {
+	p, err := authz.CurrentPrincipal(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	rows, err := m.pool.Query(c.Request.Context(), `
+		SELECT a.id, a.exam_id, e.slug, a.status, a.sections, a.overall_band::float8, a.started_at, a.completed_at
+		FROM ielts_attempts a
+		JOIN ielts_exams e ON e.id = a.exam_id
+		WHERE a.user_id = $1
+		ORDER BY a.created_at DESC
+		LIMIT 20`, p.UserID)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	defer rows.Close()
+
+	list := []Attempt{}
+	for rows.Next() {
+		var a Attempt
+		var raw []byte
+		if err := rows.Scan(&a.ID, &a.ExamID, &a.ExamSlug, &a.Status, &raw, &a.OverallBand,
+			&a.StartedAt, &a.CompletedAt); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		a.Sections = map[Skill]SectionResult{}
+		_ = json.Unmarshal(raw, &a.Sections)
+		list = append(list, a)
+	}
+	if err := rows.Err(); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, list)
 }
 
 func (m *Module) attempt(c *gin.Context) {

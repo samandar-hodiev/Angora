@@ -161,3 +161,77 @@ export const speakingApi = {
     return apiClient.postForm<SpeakingSession>("/speaking/sessions", form);
   },
 };
+
+// ---- IELTS mock exam ---------------------------------------------------------------------
+
+export type IELTSSkill = "listening" | "reading" | "writing" | "speaking";
+
+export interface IELTSExamSection {
+  skill: IELTSSkill;
+  content_item_id: string | null;
+  title?: string;
+  time_limit_seconds: number;
+}
+
+export interface IELTSExam {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  sections: IELTSExamSection[];
+  status: string;
+  total_minutes: number;
+}
+
+export interface IELTSSectionResult {
+  correct?: number;
+  total?: number;
+  rubric_score?: number;
+  band: number;
+  submitted_at: string;
+}
+
+export interface IELTSAttempt {
+  id: string;
+  exam_id: string;
+  exam_slug: string;
+  status: "in_progress" | "completed" | "abandoned";
+  sections: Partial<Record<IELTSSkill, IELTSSectionResult>>;
+  overall_band: number | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export const ieltsApi = {
+  exams: () => apiClient.get<IELTSExam[]>("/ielts/exams"),
+  attempts: () => apiClient.get<IELTSAttempt[]>("/ielts/attempts"),
+  start: (slug: string) => apiClient.post<IELTSAttempt>(`/ielts/exams/${slug}/attempts`),
+  submitSection: (attemptId: string, skill: IELTSSkill, body: { correct?: number; total?: number; rubric_score?: number; source_id?: string }) =>
+    apiClient.post<IELTSAttempt>(`/ielts/attempts/${attemptId}/sections/${skill}`, body),
+  complete: (attemptId: string) => apiClient.post<IELTSAttempt>(`/ielts/attempts/${attemptId}/complete`),
+};
+
+// ---- AI coach --------------------------------------------------------------------------
+
+export interface CoachMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface CoachConversation {
+  id: string;
+  title: string;
+  status: "active" | "archived";
+  messages?: CoachMessage[];
+  updated_at: string;
+  created_at: string;
+}
+
+export const coachApi = {
+  conversations: () => apiClient.get<CoachConversation[]>("/coach/conversations"),
+  conversation: (id: string) => apiClient.get<CoachConversation>(`/coach/conversations/${id}`),
+  send: (input: { conversation_id?: string; message: string }) =>
+    apiClient.post<CoachConversation>("/coach/messages", input),
+};

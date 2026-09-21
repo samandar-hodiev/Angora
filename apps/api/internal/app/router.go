@@ -11,6 +11,7 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/assessment"
 	"github.com/samandar-hodiev/engora/apps/api/internal/auth"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/coach"
 	"github.com/samandar-hodiev/engora/apps/api/internal/grammar"
 	"github.com/samandar-hodiev/engora/apps/api/internal/health"
 	"github.com/samandar-hodiev/engora/apps/api/internal/ielts"
@@ -91,6 +92,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		Pool: c.DB, Redis: c.Redis, Tutor: c.GrammarTutor,
 		Storage: c.Storage, Tracker: c.Analytics, Plans: c.Subscriptions, Log: c.Log,
 	}).RegisterRoutes(v1)
+	coach.NewModule(coach.Deps{Pool: c.DB, AI: c.AI, Plans: c.Subscriptions}).RegisterRoutes(v1)
 	ielts.NewModule(ielts.Deps{Pool: c.DB, Plans: c.Subscriptions}).RegisterRoutes(v1)
 	practice.NewModule(practice.Deps{
 		Pool: c.DB, Plans: c.Subscriptions, Usage: c.Subscriptions,
