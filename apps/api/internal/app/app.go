@@ -48,6 +48,7 @@ type Container struct {
 	Tokens        *auth.TokenIssuer
 	Auth          *auth.Service
 	Subscriptions *subscriptions.Service
+	Evaluator     *ai.PlacementEvaluator
 	AI            *ai.Gateway
 	Storage       storage.ObjectStorage
 	Jobs          jobs.Queue
@@ -129,11 +130,14 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 
 	c.Plans = personalization.NewService(c.DB, c.Analytics)
 	c.Onboarding = onboarding.NewService(c.DB, c.Plans, c.Analytics)
+	// One evaluator for placement and for practice: a learner's practice feedback and their
+	// placement result come from the same rubric and prompt version, so they are comparable.
+	c.Evaluator = ai.NewPlacementEvaluator(c.AI)
 	c.Assessment = assessment.NewService(assessment.Deps{
 		Pool:           c.DB,
 		Storage:        c.Storage,
 		Queue:          c.Jobs,
-		Evaluator:      ai.NewPlacementEvaluator(c.AI),
+		Evaluator:      c.Evaluator,
 		Plans:          c.Plans,
 		Progress:       c.Onboarding,
 		Tracker:        c.Analytics,

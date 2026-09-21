@@ -20,6 +20,7 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/ratelimit"
+	"github.com/samandar-hodiev/engora/apps/api/internal/practice"
 	"github.com/samandar-hodiev/engora/apps/api/internal/profiles"
 	"github.com/samandar-hodiev/engora/apps/api/internal/progress"
 	"github.com/samandar-hodiev/engora/apps/api/internal/recommendations"
@@ -85,6 +86,10 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	grammar.NewModule(grammar.Deps{
 		Pool: c.DB, Redis: c.Redis, Tutor: c.GrammarTutor,
 		Storage: c.Storage, Tracker: c.Analytics, Plans: c.Subscriptions, Log: c.Log,
+	}).RegisterRoutes(v1)
+	practice.NewModule(practice.Deps{
+		Pool: c.DB, Plans: c.Subscriptions, Usage: c.Subscriptions,
+		Evaluator: c.Evaluator, Tracker: c.Analytics,
 	}).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
 	levels.NewModule(c.DB).RegisterRoutes(v1)

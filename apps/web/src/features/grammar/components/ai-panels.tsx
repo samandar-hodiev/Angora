@@ -1,6 +1,7 @@
 "use client";
 
-import { CircleAlert, Image as ImageIcon, Lightbulb, MessageCircle, Send, Sparkles } from "lucide-react";
+import { CircleAlert, Image as ImageIcon, Lightbulb, Lock, MessageCircle, Send, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { InlineLoader } from "@/components/common/states";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { errorMessage } from "@/lib/api/errors";
+import { errorMessage, isApiError, type ApiError } from "@/lib/api/errors";
 import { apiAssetUrl } from "@/lib/media";
 import type { GrammarExplanationResponse, GrammarVisual } from "@engora/types";
 
@@ -26,13 +27,48 @@ import { AIBadge } from "./shared";
  * still on the page, and the error says so.
  */
 
-function AIFailure({ error, what }: { error: unknown; what: string }) {
+export function AIFailure({ error, what }: { error: unknown; what: string }) {
+  // A plan refusal is not a fault. The API answers ENTITLEMENT_REQUIRED when the feature is
+  // not part of the learner's plan and USAGE_LIMIT_REACHED when their budget for the period
+  // is spent; telling them "temporarily unavailable" for either would be a lie, and would
+  // hide the one thing they can act on.
+  if (isApiError(error) && (error.code === "ENTITLEMENT_REQUIRED" || error.code === "USAGE_LIMIT_REACHED")) {
+    return <AIUpgradePrompt error={error} what={what} />;
+  }
+
   return (
     <div role="alert" className="flex items-start gap-2 rounded-lg border border-dashed px-4 py-3">
       <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
       <p className="text-body-sm text-fg-secondary">
         {errorMessage(error) || `${what} is temporarily unavailable.`}
       </p>
+    </div>
+  );
+}
+
+/** What a learner sees when their plan, or their budget for this month, stops here. */
+function AIUpgradePrompt({ error, what }: { error: ApiError; what: string }) {
+  const spent = error.code === "USAGE_LIMIT_REACHED";
+  const resetsAt = typeof error.details?.resets_at === "string" ? error.details.resets_at : null;
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-primary/30 bg-primary-subtle/40 px-4 py-3.5">
+      <div className="flex items-start gap-2">
+        <Lock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+        <div className="grid gap-0.5">
+          <p className="text-label">{spent ? `You have used all of your ${what.toLowerCase()} this month` : `${what} is part of a paid plan`}</p>
+          <p className="text-body-sm text-fg-secondary">
+            {spent
+              ? resetsAt
+                ? `Your allowance returns on ${new Date(resetsAt).toLocaleDateString()}. Upgrade to keep going now.`
+                : "Upgrade to keep going now."
+              : "Everything above — the rule, the examples and the practice — stays free."}
+          </p>
+        </div>
+      </div>
+      <Button size="sm" variant="subtle" className="w-fit" asChild>
+        <Link href="/app/subscription">See plans</Link>
+      </Button>
     </div>
   );
 }
