@@ -12,6 +12,10 @@
 import { apiClient } from "@/lib/api";
 
 import type {
+  AuditRow,
+  EntitlementRow,
+  LimitPeriod,
+  PlanRow,
   AssessmentAttempt,
   AssessmentConfig,
   AssessmentStats,
@@ -111,4 +115,38 @@ export async function getAssessmentAttempts(query: {
 
 export function getAssessmentStats(days: number): Promise<AssessmentStats> {
   return apiClient.get<AssessmentStats>("/admin/assessment-stats", { query: { days } });
+}
+
+// ---- Plans, entitlements and audit ------------------------------------------------------------
+
+export function getPlans(): Promise<PlanRow[]> {
+  return apiClient.get<PlanRow[]>("/admin/plans");
+}
+
+export function getEntitlements(): Promise<EntitlementRow[]> {
+  return apiClient.get<EntitlementRow[]>("/admin/entitlements");
+}
+
+/** Grants the entitlement to the plan, or changes its limit. `limit_value: null` = unlimited. */
+export function setPlanEntitlement(input: {
+  planId: string;
+  key: string;
+  limit_value?: number | null;
+  limit_period?: LimitPeriod | null;
+}): Promise<unknown> {
+  return apiClient.put(`/admin/plans/${input.planId}/entitlements/${input.key}`, {
+    limit_value: input.limit_value ?? undefined,
+    limit_period: input.limit_period ?? undefined,
+  });
+}
+
+export function revokePlanEntitlement(planId: string, key: string): Promise<unknown> {
+  return apiClient.delete(`/admin/plans/${planId}/entitlements/${key}`);
+}
+
+export async function getAuditLogs(query: { action?: string; entity?: string; days?: number; page?: number }): Promise<Paged<AuditRow>> {
+  const result = await apiClient.getPage<AuditRow>("/admin/audit-logs", {
+    query: { action: query.action, entity: query.entity, days: query.days, page: query.page, page_size: 25 },
+  });
+  return paged(result, 25);
 }

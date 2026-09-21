@@ -63,7 +63,10 @@ func TestQuestionBankPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	// Registered as a cleanup, not deferred: deferred closes run before t.Cleanup, which
+	// would leave every other cleanup in this test talking to a closed pool. Cleanups run
+	// last-in-first-out, so registering this first closes the pool last.
+	t.Cleanup(pool.Close)
 
 	owner, err := users.NewPostgresRepository(pool).CreateAccount(ctx, users.NewAccount{
 		Email: fmt.Sprintf("owner-%d@example.com", time.Now().UnixNano()), DisplayName: "Owner", Timezone: "UTC", EmailVerified: true,
@@ -244,5 +247,166 @@ func TestQuestionBankRequiresPermission(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Errorf("POST /admin/questions as a learner: status = %d, want 403", w.Code)
+	}
+}
+
+// TestPlanEntitlementsPostgres drives the paywall the owner console edits: what a plan grants
+// today, changing a limit, revoking access, and the audit entry each change leaves.
+func TestPlanEntitlementsPostgres(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+	ctx := context.Background()
+	if err := database.MigrateUp(url); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := database.Connect(ctx, database.Options{URL: url, MaxConns: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Registered as a cleanup, not deferred: deferred closes run before t.Cleanup, which
+	// would leave every other cleanup in this test talking to a closed pool. Cleanups run
+	// last-in-first-out, so registering this first closes the pool last.
+	t.Cleanup(pool.Close)
+
+	owner, err := users.NewPostgresRepository(pool).CreateAccount(ctx, users.NewAccount{
+		Email: fmt.Sprintf("billing-%d@example.com", time.Now().UnixNano()), DisplayName: "Owner", Timezone: "UTC", EmailVerified: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, owner.ID) })
+
+	recorder := &recordingAudit{}
+	r := gin.New()
+	r.Use(middleware.Errors(observability.LogReporter{Log: slog.New(slog.DiscardHandler)}), func(c *gin.Context) {
+		authz.SetPrincipal(c, authz.Principal{UserID: owner.ID, Role: authz.RoleAdmin, SessionID: uuid.New()})
+		c.Next()
+	})
+	NewModule(pool, recorder).RegisterRoutes(r.Group("/api/v1"))
+
+	do := func(method, path string, body any) (*httptest.ResponseRecorder, map[string]any) {
+		t.Helper()
+		var buf bytes.Buffer
+		if body != nil {
+			_ = json.NewEncoder(&buf).Encode(body)
+		}
+		req := httptest.NewRequest(method, "/api/v1"+path, &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		var envelope map[string]any
+		if w.Body.Len() > 0 {
+			_ = json.Unmarshal(w.Body.Bytes(), &envelope)
+		}
+		return w, envelope
+	}
+
+	w, listed := do(http.MethodGet, "/admin/plans", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("list plans: status = %d body = %s", w.Code, w.Body.String())
+	}
+	plans, _ := listed["data"].([]any)
+	if len(plans) == 0 {
+		t.Fatal("no plans returned; the catalogue seed is missing")
+	}
+
+	// Find the free plan and remember what it grants, so the test can put it back.
+	var freeID string
+	for _, raw := range plans {
+		plan, _ := raw.(map[string]any)
+		if code, _ := plan["code"].(string); code == "free" {
+			freeID, _ = plan["id"].(string)
+		}
+	}
+	if freeID == "" {
+		t.Fatal("no free plan in the catalogue")
+	}
+
+	const key = "grammar.ai_explanation"
+	var before struct {
+		value  *int
+		period *string
+		found  bool
+	}
+	_ = pool.QueryRow(ctx, `SELECT limit_value, limit_period FROM plan_entitlements WHERE plan_id = $1 AND entitlement_key = $2`,
+		freeID, key).Scan(&before.value, &before.period)
+	before.found = before.value != nil || before.period != nil
+	t.Cleanup(func() {
+		if before.found {
+			_, _ = pool.Exec(context.Background(), `
+				INSERT INTO plan_entitlements (plan_id, entitlement_key, limit_value, limit_period)
+				VALUES ($1, $2, $3, $4)
+				ON CONFLICT (plan_id, entitlement_key) DO UPDATE
+					SET limit_value = EXCLUDED.limit_value, limit_period = EXCLUDED.limit_period`,
+				freeID, key, before.value, before.period)
+		}
+	})
+
+	// Raising a limit is the everyday paywall change.
+	if w, _ := do(http.MethodPut, "/admin/plans/"+freeID+"/entitlements/"+key,
+		map[string]any{"limit_value": 9, "limit_period": "month"}); w.Code != http.StatusOK {
+		t.Fatalf("update limit: status = %d body = %s", w.Code, w.Body.String())
+	}
+	var limit int
+	if err := pool.QueryRow(ctx, `SELECT limit_value FROM plan_entitlements WHERE plan_id = $1 AND entitlement_key = $2`,
+		freeID, key).Scan(&limit); err != nil {
+		t.Fatal(err)
+	}
+	if limit != 9 {
+		t.Errorf("limit_value = %d, want 9", limit)
+	}
+
+	// A feature has no number: a value sent for one must be dropped rather than stored.
+	if w, _ := do(http.MethodPut, "/admin/plans/"+freeID+"/entitlements/grammar.ai_tutor",
+		map[string]any{"limit_value": 5, "limit_period": "month"}); w.Code != http.StatusOK {
+		t.Fatalf("grant feature: status = %d body = %s", w.Code, w.Body.String())
+	}
+	var featureLimit *int
+	if err := pool.QueryRow(ctx, `SELECT limit_value FROM plan_entitlements WHERE plan_id = $1 AND entitlement_key = 'grammar.ai_tutor'`,
+		freeID).Scan(&featureLimit); err != nil {
+		t.Fatal(err)
+	}
+	if featureLimit != nil {
+		t.Errorf("a feature stored limit_value = %d; features carry no limit", *featureLimit)
+	}
+
+	if w, _ := do(http.MethodDelete, "/admin/plans/"+freeID+"/entitlements/grammar.ai_tutor", nil); w.Code != http.StatusNoContent {
+		t.Fatalf("revoke: status = %d", w.Code)
+	}
+	var stillThere bool
+	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM plan_entitlements WHERE plan_id = $1 AND entitlement_key = 'grammar.ai_tutor')`,
+		freeID).Scan(&stillThere); err != nil {
+		t.Fatal(err)
+	}
+	if stillThere {
+		t.Error("the entitlement survived a revoke")
+	}
+
+	if w, _ := do(http.MethodPut, "/admin/plans/"+freeID+"/entitlements/not.a.real.entitlement", map[string]any{}); w.Code != http.StatusNotFound {
+		t.Errorf("unknown entitlement: status = %d, want 404", w.Code)
+	}
+
+	// Every paywall change is on the record.
+	want := map[string]bool{ActionEntitlementUpdated: false, ActionEntitlementGranted: false, ActionEntitlementRevoked: false}
+	for _, action := range recorder.actions() {
+		if _, ok := want[action]; ok {
+			want[action] = true
+		}
+	}
+	for action, seen := range want {
+		if !seen {
+			t.Errorf("no audit entry recorded for %s", action)
+		}
+	}
+
+	// And the audit endpoint can read them back.
+	w, logs := do(http.MethodGet, "/admin/audit-logs?entity=plan_entitlement", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit log: status = %d body = %s", w.Code, w.Body.String())
+	}
+	if entries, _ := logs["data"].([]any); entries == nil {
+		t.Error("audit log returned no data field")
 	}
 }

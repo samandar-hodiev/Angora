@@ -629,3 +629,56 @@ export interface AssessmentStats {
   level_distribution: QuestionBucket[];
   by_skill: SkillOutcome[];
 }
+
+// ---- Plans, entitlements and audit (live API) ------------------------------------------------
+
+/** Mirrors apps/api/internal/admin/plans.go. */
+
+export type EntitlementKind = "feature" | "limit";
+export type LimitPeriod = "day" | "week" | "month" | "lifetime";
+
+export interface PlanEntitlementRow {
+  key: string;
+  kind: EntitlementKind;
+  description: string;
+  /** null = unlimited on a limit entitlement; features carry no value. */
+  limit_value: number | null;
+  limit_period: LimitPeriod | null;
+}
+
+export interface PlanRow {
+  id: UUID;
+  code: string;
+  name: string;
+  description: string;
+  billing_interval: "none" | "month" | "year";
+  price_cents: number;
+  currency: string;
+  trial_days: number;
+  is_default: boolean;
+  is_public: boolean;
+  is_active: boolean;
+  subscribers: number;
+  mrr_cents: number;
+  entitlements: PlanEntitlementRow[];
+  updated_at: ISODate;
+}
+
+export interface EntitlementRow {
+  key: string;
+  kind: EntitlementKind;
+  description: string;
+  /** Plan codes that grant it. */
+  plans: string[];
+  created_at: ISODate;
+}
+
+export interface AuditRow {
+  id: UUID;
+  actor_email: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  metadata: Record<string, unknown>;
+  created_at: ISODate;
+}

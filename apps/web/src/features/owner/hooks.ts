@@ -325,3 +325,37 @@ export function useAssessmentStats(days: number) {
     placeholderData: keepPreviousData,
   });
 }
+
+// ---- Plans, entitlements and audit (live API) -------------------------------------------------
+
+export function usePlans() {
+  return useQuery({ queryKey: queryKeys.owner.plans, queryFn: assessmentApi.getPlans });
+}
+
+export function useEntitlements() {
+  return useQuery({ queryKey: queryKeys.owner.entitlements, queryFn: assessmentApi.getEntitlements });
+}
+
+export function useSetPlanEntitlement() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: assessmentApi.setPlanEntitlement,
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useRevokePlanEntitlement() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ planId, key }: { planId: string; key: string }) => assessmentApi.revokePlanEntitlement(planId, key),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useAuditLogs(query: { action?: string; entity?: string; days?: number; page?: number }) {
+  return useQuery({
+    queryKey: queryKeys.owner.auditLogs(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.getAuditLogs(query),
+    placeholderData: keepPreviousData,
+  });
+}

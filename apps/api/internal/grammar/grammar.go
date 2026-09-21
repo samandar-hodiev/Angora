@@ -18,6 +18,7 @@
 package grammar
 
 import (
+	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -186,7 +187,17 @@ type Module struct {
 	tutor   Tutor
 	storage storage.ObjectStorage
 	tracker analytics.Tracker
+	plans   Entitlements
 	log     Logger
+}
+
+// Entitlements is the slice of the subscriptions service this package needs: what the
+// learner's plan allows, and the metered budget behind it. Grammar does not know about plans,
+// prices or subscriptions — only about entitlement keys.
+type Entitlements interface {
+	RequireFeature(ctx context.Context, userID uuid.UUID, key string) error
+	ConsumeUsage(ctx context.Context, userID uuid.UUID, key string, amount int) error
+	ReleaseUsage(ctx context.Context, userID uuid.UUID, key string, amount int) error
 }
 
 // Logger is the slice of *slog.Logger this package needs.
@@ -201,11 +212,56 @@ type Deps struct {
 	Tutor   Tutor
 	Storage storage.ObjectStorage
 	Tracker analytics.Tracker
-	Log     Logger
+	// Plans enforces what the learner's subscription allows. When nil the AI routes are
+	// open, which is only ever the case in tests that do not exercise entitlements.
+	Plans Entitlements
+	Log   Logger
 }
 
 func NewModule(d Deps) *Module {
-	return &Module{pool: d.Pool, redis: d.Redis, tutor: d.Tutor, storage: d.Storage, tracker: d.Tracker, log: d.Log}
+	return &Module{pool: d.Pool, redis: d.Redis, tutor: d.Tutor, storage: d.Storage, tracker: d.Tracker,
+		plans: d.Plans, log: d.Log}
+}
+
+// Entitlement keys for the AI features in this package. They exist in the entitlements table
+// (migration 000015) and are what the owner console edits on the paywall page.
+const (
+	EntitlementExplanation = "grammar.ai_explanation"
+	EntitlementTutor       = "grammar.ai_tutor"
+	EntitlementQuestions   = "grammar.ai_questions"
+	EntitlementVisualize   = "grammar.visualize"
+	EntitlementVisuals     = "grammar.visuals"
+)
+
+// spend reserves one unit of a metered entitlement before work that costs money runs.
+//
+// Consuming first is deliberate: two requests arriving together must not both pass a check
+// that reads the counter and then writes it. The increment is atomic and refuses when the
+// budget is gone, so the learner is told before a provider is called rather than after.
+func (m *Module) spend(ctx context.Context, userID uuid.UUID, key string) error {
+	if m.plans == nil {
+		return nil
+	}
+	return m.plans.ConsumeUsage(ctx, userID, key, 1)
+}
+
+// refund returns a unit reserved for work that then failed. Best-effort: a learner must not
+// see a refund error instead of the provider error that actually stopped them.
+func (m *Module) refund(ctx context.Context, userID uuid.UUID, key string) {
+	if m.plans == nil {
+		return
+	}
+	if err := m.plans.ReleaseUsage(ctx, userID, key, 1); err != nil && m.log != nil {
+		m.log.Warn("grammar: refunding usage failed", "entitlement", key, "user_id", userID, "error", err)
+	}
+}
+
+// requireFeature reports whether the learner's plan includes a feature at all.
+func (m *Module) requireFeature(ctx context.Context, userID uuid.UUID, key string) error {
+	if m.plans == nil {
+		return nil
+	}
+	return m.plans.RequireFeature(ctx, userID, key)
 }
 
 // AI endpoint budgets. They are per user, not per IP: an expensive call is charged to the

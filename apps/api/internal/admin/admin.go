@@ -129,6 +129,16 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.POST("/assessment-configs/:id/activate", manage, m.activateAssessmentConfig)
 	g.GET("/assessment-attempts", read, m.assessmentAttempts)
 	g.GET("/assessment-stats", read, m.assessmentStats)
+
+	// Paywall. Reading the configuration is part of understanding the platform; changing
+	// what people pay for is not, so the writes need the billing permission.
+	billing := authz.RequirePermission(authz.PermSubscriptionsManage)
+	g.GET("/plans", authz.RequirePermission(authz.PermUsersRead), m.plans)
+	g.GET("/entitlements", authz.RequirePermission(authz.PermUsersRead), m.entitlements)
+	g.PUT("/plans/:id/entitlements/:key", billing, m.setPlanEntitlement)
+	g.DELETE("/plans/:id/entitlements/:key", billing, m.deletePlanEntitlement)
+
+	g.GET("/audit-logs", authz.RequirePermission(authz.PermAuditRead), m.auditLog)
 }
 
 func (m *Module) overview(c *gin.Context) {

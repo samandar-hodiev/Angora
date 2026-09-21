@@ -112,8 +112,16 @@ func (m *Module) aiExplain(c *gin.Context) {
 		}
 	}
 
+	// Nothing was cached, so this call costs money: charge the learner's plan before it runs.
+	// A cached explanation above never reaches here, which is why reading one again is free.
+	if err := m.spend(ctx, p.UserID, EntitlementExplanation); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
 	explanation, meta, err := m.tutor.ExplainGrammar(ctx, subject.topic, subject.learner)
 	if err != nil {
+		m.refund(ctx, p.UserID, EntitlementExplanation)
 		httpx.Fail(c, m.aiFailure(err, "AI explanation"))
 		return
 	}
@@ -190,8 +198,20 @@ func (m *Module) aiAsk(c *gin.Context) {
 		history = append(history, ai.Message{Role: msg.Role, Content: msg.Content})
 	}
 
+	// Two separate questions: does the plan include the tutor at all, and is there budget
+	// left for another question?
+	if err := m.requireFeature(ctx, p.UserID, EntitlementTutor); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if err := m.spend(ctx, p.UserID, EntitlementQuestions); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
 	reply, err := m.tutor.AskGrammar(ctx, subject.topic, subject.learner, history, req.Question)
 	if err != nil {
+		m.refund(ctx, p.UserID, EntitlementQuestions)
 		httpx.Fail(c, m.aiFailure(err, "The AI tutor"))
 		return
 	}
@@ -275,8 +295,19 @@ func (m *Module) aiVisual(c *gin.Context) {
 		return
 	}
 
+	// Past the cache, so a diagram has to be generated: check the plan, then the budget.
+	if err := m.requireFeature(ctx, p.UserID, EntitlementVisualize); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if err := m.spend(ctx, p.UserID, EntitlementVisuals); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
 	generated, requestID, err := m.tutor.VisualizeGrammar(ctx, subject.topic, compareCtx, req.Kind, subject.learner)
 	if err != nil {
+		m.refund(ctx, p.UserID, EntitlementVisuals)
 		httpx.Fail(c, m.aiFailure(err, "Visual generation"))
 		return
 	}

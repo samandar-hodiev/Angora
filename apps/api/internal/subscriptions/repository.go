@@ -142,6 +142,17 @@ func (s *PostgresStore) Usage(ctx context.Context, userID uuid.UUID, since time.
 	return usage, rows.Err()
 }
 
+// DecrementUsage clamps at zero: the counter column refuses negatives, and a refund for a
+// period that has already rolled over must simply do nothing rather than fail.
+func (s *PostgresStore) DecrementUsage(ctx context.Context, userID uuid.UUID, key UsageKey, amount int) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE usage_counters
+		SET used = GREATEST(0, used - $4), updated_at = now()
+		WHERE user_id = $1 AND entitlement_key = $2 AND period_start = $3`,
+		userID, key.Entitlement, key.PeriodStart, amount)
+	return err
+}
+
 func (s *PostgresStore) IncrementUsage(ctx context.Context, userID uuid.UUID, key UsageKey, amount int, limit *int) (bool, error) {
 	var used int
 	err := s.pool.QueryRow(ctx, `

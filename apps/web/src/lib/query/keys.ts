@@ -91,6 +91,9 @@ export const queryKeys = {
     assessmentConfigs: ["owner", "assessment-configs"] as const,
     assessmentAttempts: (filters: Record<string, string | number | undefined>) => ["owner", "assessment-attempts", filters] as const,
     assessmentStats: (days: number) => ["owner", "assessment-stats", days] as const,
+    plans: ["owner", "plans"] as const,
+    entitlements: ["owner", "entitlements"] as const,
+    auditLogs: (filters: Record<string, string | number | undefined>) => ["owner", "audit-logs", filters] as const,
   },
   admin: {
     overview: ["admin", "overview"] as const,

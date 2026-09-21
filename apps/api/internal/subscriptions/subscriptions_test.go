@@ -119,6 +119,12 @@ func (m *memStore) IncrementUsage(_ context.Context, _ uuid.UUID, key UsageKey, 
 	m.usage[key] += amount
 	return true, nil
 }
+func (m *memStore) DecrementUsage(_ context.Context, _ uuid.UUID, key UsageKey, amount int) error {
+	if m.usage[key] -= amount; m.usage[key] < 0 {
+		m.usage[key] = 0
+	}
+	return nil
+}
 
 func TestRequireFeature(t *testing.T) {
 	store := &memStore{usage: map[UsageKey]int{}}
@@ -152,5 +158,65 @@ func TestConsumeUsageEnforcesLimit(t *testing.T) {
 	}
 	if err := svc.ConsumeUsage(ctx, user, "ai_coach.messages", 1); !apperr.Is(err, apperr.CodeEntitlementRequired) {
 		t.Fatalf("limit not in plan: err = %v, want ENTITLEMENT_REQUIRED", err)
+	}
+}
+
+func TestUnlimitedPlanIsNotMetered(t *testing.T) {
+	// A plan that grants the limit with no value (the "unlimited" tier) must never refuse
+	// the learner, however much they use.
+	store := &memStore{usage: map[UsageKey]int{}, sub: &Subscription{Status: "active", PlanID: proPlan.ID}}
+	svc := NewService(store)
+	ctx := context.Background()
+	user := uuid.New()
+
+	for i := 0; i < 500; i++ {
+		if err := svc.ConsumeUsage(ctx, user, "speaking.evaluations", 1); err != nil {
+			t.Fatalf("unlimited plan refused use %d: %v", i+1, err)
+		}
+	}
+}
+
+func TestReleaseUsageRefundsFailedWork(t *testing.T) {
+	// A provider failure must not cost the learner a unit of their quota.
+	store := &memStore{usage: map[UsageKey]int{}}
+	svc := NewService(store)
+	ctx := context.Background()
+	user := uuid.New()
+
+	for i := 0; i < 3; i++ {
+		if err := svc.ConsumeUsage(ctx, user, "speaking.evaluations", 1); err != nil {
+			t.Fatalf("use %d: %v", i+1, err)
+		}
+	}
+	if err := svc.ConsumeUsage(ctx, user, "speaking.evaluations", 1); !apperr.Is(err, apperr.CodeUsageLimitReached) {
+		t.Fatalf("free plan should be exhausted, got %v", err)
+	}
+
+	if err := svc.ReleaseUsage(ctx, user, "speaking.evaluations", 1); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	if err := svc.ConsumeUsage(ctx, user, "speaking.evaluations", 1); err != nil {
+		t.Fatalf("after a refund the learner should have one unit back, got %v", err)
+	}
+}
+
+func TestReleaseUsageNeverGoesNegative(t *testing.T) {
+	store := &memStore{usage: map[UsageKey]int{}}
+	svc := NewService(store)
+	ctx := context.Background()
+	user := uuid.New()
+
+	if err := svc.ReleaseUsage(ctx, user, "speaking.evaluations", 5); err != nil {
+		t.Fatalf("refunding unused quota: %v", err)
+	}
+	for key, used := range store.usage {
+		if used < 0 {
+			t.Fatalf("%s went negative: %d", key.Entitlement, used)
+		}
+	}
+
+	// A refund for something the plan does not meter is a no-op, not an error.
+	if err := svc.ReleaseUsage(ctx, user, "ai_coach.messages", 1); err != nil {
+		t.Fatalf("refund for an unmetered entitlement: %v", err)
 	}
 }

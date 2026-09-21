@@ -22,6 +22,9 @@ type Store interface {
 	// IncrementUsage adds amount if the result stays within limit (nil = unlimited) and
 	// reports whether it did. It must be atomic.
 	IncrementUsage(ctx context.Context, userID uuid.UUID, key UsageKey, amount int, limit *int) (bool, error)
+	// DecrementUsage gives amount back, never below zero, and does nothing when no counter
+	// exists. Refunds are not limit-checked: giving usage back can never exceed a limit.
+	DecrementUsage(ctx context.Context, userID uuid.UUID, key UsageKey, amount int) error
 }
 
 type Service struct {
@@ -103,6 +106,32 @@ func (s *Service) ConsumeUsage(ctx context.Context, userID uuid.UUID, key string
 	}
 	if !ok {
 		return limitReached
+	}
+	return nil
+}
+
+// ReleaseUsage gives back usage that was consumed for work that then failed.
+//
+// Metered features consume before they call a provider, so two requests can never both slip
+// under the last remaining unit. When the provider then fails, the learner must not be left
+// paying for an answer they never received — this puts the unit back. It is best-effort:
+// a failed refund is not worth turning a provider error into a different error, so callers
+// log it and move on.
+func (s *Service) ReleaseUsage(ctx context.Context, userID uuid.UUID, key string, amount int) error {
+	if amount <= 0 {
+		return nil
+	}
+	e, err := s.EntitlementsFor(ctx, userID)
+	if err != nil {
+		return err
+	}
+	state, ok := e.Limits[key]
+	if !ok {
+		return nil
+	}
+	start, _ := Window(state.Period, s.now())
+	if err := s.store.DecrementUsage(ctx, userID, UsageKey{Entitlement: key, PeriodStart: start}, amount); err != nil {
+		return fmt.Errorf("release usage: %w", err)
 	}
 	return nil
 }
