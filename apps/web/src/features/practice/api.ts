@@ -120,3 +120,44 @@ export const writingApi = {
     apiClient.post<WritingSubmission>("/writing/submissions", input),
   submissions: () => apiClient.getPage<WritingSubmission>("/writing/submissions", { query: { page_size: 20 } }),
 };
+
+// ---- Speaking --------------------------------------------------------------------------
+
+export interface SpeakingFeedback {
+  fluency: number;
+  grammar: number;
+  vocabulary: number;
+  relevance: number;
+  cefr_estimate: string;
+  confidence: number;
+  mistakes: { category: string; original: string; correction: string; explanation: string; severity: string }[];
+}
+
+export interface SpeakingSession {
+  id: string;
+  task_id: string | null;
+  prompt: string;
+  status: "in_progress" | "submitted" | "analyzing" | "completed" | "failed" | "abandoned";
+  overall_score: number | null;
+  duration_ms: number | null;
+  transcript?: string;
+  words_per_minute?: number;
+  feedback?: SpeakingFeedback;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export const speakingApi = {
+  tasks: () => apiClient.getPage<WritingTask>("/speaking/tasks", { query: { page_size: 50 } }),
+  sessions: () => apiClient.getPage<SpeakingSession>("/speaking/sessions", { query: { page_size: 20 } }),
+  /** The recording goes up as multipart; the report comes back when all three stages finish. */
+  submit: (input: { blob: Blob; mimeType: string; durationMs: number; taskId?: string }) => {
+    const form = new FormData();
+    // The filename's extension matters: the server checks the declared type against the bytes.
+    const extension = input.mimeType.includes("ogg") ? "ogg" : input.mimeType.includes("mp4") ? "m4a" : "webm";
+    form.append("audio", new File([input.blob], `answer.${extension}`, { type: input.mimeType }));
+    form.append("duration_ms", String(Math.round(input.durationMs)));
+    if (input.taskId) form.append("task_id", input.taskId);
+    return apiClient.postForm<SpeakingSession>("/speaking/sessions", form);
+  },
+};

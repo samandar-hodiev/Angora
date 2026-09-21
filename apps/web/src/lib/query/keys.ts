@@ -39,6 +39,8 @@ export const queryKeys = {
     set: (skill: string, id: string) => ["practice", "set", skill, id] as const,
     writingTasks: ["practice", "writing", "tasks"] as const,
     writingSubmissions: ["practice", "writing", "submissions"] as const,
+    speakingTasks: ["practice", "speaking", "tasks"] as const,
+    speakingSessions: ["practice", "speaking", "sessions"] as const,
   },
   grammar: {
     all: ["grammar"] as const,

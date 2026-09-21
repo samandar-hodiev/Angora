@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/query/keys";
 
-import { practiceApi, writingApi, type PracticeAnswer, type PracticeSkill } from "./api";
+import { practiceApi, speakingApi, writingApi, type PracticeAnswer, type PracticeSkill } from "./api";
 
 export function usePracticeSets(skill: PracticeSkill) {
   return useQuery({ queryKey: queryKeys.practice.sets(skill), queryFn: () => practiceApi.sets(skill) });
@@ -50,6 +50,25 @@ export function useSubmitWriting() {
     mutationFn: writingApi.submit,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.practice.writingSubmissions });
+      void client.invalidateQueries({ queryKey: queryKeys.progress.overview });
+    },
+  });
+}
+
+export function useSpeakingTasks() {
+  return useQuery({ queryKey: queryKeys.practice.speakingTasks, queryFn: speakingApi.tasks });
+}
+
+export function useSpeakingSessions() {
+  return useQuery({ queryKey: queryKeys.practice.speakingSessions, queryFn: speakingApi.sessions });
+}
+
+export function useSubmitSpeaking() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: speakingApi.submit,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.practice.speakingSessions });
       void client.invalidateQueries({ queryKey: queryKeys.progress.overview });
     },
   });

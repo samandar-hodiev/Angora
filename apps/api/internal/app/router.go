@@ -59,6 +59,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		middleware.CORS(cfg.HTTP.CORSAllowedOrigins),
 		middleware.BodyLimitWithOverrides(cfg.HTTP.MaxJSONBodyBytes, map[string]int64{
 			assessment.RecordingRoute: cfg.Storage.MaxUploadBytes + 1<<20,
+			practice.SpeakingRoute:    cfg.Storage.MaxUploadBytes + 1<<20,
 			profiles.AvatarRoute:      6 << 20,
 			profiles.WallpaperRoute:   9 << 20,
 		}),
@@ -89,7 +90,8 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	}).RegisterRoutes(v1)
 	practice.NewModule(practice.Deps{
 		Pool: c.DB, Plans: c.Subscriptions, Usage: c.Subscriptions,
-		Evaluator: c.Evaluator, Tracker: c.Analytics,
+		Evaluator: c.Evaluator, Speaker: c.Evaluator, Storage: c.Storage,
+		MaxUploadBytes: cfg.Storage.MaxUploadBytes, Tracker: c.Analytics,
 	}).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
 	levels.NewModule(c.DB).RegisterRoutes(v1)

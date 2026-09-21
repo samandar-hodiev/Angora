@@ -60,6 +60,9 @@ type Module struct {
 	plans     Entitlements
 	usage     Usage
 	evaluator WritingEvaluator
+	speaker   SpeakingEvaluator
+	store     Storage
+	maxUpload int64
 	track     Tracker
 }
 
@@ -72,11 +75,21 @@ type Deps struct {
 	// Evaluator scores writing. Nil makes the writing endpoints report NOT_IMPLEMENTED
 	// rather than pretending to have feedback.
 	Evaluator WritingEvaluator
-	Tracker   Tracker
+	// Speaker transcribes and scores speaking; Storage holds the audio. Both nil together
+	// disables speaking practice rather than half-enabling it.
+	Speaker        SpeakingEvaluator
+	Storage        Storage
+	MaxUploadBytes int64
+	Tracker        Tracker
 }
 
 func NewModule(d Deps) *Module {
-	return &Module{pool: d.Pool, plans: d.Plans, usage: d.Usage, evaluator: d.Evaluator, track: d.Tracker}
+	maxUpload := d.MaxUploadBytes
+	if maxUpload <= 0 {
+		maxUpload = 12 << 20
+	}
+	return &Module{pool: d.Pool, plans: d.Plans, usage: d.Usage, evaluator: d.Evaluator,
+		speaker: d.Speaker, store: d.Storage, maxUpload: maxUpload, track: d.Tracker}
 }
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
@@ -90,6 +103,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 		g.GET("/attempts/:id", m.attempt(skill))
 	}
 	m.registerWritingRoutes(v1)
+	m.registerSpeakingRoutes(v1)
 }
 
 // ---- Sets -------------------------------------------------------------------------------
