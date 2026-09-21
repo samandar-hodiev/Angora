@@ -33,6 +33,13 @@ export const queryKeys = {
   vocabulary: {
     deck: (page: number) => ["vocabulary", "deck", page] as const,
   },
+  practice: {
+    all: ["practice"] as const,
+    sets: (skill: string) => ["practice", "sets", skill] as const,
+    set: (skill: string, id: string) => ["practice", "set", skill, id] as const,
+    writingTasks: ["practice", "writing", "tasks"] as const,
+    writingSubmissions: ["practice", "writing", "submissions"] as const,
+  },
   grammar: {
     all: ["grammar"] as const,
     categories: ["grammar", "categories"] as const,

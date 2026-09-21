@@ -1,91 +1,78 @@
 "use client";
 
-import type { ListeningExerciseBody } from "@engora/types";
-import { Eye, EyeOff, Headphones, Info } from "lucide-react";
 import { useState } from "react";
 
-import { AudioPlayer } from "@/components/learning/audio-player";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useContentItem } from "@/features/learning/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
+import { apiAssetUrl } from "@/lib/media";
 
-import { ContentPicker, PracticeFrame, useContentSelection } from "./content-picker";
-import { QuestionList } from "./questions";
+import { AttemptView } from "./attempt-view";
 
+/**
+ * Listening practice.
+ *
+ * The transcript is hidden by default and one click away. Revealing it is the learner's
+ * choice, not a penalty — but it is not shown first, because reading the answer is not
+ * listening practice.
+ */
 export function ListeningView({ initialContentId }: { initialContentId?: string }) {
-  const { list, items, current, select } = useContentSelection({ type: "listening_exercise" }, initialContentId);
-  const item = useContentItem<ListeningExerciseBody>(current?.id);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  return (
+    <AttemptView
+      skill="listening"
+      title="Listening practice"
+      description="Play the clip as often as you need. Answers are checked against the key."
+      pickerLabel="Clip"
+      initialSetId={initialContentId}
+      renderStimulus={(body, loading) => <Clip body={body} loading={loading} />}
+    />
+  );
+}
+
+function Clip({ body, loading }: { body: Record<string, unknown>; loading: boolean }) {
   const [showTranscript, setShowTranscript] = useState(false);
-  const body = item.data?.body;
-  const allAnswered = !!body && body.questions.every((q) => answers[q.id]);
+
+  if (loading) {
+    return (
+      <div className="grid gap-3">
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-5 w-2/3" />
+      </div>
+    );
+  }
+
+  const audioUrl = typeof body.audio_url === "string" ? body.audio_url : null;
+  const transcript = typeof body.transcript === "string" ? body.transcript : "";
+  const duration = typeof body.duration_seconds === "number" ? body.duration_seconds : null;
 
   return (
-    <PracticeFrame skill="listening" title="Listening practice" description="Listen, answer, then check the transcript." list={list} emptyTitle="No listening exercises yet">
-      <div className="mx-auto grid max-w-2xl gap-6">
-        <ContentPicker
-          items={items}
-          current={current}
-          onSelect={(id) => {
-            select(id);
-            setAnswers({});
-            setShowTranscript(false);
-          }}
-          label="Exercise"
-        />
+    <div className="grid gap-5">
+      {audioUrl ? (
+        <audio controls className="w-full" src={apiAssetUrl(audioUrl) ?? undefined}>
+          Your browser cannot play this clip.
+        </audio>
+      ) : (
+        <div className="grid gap-1 rounded-lg border border-dashed px-4 py-3">
+          <p className="text-body-sm text-fg-secondary">
+            This clip has no audio file yet — the transcript below is the exercise for now.
+          </p>
+          {duration !== null && <p className="text-caption text-fg-muted">Recorded length: {duration} seconds</p>}
+        </div>
+      )}
 
-        <section aria-labelledby="exercise-title" className="grid gap-5 rounded-xl border bg-surface p-6">
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-primary-subtle text-primary-subtle-foreground">
-              <Headphones className="size-5" aria-hidden />
-            </span>
-            <div>
-              <h2 id="exercise-title" className="text-h3">
-                {current?.title}
-              </h2>
-              {current?.level && <Badge variant="secondary">{current.level}</Badge>}
+      {transcript && (
+        <div className="grid justify-items-start gap-3">
+          <Button variant="outline" size="sm" onClick={() => setShowTranscript((shown) => !shown)}>
+            {showTranscript ? "Hide transcript" : "Show transcript"}
+          </Button>
+          {showTranscript && (
+            <div className="grid max-w-[65ch] gap-4 text-body leading-7 text-fg-secondary">
+              {transcript.split(/\n{2,}/).map((paragraph, index) => (
+                <p key={index}>{paragraph}</p>
+              ))}
             </div>
-          </div>
-          <AudioPlayer key={current?.id} src={body?.audio_url ?? null} title={current?.title ?? "exercise"} />
-          {body && !body.audio_url && (
-            <Alert variant="info">
-              <Info />
-              <AlertDescription>Audio for this exercise is being produced. Meanwhile, you can reveal the transcript after answering.</AlertDescription>
-            </Alert>
           )}
-        </section>
-
-        {body && (
-          <section aria-labelledby="lq-title" className="grid gap-6 rounded-xl border bg-surface p-6">
-            <h2 id="lq-title" className="text-h3">
-              Questions
-            </h2>
-            <QuestionList questions={body.questions} answers={answers} onAnswer={(q, o) => setAnswers((a) => ({ ...a, [q]: o }))} />
-          </section>
-        )}
-
-        {body?.transcript && (
-          <section className="grid gap-3">
-            <Button
-              variant="outline"
-              className="justify-self-start"
-              onClick={() => setShowTranscript((v) => !v)}
-              disabled={!allAnswered}
-              aria-expanded={showTranscript}
-              aria-controls="transcript"
-            >
-              {showTranscript ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-              {showTranscript ? "Hide transcript" : allAnswered ? "Show transcript" : "Answer all questions to see the transcript"}
-            </Button>
-            {showTranscript && (
-              <p id="transcript" className="rounded-xl border bg-surface p-6 text-body leading-7 text-fg-secondary">
-                {body.transcript}
-              </p>
-            )}
-          </section>
-        )}
-      </div>
-    </PracticeFrame>
+        </div>
+      )}
+    </div>
   );
 }

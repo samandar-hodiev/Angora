@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -94,10 +96,14 @@ var content = []contentSeed{
 				"need people every day. Others worry that squeezing the same work into fewer days could increase stress.\n\n" +
 				"The results so far are mixed, but one thing is clear: many workers now expect more flexibility than before.",
 			"questions": []map[string]any{
-				{"id": "q1", "prompt": "In most trials, what happens to salaries?", "options": []string{"They go down", "They stay the same", "They go up", "They are replaced by bonuses"}},
-				{"id": "q2", "prompt": "Which benefit do some companies report?", "options": []string{"Longer meetings", "Fewer sick days", "Higher prices", "More overtime"}},
-				{"id": "q3", "prompt": "Why are critics unconvinced?", "options": []string{"Salaries are too high", "Some jobs need people every day", "Workers dislike free time", "Offices are too small"}},
-				{"id": "q4", "prompt": "What is the writer's conclusion?", "options": []string{"The idea has failed", "Everyone should adopt it now", "Results are mixed but expectations have changed", "Only hospitals benefit"}},
+				{"id": "q1", "prompt": "In most trials, what happens to salaries?", "options": []string{"They go down", "They stay the same", "They go up", "They are replaced by bonuses"},
+					"answer": 1, "target": "reading.detail", "explanation": "The first paragraph says employees \"receive the same salary\"."},
+				{"id": "q2", "prompt": "Which benefit do some companies report?", "options": []string{"Longer meetings", "Fewer sick days", "Higher prices", "More overtime"},
+					"answer": 1, "target": "reading.detail", "explanation": "\"Some companies also report fewer sick days.\""},
+				{"id": "q3", "prompt": "Why are critics unconvinced?", "options": []string{"Salaries are too high", "Some jobs need people every day", "Workers dislike free time", "Offices are too small"},
+					"answer": 1, "target": "reading.inference", "explanation": "Critics point out that hospitals, shops and schools need people every day."},
+				{"id": "q4", "prompt": "What is the writer's conclusion?", "options": []string{"The idea has failed", "Everyone should adopt it now", "Results are mixed but expectations have changed", "Only hospitals benefit"},
+					"answer": 2, "target": "reading.main_idea", "explanation": "The last line: results are mixed, but expectations have changed."},
 			},
 		}},
 	{"listening_exercise", "Booking a table", "listening", "A2", "daily-life", nil, 3, []string{"phone call", "restaurant"},
@@ -108,9 +114,12 @@ var content = []contentSeed{
 				"— Four. — And what time? — Around half past seven. — Let me check... Yes, 7:30 is fine. Can I have your name? — It's Karimova. " +
 				"— Thank you. Would you like a table inside or on the terrace? — Inside, please. It might be cold.",
 			"questions": []map[string]any{
-				{"id": "q1", "prompt": "Which day is the booking for?", "options": []string{"Thursday", "Friday", "Saturday", "Sunday"}},
-				{"id": "q2", "prompt": "How many people is the table for?", "options": []string{"Two", "Three", "Four", "Five"}},
-				{"id": "q3", "prompt": "Where does the caller want to sit?", "options": []string{"On the terrace", "By the window", "Inside", "At the bar"}},
+				{"id": "q1", "prompt": "Which day is the booking for?", "options": []string{"Thursday", "Friday", "Saturday", "Sunday"},
+					"answer": 1, "target": "listening.detail", "explanation": "\"I'd like to book a table for Friday evening.\""},
+				{"id": "q2", "prompt": "How many people is the table for?", "options": []string{"Two", "Three", "Four", "Five"},
+					"answer": 2, "target": "listening.numbers", "explanation": "The caller answers \"Four\" when asked how many people."},
+				{"id": "q3", "prompt": "Where does the caller want to sit?", "options": []string{"On the terrace", "By the window", "Inside", "At the bar"},
+					"answer": 2, "target": "listening.detail", "explanation": "\"Inside, please. It might be cold.\""},
 			},
 		}},
 }
@@ -147,7 +156,100 @@ func seedContent(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 		inserted += int(tag.RowsAffected())
 	}
-	fmt.Printf("content ready: %d topics, %d words, %d content items (%d new)\n",
-		len(topics), len(words), len(content), inserted)
+
+	questions, err := seedPracticeQuestions(ctx, pool)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("content ready: %d topics, %d words, %d content items (%d new), %d practice questions\n",
+		len(topics), len(words), len(content), inserted, questions)
 	return nil
+}
+
+// seedPracticeQuestions moves the questions written beside each passage and clip into the
+// question bank, with their answer keys.
+//
+// The bank is where questions live: it is what the owner console edits, what placement draws
+// from, and what practice is marked against. Keeping a second copy inside content_items.body
+// would mean two answers to "what is question 3", and the learner app was already showing the
+// consequence — a "check answers" button that could not check anything.
+func seedPracticeQuestions(ctx context.Context, pool *pgxpool.Pool) (int, error) {
+	total := 0
+	for _, ci := range content {
+		skill := ci.skill
+		if skill != "reading" && skill != "listening" {
+			continue
+		}
+		raw, ok := ci.body["questions"].([]map[string]any)
+		if !ok {
+			continue
+		}
+
+		var stimulusID string
+		if err := pool.QueryRow(ctx,
+			`SELECT id FROM content_items WHERE type = $1 AND title = $2`, ci.typ, ci.title).Scan(&stimulusID); err != nil {
+			return total, fmt.Errorf("stimulus %q: %w", ci.title, err)
+		}
+
+		for position, q := range raw {
+			answer, hasAnswer := q["answer"].(int)
+			if !hasAnswer {
+				// A question with no key cannot be marked, so it is not published.
+				continue
+			}
+			options, _ := q["options"].([]string)
+			if answer < 0 || answer >= len(options) {
+				return total, fmt.Errorf("content %q question %v: answer index out of range", ci.title, q["id"])
+			}
+
+			optionRows := make([]map[string]string, 0, len(options))
+			for i, text := range options {
+				optionRows = append(optionRows, map[string]string{"id": string(rune('a' + i)), "text": text})
+			}
+			optionsJSON, err := json.Marshal(optionRows)
+			if err != nil {
+				return total, err
+			}
+			keyJSON, err := json.Marshal(map[string]string{"option_id": string(rune('a' + answer))})
+			if err != nil {
+				return total, err
+			}
+
+			slug := fmt.Sprintf("%s-%v", slugify(ci.title), q["id"])
+			target, _ := q["target"].(string)
+			explanation, _ := q["explanation"].(string)
+
+			tag, err := pool.Exec(ctx, `
+				INSERT INTO assessment_items (slug, kind, skill, level_id, difficulty, topic, item_type,
+				                              stimulus_id, position, prompt, options, answer_key, explanation,
+				                              status, published_at)
+				SELECT $1, $2, $3, l.id, $4, $5, 'multiple_choice', $6, $7, $8, $9, $10, $11, 'published', now()
+				FROM levels l WHERE l.code = $12
+				ON CONFLICT (slug) DO NOTHING`,
+				slug, skill+"_practice", skill, ci.difficulty, target, stimulusID, position,
+				q["prompt"], optionsJSON, keyJSON, explanation, ci.level)
+			if err != nil {
+				return total, fmt.Errorf("question %s: %w", slug, err)
+			}
+			total += int(tag.RowsAffected())
+		}
+	}
+	return total, nil
+}
+
+// slugify makes a stable identifier from a title, so re-running the seed updates nothing.
+func slugify(title string) string {
+	var b strings.Builder
+	lastDash := true
+	for _, r := range strings.ToLower(title) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		case !lastDash:
+			b.WriteRune('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
