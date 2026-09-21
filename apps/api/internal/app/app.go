@@ -22,7 +22,9 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/grammar"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
+	"github.com/samandar-hodiev/engora/apps/api/internal/notifications"
 	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
+	"github.com/samandar-hodiev/engora/apps/api/internal/payments"
 	"github.com/samandar-hodiev/engora/apps/api/internal/personalization"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/cache"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
@@ -44,19 +46,22 @@ type Container struct {
 	Audit    audit.Recorder
 	Mailer   mail.Mailer
 
-	Users         *users.PostgresRepository
-	Tokens        *auth.TokenIssuer
-	Auth          *auth.Service
-	Subscriptions *subscriptions.Service
-	Evaluator     *ai.PlacementEvaluator
-	AI            *ai.Gateway
-	Storage       storage.ObjectStorage
-	Jobs          jobs.Queue
-	Analytics     analytics.Tracker
-	Plans         *personalization.Service
-	Onboarding    *onboarding.Service
-	Assessment    *assessment.Service
-	GrammarTutor  grammar.Tutor
+	Users             *users.PostgresRepository
+	Tokens            *auth.TokenIssuer
+	Auth              *auth.Service
+	Subscriptions     *subscriptions.Service
+	SubscriptionStore *subscriptions.PostgresStore
+	Payments          payments.Provider
+	Evaluator         *ai.PlacementEvaluator
+	AI                *ai.Gateway
+	Storage           storage.ObjectStorage
+	Jobs              jobs.Queue
+	Analytics         analytics.Tracker
+	Notifications     *notifications.Service
+	Plans             *personalization.Service
+	Onboarding        *onboarding.Service
+	Assessment        *assessment.Service
+	GrammarTutor      grammar.Tutor
 }
 
 func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container, error) {
@@ -96,6 +101,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	if cfg.Mail.Provider == "log" {
 		log.Warn("emails are not sent (MAIL_PROVIDER=log): verification codes are logged and shown on the verify page in development")
 	}
+	c.Notifications = notifications.NewService(c.DB, c.Mailer, log)
 	c.Users = users.NewPostgresRepository(c.DB)
 	c.Tokens = auth.NewTokenIssuer(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
 	c.Analytics = analytics.NewPostgresTracker(c.DB, log)
@@ -110,6 +116,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		Issuer:     c.Tokens,
 		Audit:      c.Audit,
 		Mailer:     c.Mailer,
+		Notifier:   c.Notifications,
 	}
 	if len(cfg.Auth.GoogleClientIDs) > 0 {
 		authDeps.Google = auth.NewGoogleVerifier(cfg.Auth.GoogleClientIDs)
@@ -125,7 +132,13 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		c.Close()
 		return nil, fmt.Errorf("auth: %w", err)
 	}
-	c.Subscriptions = subscriptions.NewService(subscriptions.NewPostgresStore(c.DB))
+	c.SubscriptionStore = subscriptions.NewPostgresStore(c.DB)
+	c.Subscriptions = subscriptions.NewService(c.SubscriptionStore)
+	if cfg.Payments.Provider == payments.ProviderClick {
+		c.Payments = payments.NewClick(cfg.Payments.Click, cfg.App.WebURL, log)
+	} else {
+		log.Warn("online payment is disabled (PAYMENTS_PROVIDER=none): checkout returns SERVICE_UNAVAILABLE")
+	}
 	c.Jobs = jobs.NewRedisQueue(c.Redis, "default")
 
 	c.Plans = personalization.NewService(c.DB, c.Analytics)
@@ -140,6 +153,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		Evaluator:      c.Evaluator,
 		Plans:          c.Plans,
 		Progress:       c.Onboarding,
+		Notifier:       c.Notifications,
 		Tracker:        c.Analytics,
 		Log:            log,
 		MaxUploadBytes: cfg.Storage.MaxUploadBytes,

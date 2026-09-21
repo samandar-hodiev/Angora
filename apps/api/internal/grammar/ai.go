@@ -487,7 +487,14 @@ func (m *Module) aiSubjectByID(ctx context.Context, userID, topicID uuid.UUID) (
 		FROM grammar_topics t
 		LEFT JOIN levels l ON l.id = t.level_id
 		LEFT JOIN grammar_categories c ON c.id = t.category_id
-		LEFT JOIN grammar_content gc ON gc.grammar_topic_id = t.id AND gc.status = 'published'
+		-- A topic can have a published explanation in several languages. The prompt is
+		-- built from the English one and the model is told separately which language to
+		-- answer in, so the context stays one text rather than whichever row came first.
+		LEFT JOIN LATERAL (
+			SELECT gcx.body FROM grammar_content gcx
+			WHERE gcx.grammar_topic_id = t.id AND gcx.status = 'published'
+			ORDER BY (gcx.language = 'en') DESC, gcx.version DESC LIMIT 1
+		) gc ON true
 		WHERE t.id = $1`, topicID).
 		Scan(&out.topic.Slug, &out.topic.Name, &level, &category, &out.topic.Summary, &bodyRaw)
 	if err != nil {

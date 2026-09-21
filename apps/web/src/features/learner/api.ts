@@ -3,6 +3,7 @@ import type {
   LearningPlan,
   Mistake,
   MistakeSummary,
+  ProgressForecast,
   ProgressOverview,
   Recommendation,
   VocabularyDeck,
@@ -17,6 +18,7 @@ import { apiClient } from "@/lib/api";
  */
 export const learnerApi = {
   progress: () => apiClient.get<ProgressOverview>("/progress"),
+  forecast: () => apiClient.get<ProgressForecast>("/progress/forecast"),
   history: (page: number) => apiClient.getPage<HistoryItem>("/history", { query: { page, page_size: 20 } }),
   mistakeSummary: () => apiClient.get<MistakeSummary>("/mistakes/summary"),
   mistakes: (group: string, page: number) =>

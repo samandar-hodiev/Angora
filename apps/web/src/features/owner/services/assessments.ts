@@ -12,7 +12,15 @@
 import { apiClient } from "@/lib/api";
 
 import type {
+  ContentLanguage,
   ContentTaxonomy,
+  ContentVersionDetail,
+  ContentVersionRow,
+  NotificationTemplateRow,
+  PaymentRow,
+  RevenueReport,
+  SentNotificationRow,
+  TemplatePreview,
   LiveContentDetail,
   LiveContentRow,
   LiveGrammarCategory,
@@ -262,6 +270,11 @@ export async function getLiveContent(query: {
 
 export const contentApi = {
   detail: (id: string) => apiClient.get<LiveContentDetail>(`/admin/content/${id}`),
+  versions: (id: string) => apiClient.get<ContentVersionRow[]>(`/admin/content/${id}/versions`),
+  version: (id: string, version: number) =>
+    apiClient.get<ContentVersionDetail>(`/admin/content/${id}/versions/${version}`),
+  restore: (id: string, version: number) =>
+    apiClient.post<LiveContentDetail>(`/admin/content/${id}/versions/${version}/restore`, {}),
   taxonomy: () => apiClient.get<ContentTaxonomy>("/admin/content/taxonomy"),
   create: (input: Record<string, unknown>) => apiClient.post<LiveContentDetail>("/admin/content", input),
   update: (id: string, input: Record<string, unknown>) => apiClient.patch<LiveContentDetail>(`/admin/content/${id}`, input),
@@ -283,7 +296,8 @@ export const grammarAdminApi = {
     });
     return paged(result, 25);
   },
-  topic: (slug: string) => apiClient.get<LiveGrammarTopicDetail>(`/admin/grammar/topics/${slug}`),
+  topic: (slug: string, language: ContentLanguage = "en") =>
+    apiClient.get<LiveGrammarTopicDetail>(`/admin/grammar/topics/${slug}`, { query: { lang: language } }),
   create: (input: Record<string, unknown>) => apiClient.post<LiveGrammarTopicDetail>("/admin/grammar/topics", input),
   update: (slug: string, input: Record<string, unknown>) =>
     apiClient.patch<LiveGrammarTopicDetail>(`/admin/grammar/topics/${slug}`, input),
@@ -297,4 +311,48 @@ export const settingsApi = {
   wallpapers: () => apiClient.get<LiveWallpaper[]>("/admin/wallpapers"),
   updateWallpaper: (id: string, input: { enabled?: boolean; sort_order?: number }) =>
     apiClient.patch<LiveWallpaper[]>(`/admin/wallpapers/${id}`, input),
+};
+
+// ---- Payments ---------------------------------------------------------------------------------
+
+export async function getPayments(query: {
+  status?: string;
+  provider?: string;
+  q?: string;
+  page?: number;
+}): Promise<Paged<PaymentRow>> {
+  const result = await apiClient.getPage<PaymentRow>("/admin/payments", {
+    query: {
+      status: query.status === "all" ? undefined : query.status,
+      provider: query.provider === "all" ? undefined : query.provider,
+      q: query.q || undefined,
+      page: query.page,
+      page_size: 25,
+    },
+  });
+  return paged(result, 25);
+}
+
+export function getRevenue(days: number): Promise<RevenueReport> {
+  return apiClient.get<RevenueReport>("/admin/payments/revenue", { query: { days } });
+}
+
+export function updatePlan(id: string, input: Record<string, unknown>): Promise<PlanRow[]> {
+  return apiClient.patch<PlanRow[]>(`/admin/plans/${id}`, input);
+}
+
+// ---- Notification templates --------------------------------------------------------------------
+
+export const notificationsAdminApi = {
+  templates: () => apiClient.get<NotificationTemplateRow[]>("/admin/notification-templates"),
+  update: (code: string, locale: string, input: Record<string, unknown>) =>
+    apiClient.patch<NotificationTemplateRow[]>(`/admin/notification-templates/${code}/${locale}`, input),
+  preview: (code: string, locale: string, input: { subject?: string; body?: string; variables?: Record<string, unknown> }) =>
+    apiClient.post<TemplatePreview>(`/admin/notification-templates/${code}/${locale}/preview`, input),
+  sent: async (query: { code?: string; page?: number }) => {
+    const result = await apiClient.getPage<SentNotificationRow>("/admin/notifications", {
+      query: { code: query.code || undefined, page: query.page, page_size: 25 },
+    });
+    return paged(result, 25);
+  },
 };

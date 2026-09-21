@@ -3,6 +3,7 @@ import {
   ClipboardList,
   ScrollText,
   Sparkles,
+  Bell,
   CreditCard,
   FileStack,
   Headphones,
@@ -16,6 +17,7 @@ import {
   Trophy,
   Type,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -70,6 +72,8 @@ export const ownerNav: OwnerNavSection[] = [
     items: [
       { href: "/owner/learners", label: "Learners", icon: Users },
       { href: "/owner/paywall", label: "Paywall", icon: CreditCard },
+      { href: "/owner/payments", label: "Payments", icon: Wallet },
+      { href: "/owner/notifications", label: "Notifications", icon: Bell },
       { href: "/owner/settings", label: "Settings", icon: Settings },
       { href: "/owner/ai", label: "AI", icon: Sparkles },
       { href: "/owner/audit", label: "Audit log", icon: ScrollText },

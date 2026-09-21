@@ -13,7 +13,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { queryKeys } from "@/lib/query/keys";
 
 import * as assessmentApi from "./services/assessments";
-import type { QuestionInput, QuestionQuery, QuestionStatus } from "./types";
+import type { ContentLanguage, QuestionInput, QuestionQuery, QuestionStatus } from "./types";
 
 // ---- Assessment & question bank (live API) --------------------------------------------------
 
@@ -63,6 +63,14 @@ export function useSetQuestionStatus() {
 
 export function useAssessmentConfigs() {
   return useQuery({ queryKey: queryKeys.owner.assessmentConfigs, queryFn: assessmentApi.getAssessmentConfigs });
+}
+
+export function useCreateAssessmentConfig() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { kind: string; config: unknown }) => assessmentApi.createAssessmentConfig(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.assessmentConfigs }),
+  });
 }
 
 export function useActivateAssessmentConfig() {
@@ -253,10 +261,10 @@ export function useGrammarAdminTopics(query: { search?: string; category?: strin
   });
 }
 
-export function useGrammarAdminTopic(slug: string | null) {
+export function useGrammarAdminTopic(slug: string | null, language: ContentLanguage = "en") {
   return useQuery({
-    queryKey: queryKeys.owner.grammarAdminTopic(slug ?? ""),
-    queryFn: () => assessmentApi.grammarAdminApi.topic(slug!),
+    queryKey: [...queryKeys.owner.grammarAdminTopic(slug ?? ""), language],
+    queryFn: () => assessmentApi.grammarAdminApi.topic(slug!, language),
     enabled: Boolean(slug),
   });
 }
@@ -309,5 +317,85 @@ export function useUpdateWallpaper() {
     mutationFn: ({ id, input }: { id: string; input: { enabled?: boolean; sort_order?: number } }) =>
       assessmentApi.settingsApi.updateWallpaper(id, input),
     onSuccess: (wallpapers) => client.setQueryData(queryKeys.owner.liveWallpapers, wallpapers),
+  });
+}
+
+// ---- Payments (live API) ----------------------------------------------------------------------
+
+export function usePayments(query: { status?: string; provider?: string; q?: string; page?: number }) {
+  return useQuery({
+    queryKey: queryKeys.owner.payments(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.getPayments(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useRevenue(days: number) {
+  return useQuery({
+    queryKey: queryKeys.owner.revenue(days),
+    queryFn: () => assessmentApi.getRevenue(days),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useUpdatePlan() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Record<string, unknown> }) => assessmentApi.updatePlan(id, input),
+    onSuccess: (plans) => {
+      client.setQueryData(queryKeys.owner.plans, plans);
+      client.invalidateQueries({ queryKey: queryKeys.owner.revenue(30) });
+    },
+  });
+}
+
+// ---- Notification templates (live API) ---------------------------------------------------------
+
+export function useNotificationTemplates() {
+  return useQuery({
+    queryKey: queryKeys.owner.notificationTemplates,
+    queryFn: assessmentApi.notificationsAdminApi.templates,
+  });
+}
+
+export function useUpdateNotificationTemplate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, locale, input }: { code: string; locale: string; input: Record<string, unknown> }) =>
+      assessmentApi.notificationsAdminApi.update(code, locale, input),
+    onSuccess: (templates) => client.setQueryData(queryKeys.owner.notificationTemplates, templates),
+  });
+}
+
+export function usePreviewNotificationTemplate() {
+  return useMutation({
+    mutationFn: ({ code, locale, input }: { code: string; locale: string; input: { subject?: string; body?: string } }) =>
+      assessmentApi.notificationsAdminApi.preview(code, locale, input),
+  });
+}
+
+export function useSentNotifications(query: { code?: string; page?: number }) {
+  return useQuery({
+    queryKey: queryKeys.owner.sentNotifications(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.notificationsAdminApi.sent(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+// ---- Content revisions (live API) --------------------------------------------------------------
+
+export function useContentVersions(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.owner.contentVersions(id ?? ""),
+    queryFn: () => assessmentApi.contentApi.versions(id!),
+    enabled: Boolean(id),
+  });
+}
+
+export function useRestoreContentVersion() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) => assessmentApi.contentApi.restore(id, version),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
   });
 }

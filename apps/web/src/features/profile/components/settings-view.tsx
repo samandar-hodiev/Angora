@@ -6,21 +6,25 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/common/page-header";
+import { ErrorState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OptionCard, Switch } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { useLogout, useSession } from "@/features/auth/hooks";
+import { useNotificationPreferences, useUpdateNotificationPreferences } from "@/features/notifications/hooks";
 import { useCurrentSubscription } from "@/features/subscription/hooks";
 import { errorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
+import type { NotificationPreferences } from "@engora/types";
 import type { ThemePreference } from "@/lib/theme";
 import { useTheme } from "@/providers/theme-provider";
 
 import { useSaveAppearance } from "../appearance";
-import { useProfile, useUpdateProfile } from "../hooks";
+import { useProfile } from "../hooks";
 import { WallpaperPicker } from "./wallpaper-picker";
 
 const sections = [
@@ -35,10 +39,18 @@ const sections = [
   ["subscription", "Subscription"],
 ] as const;
 
-const notificationOptions = [
-  { key: "daily_reminder", label: "Daily practice reminder", description: "A gentle nudge if you haven't practised today." },
-  { key: "weekly_report", label: "Weekly progress report", description: "Your skill changes and focus for next week." },
-  { key: "product_updates", label: "Product updates", description: "New features and learning content." },
+/**
+ * The messages a learner may switch off, by template code.
+ *
+ * Receipts and the welcome message are deliberately not here. A payment confirmation is a
+ * record of money changing hands, not marketing, and somebody who switched it off six
+ * months ago and then disputes a charge is worse off for it.
+ */
+const mutableNotifications = [
+  { code: "streak_reminder", label: "Streak reminder", description: "A nudge in the evening if you have a streak going and haven't practised." },
+  { code: "subscription_expiring", label: "Subscription ending", description: "Three days before a paid period runs out." },
+  { code: "level_changed", label: "Level changes", description: "When an assessment moves your CEFR level." },
+  { code: "assessment_completed", label: "Assessment results", description: "When a placement test has finished scoring." },
 ] as const;
 
 function SettingsSection({
@@ -85,7 +97,6 @@ export function SettingsView() {
   const [flash, setFlash] = useState<{ id: string; at: number } | null>(null);
   const { user } = useSession();
   const profile = useProfile();
-  const update = useUpdateProfile();
   const logout = useLogout();
   const router = useRouter();
   const subscription = useCurrentSubscription();
@@ -114,15 +125,7 @@ export function SettingsView() {
     return () => window.clearTimeout(timer);
   }, [flash]);
 
-  const notifications = (profile.data?.preferences?.notifications ?? {}) as Record<string, boolean>;
   const focus = (profile.data?.preferences?.focus_skills ?? []) as string[];
-
-  const setNotification = (key: string, enabled: boolean) => {
-    update.mutate(
-      { preferences: { notifications: { ...notifications, [key]: enabled } } },
-      { onError: (error) => toast({ title: "Couldn't save", description: errorMessage(error), variant: "error" }) },
-    );
-  };
 
   const signOut = async () => {
     await logout.mutateAsync().catch(() => undefined);
@@ -202,23 +205,13 @@ export function SettingsView() {
             <WallpaperPicker />
           </SettingsSection>
 
-          <SettingsSection flashed={flash?.id === "notifications"} id="notifications" title="Notifications">
-            <ul className="grid gap-5">
-              {notificationOptions.map((opt) => (
-                <li key={opt.key} className="flex items-center justify-between gap-4">
-                  <Label htmlFor={`n-${opt.key}`} className="grid gap-1">
-                    <span>{opt.label}</span>
-                    <span className="text-caption font-normal text-fg-muted">{opt.description}</span>
-                  </Label>
-                  <Switch
-                    id={`n-${opt.key}`}
-                    checked={notifications[opt.key] ?? opt.key !== "product_updates"}
-                    disabled={!profile.data || update.isPending}
-                    onCheckedChange={(checked) => setNotification(opt.key, checked)}
-                  />
-                </li>
-              ))}
-            </ul>
+          <SettingsSection
+            flashed={flash?.id === "notifications"}
+            id="notifications"
+            title="Notifications"
+            description="Where messages reach you, and which ones."
+          >
+            <NotificationSettings />
           </SettingsSection>
 
           <SettingsSection flashed={flash?.id === "learning"} id="learning" title="Learning preferences" description="Level, goals and daily time shape your plan.">
@@ -290,5 +283,99 @@ export function SettingsView() {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Delivery preferences, read from and written to the server.
+ *
+ * A switch here can only ever turn something off. What a template is *allowed* to use is
+ * decided by the template itself, in the owner console — so nobody can opt themselves into
+ * an email the product never intended to send.
+ */
+function NotificationSettings() {
+  const prefs = useNotificationPreferences();
+  const update = useUpdateNotificationPreferences();
+
+  if (prefs.isPending) {
+    return (
+      <div className="grid gap-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-10" />
+        ))}
+      </div>
+    );
+  }
+  if (prefs.isError) {
+    return <ErrorState title="Couldn't load your preferences" error={prefs.error} onRetry={() => void prefs.refetch()} />;
+  }
+
+  const current = prefs.data;
+  const muted = new Set(current.muted);
+
+  const save = (input: Partial<NotificationPreferences>) =>
+    update.mutate(input, {
+      onError: (error) => toast({ title: "Couldn't save", description: errorMessage(error), variant: "error" }),
+    });
+
+  const toggleMuted = (code: string, enabled: boolean) => {
+    const next = new Set(muted);
+    if (enabled) next.delete(code);
+    else next.add(code);
+    save({ muted: [...next] });
+  };
+
+  return (
+    <div className="grid gap-6">
+      <ul className="grid gap-5">
+        <li className="flex items-center justify-between gap-4">
+          <Label htmlFor="channel-in-app" className="grid gap-1">
+            <span>In the app</span>
+            <span className="text-caption font-normal text-fg-muted">Shown under the bell in the header.</span>
+          </Label>
+          <Switch
+            id="channel-in-app"
+            checked={current.in_app}
+            disabled={update.isPending}
+            onCheckedChange={(checked) => save({ in_app: checked })}
+          />
+        </li>
+        <li className="flex items-center justify-between gap-4">
+          <Label htmlFor="channel-email" className="grid gap-1">
+            <span>Email</span>
+            <span className="text-caption font-normal text-fg-muted">Only the messages that are worth an inbox.</span>
+          </Label>
+          <Switch
+            id="channel-email"
+            checked={current.email}
+            disabled={update.isPending}
+            onCheckedChange={(checked) => save({ email: checked })}
+          />
+        </li>
+      </ul>
+
+      <div className="grid gap-5 border-t pt-5">
+        <p className="text-label text-fg-muted">Which messages</p>
+        <ul className="grid gap-5">
+          {mutableNotifications.map((item) => (
+            <li key={item.code} className="flex items-center justify-between gap-4">
+              <Label htmlFor={`n-${item.code}`} className="grid gap-1">
+                <span>{item.label}</span>
+                <span className="text-caption font-normal text-fg-muted">{item.description}</span>
+              </Label>
+              <Switch
+                id={`n-${item.code}`}
+                checked={!muted.has(item.code)}
+                disabled={update.isPending}
+                onCheckedChange={(checked) => toggleMuted(item.code, checked)}
+              />
+            </li>
+          ))}
+        </ul>
+        <p className="text-caption text-fg-muted">
+          Payment receipts are always sent — they are a record of money changing hands.
+        </p>
+      </div>
+    </div>
   );
 }

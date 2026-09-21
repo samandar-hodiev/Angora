@@ -61,10 +61,10 @@ export function useGrammarSearch(query: string, level: GrammarLevelFilter, delay
   };
 }
 
-export function useGrammarTopic(slug: string | undefined) {
+export function useGrammarTopic(slug: string | undefined, lang?: string) {
   return useQuery({
-    queryKey: queryKeys.grammar.topic(slug ?? ""),
-    queryFn: () => grammarApi.topic(slug!),
+    queryKey: [...queryKeys.grammar.topic(slug ?? ""), lang ?? "auto"],
+    queryFn: () => grammarApi.topic(slug!, lang),
     enabled: useAuthed() && Boolean(slug),
   });
 }

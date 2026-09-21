@@ -6,6 +6,9 @@ export const queryKeys = {
   system: {
     health: ["system", "health"] as const,
   },
+  platform: {
+    settings: ["platform", "settings"] as const,
+  },
   learning: {
     all: ["learning"] as const,
     skills: ["learning", "skills"] as const,
@@ -18,12 +21,23 @@ export const queryKeys = {
     plans: ["subscription", "plans"] as const,
     current: ["subscription", "current"] as const,
   },
+  payments: {
+    all: ["payments"] as const,
+    methods: ["payments", "methods"] as const,
+    transactions: ["payments", "transactions"] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    list: (unreadOnly: boolean) => ["notifications", "list", unreadOnly] as const,
+    preferences: ["notifications", "preferences"] as const,
+  },
   profile: {
     all: ["profile"] as const,
     me: ["profile", "me"] as const,
   },
   progress: {
     overview: ["progress", "overview"] as const,
+    forecast: ["progress", "forecast"] as const,
     history: (page: number) => ["progress", "history", page] as const,
   },
   mistakes: {
@@ -122,6 +136,11 @@ export const queryKeys = {
     grammarAdminTopic: (slug: string) => ["owner", "grammar-admin", "topic", slug] as const,
     siteSettings: ["owner", "site-settings"] as const,
     liveWallpapers: ["owner", "live-wallpapers"] as const,
+    payments: (filters: Record<string, string | number | undefined>) => ["owner", "payments", filters] as const,
+    revenue: (days: number) => ["owner", "revenue", days] as const,
+    notificationTemplates: ["owner", "notification-templates"] as const,
+    sentNotifications: (filters: Record<string, string | number | undefined>) => ["owner", "sent-notifications", filters] as const,
+    contentVersions: (id: string) => ["owner", "content-versions", id] as const,
   },
   admin: {
     overview: ["admin", "overview"] as const,

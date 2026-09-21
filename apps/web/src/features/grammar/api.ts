@@ -36,7 +36,10 @@ export const grammarApi = {
       signal,
     }),
 
-  topic: (slug: string) => apiClient.get<GrammarTopic>(`/grammar/topics/${slug}`),
+  // `lang` is only sent when the learner picks one: with no parameter the API serves the
+  // language on their profile, which is the same field the AI tutor writes in.
+  topic: (slug: string, lang?: string) =>
+    apiClient.get<GrammarTopic>(`/grammar/topics/${slug}`, { query: { lang } }),
   comparison: (slug: string, other: string) =>
     apiClient.get<GrammarComparison>(`/grammar/topics/${slug}/compare/${other}`),
   map: () => apiClient.get<GrammarMapNode[]>("/grammar/map"),

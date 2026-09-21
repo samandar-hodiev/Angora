@@ -118,9 +118,59 @@ export interface SubscriptionPlan {
   billing_interval: "none" | "month" | "year";
   price_cents: number;
   currency: string;
+  /** Price in so'm. null means the plan is not sold through a so'm provider. */
+  price_uzs: number | null;
   trial_days: number;
   is_default: boolean;
   entitlements: PlanEntitlement[];
+}
+
+/** One attempt to pay for one plan. */
+export interface PaymentTransaction {
+  id: UUID;
+  plan_id: UUID;
+  plan_code: string;
+  plan_name: string;
+  provider: string;
+  status: "created" | "prepared" | "paid" | "canceled" | "failed";
+  /** Minor units of `currency`: tiyin for UZS. */
+  amount_minor: number;
+  currency: string;
+  error_note?: string;
+  paid_at: Timestamp | null;
+  created_at: Timestamp;
+}
+
+export interface PaymentMethods {
+  provider: string | null;
+  available: boolean;
+}
+
+export interface Checkout {
+  transaction_id: UUID;
+  provider: string;
+  url: string;
+  amount_minor: number;
+  currency: string;
+}
+
+/** A message the platform sent to this learner. */
+export interface Notification {
+  id: UUID;
+  type: string;
+  channel: "in_app" | "push" | "email";
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  read_at: Timestamp | null;
+  created_at: Timestamp;
+}
+
+export interface NotificationPreferences {
+  in_app: boolean;
+  email: boolean;
+  /** Template codes this learner has switched off individually. */
+  muted: string[];
 }
 
 export interface LimitState {
@@ -201,4 +251,47 @@ export interface HealthReport {
   version: string;
   time: Timestamp;
   checks: Record<string, { status: "up" | "down"; latency_ms: number }>;
+}
+
+// ---- Progress forecast -------------------------------------------------------------------
+
+export interface ForecastWeek {
+  week_start: Timestamp;
+  sessions: number;
+  avg_score: number;
+  minutes: number;
+}
+
+export interface ForecastSkill {
+  skill: string;
+  /** Points per week. Negative means the skill is going backwards. */
+  trend_per_week: number;
+  avg_score: number;
+  sessions: number;
+}
+
+/**
+ * When this learner reaches the next level, at the rate they are going.
+ *
+ * `available` is false whenever there is no honest answer — too little practice, a flat
+ * trend, a trend going the wrong way, or a date so far out that a straight line through a
+ * few weeks means nothing. `reason` says which.
+ */
+export interface ProgressForecast {
+  available: boolean;
+  reason?: "not_enough_practice" | "no_upward_trend" | "too_far_out" | "ready_now";
+  current_level: string | null;
+  target_level: string | null;
+  next_level: string | null;
+  current_score: number | null;
+  trend_per_week: number;
+  weeks_to_next_level: number | null;
+  projected_date: Timestamp | null;
+  /** R² of the fit: how well a straight line actually describes this learner. */
+  confidence: number;
+  weeks: ForecastWeek[];
+  skills: ForecastSkill[];
+  sessions: number;
+  weekly_sessions: number;
+  method: string;
 }

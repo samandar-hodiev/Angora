@@ -27,15 +27,22 @@ import {
 } from "../components/primitives";
 import { useGrammarAdminTopic, useSaveGrammarTopic, useSetGrammarTopicStatus } from "../hooks";
 import { formatDate } from "../lib/format";
-import { cefrLevels } from "../types";
+import { cefrLevels, contentLanguageLabels, contentLanguages } from "../types";
+import type { ContentLanguage } from "../types";
 import { GrammarLearnerPreview } from "./grammar-preview";
 
 /**
- * One grammar topic.
+ * One grammar topic, in one language.
  *
  * The explanation is versioned: saving writes a new draft version rather than editing the
  * published one, so what learners are reading never changes underneath them. Publishing the
- * topic publishes its newest version and retires the previous one, in one transaction.
+ * topic publishes the newest version of every language that has been written, and retires
+ * the previous ones, in one transaction.
+ *
+ * Languages are versioned separately, and the editor opens one at a time. English is the
+ * one a topic cannot be published without: it is what the AI tutor is given as context, and
+ * what a learner reads when their own language has not been translated yet. The other
+ * languages ship when they are ready and never hold English back.
  */
 
 const workflow = ["draft", "review", "published"] as const;
@@ -44,12 +51,15 @@ const activeTab = "data-[state=active]:text-primary data-[state=active]:ring-1 d
 export function GrammarTopicEditorView({ slug }: { slug: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const topic = useGrammarAdminTopic(slug);
+  const [language, setLanguage] = useState<ContentLanguage>("en");
+  const topic = useGrammarAdminTopic(slug, language);
   const save = useSaveGrammarTopic();
   const setStatus = useSetGrammarTopicStatus();
 
   const [tab, setTab] = useState(params.get("tab") === "preview" ? "preview" : "editor");
   const [publishOpen, setPublishOpen] = useState(false);
+  // Keyed by language, so switching tabs reloads that language's text rather than showing
+  // the previous one until the request lands.
   const [loaded, setLoaded] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -61,8 +71,9 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
     body: "{}",
   });
 
-  if (topic.data && loaded !== topic.data.id) {
-    setLoaded(topic.data.id);
+  const loadKey = topic.data ? `${topic.data.id}:${topic.data.language}` : null;
+  if (topic.data && loadKey !== null && loaded !== loadKey) {
+    setLoaded(loadKey);
     setForm({
       name: topic.data.name,
       description: topic.data.description,
@@ -161,8 +172,20 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
           </ol>
           <p className="mt-3 text-caption text-fg-muted">
             {detail.has_content
-              ? `Explanation version ${detail.version} · ${detail.content_status}`
-              : "No explanation written yet — a topic cannot be published without one."}
+              ? `${contentLanguageLabels[detail.language]} explanation, version ${detail.version} · ${detail.content_status}`
+              : `No ${contentLanguageLabels[detail.language]} explanation yet${detail.language === "en" ? " — a topic cannot be published without the English one." : "."}`}
+          </p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-caption text-fg-muted">
+            <span>Published in:</span>
+            {detail.languages.length === 0 ? (
+              <span>nothing yet</span>
+            ) : (
+              detail.languages.map((code) => (
+                <Badge key={code} variant="outline">
+                  {contentLanguageLabels[code]}
+                </Badge>
+              ))
+            )}
           </p>
         </SectionCard>
 
@@ -265,6 +288,23 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
               title="Explanation"
               description="Saving writes a new draft version; the published one is untouched until you publish"
               action={
+                <>
+                  <div className="mr-2 flex rounded-lg border p-0.5" role="group" aria-label="Explanation language">
+                    {contentLanguages.map((code) => (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => setLanguage(code)}
+                        aria-pressed={language === code}
+                        className={cn(
+                          "rounded-md px-2.5 py-1 text-caption font-medium transition-colors duration-micro",
+                          language === code ? "bg-surface-active text-foreground" : "text-fg-muted hover:text-foreground",
+                        )}
+                      >
+                        {contentLanguageLabels[code]}
+                      </button>
+                    ))}
+                  </div>
                 <Button
                   size="sm"
                   loading={save.isPending}
@@ -280,11 +320,16 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
                           estimated_minutes: form.estimated_minutes,
                           ielts_relevant: form.ielts_relevant,
                           keywords: form.keywords.split(",").map((k) => k.trim()).filter(Boolean),
+                          language,
                           body: parsedBody,
                         },
                       },
                       {
-                        onSuccess: () => toast({ title: "Saved as a new draft version", variant: "success" }),
+                        onSuccess: () =>
+                          toast({
+                            title: `Saved as a new ${contentLanguageLabels[language]} draft`,
+                            variant: "success",
+                          }),
                         onError: (error) =>
                           toast({
                             title: "It could not be saved",
@@ -298,6 +343,7 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
                   <Save aria-hidden />
                   Save
                 </Button>
+                </>
               }
             >
               <div className="grid gap-1.5">
@@ -335,7 +381,7 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
         open={publishOpen}
         onOpenChange={setPublishOpen}
         title={`Publish "${detail.name}"?`}
-        description="The topic and its newest explanation go live together; the previous version is retired."
+        description="The topic goes live with the newest explanation of every language that has been written. Previous versions are retired."
         confirmLabel="Publish"
         loading={setStatus.isPending}
         onConfirm={() => {

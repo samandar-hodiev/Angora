@@ -116,6 +116,11 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.POST("/content", content, m.createContent)
 	g.PATCH("/content/:id", content, m.updateContent)
 	g.POST("/content/:id/status", content, m.setContentStatus)
+	// Revision history. Reading it needs only the content read permission — knowing what a
+	// passage used to say is not a write.
+	g.GET("/content/:id/versions", content, m.contentVersions)
+	g.GET("/content/:id/versions/:version", content, m.contentVersion)
+	g.POST("/content/:id/versions/:version/restore", content, m.restoreContentVersion)
 
 	g.GET("/grammar/categories", content, m.grammarCategories)
 	g.GET("/grammar/topics", content, m.grammarTopics)
@@ -148,8 +153,21 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	billing := authz.RequirePermission(authz.PermSubscriptionsManage)
 	g.GET("/plans", authz.RequirePermission(authz.PermUsersRead), m.plans)
 	g.GET("/entitlements", authz.RequirePermission(authz.PermUsersRead), m.entitlements)
+	g.PATCH("/plans/:id", billing, m.updatePlan)
 	g.PUT("/plans/:id/entitlements/:key", billing, m.setPlanEntitlement)
 	g.DELETE("/plans/:id/entitlements/:key", billing, m.deletePlanEntitlement)
+
+	// Money. Reading it is a business question, so anyone who can see learners can see it;
+	// nothing here can change a payment, because a payment is a record of what happened.
+	g.GET("/payments", authz.RequirePermission(authz.PermUsersRead), m.payments)
+	g.GET("/payments/revenue", authz.RequirePermission(authz.PermUsersRead), m.revenue)
+
+	// Notification templates. Reading is open to anyone who can see learners; editing the
+	// words that go to every learner's inbox is a settings-level action.
+	g.GET("/notification-templates", authz.RequirePermission(authz.PermUsersRead), m.notificationTemplates)
+	g.PATCH("/notification-templates/:code/:locale", authz.RequirePermission(authz.PermSettingsManage), m.updateNotificationTemplate)
+	g.POST("/notification-templates/:code/:locale/preview", authz.RequirePermission(authz.PermUsersRead), m.previewNotificationTemplate)
+	g.GET("/notifications", authz.RequirePermission(authz.PermUsersRead), m.sentNotifications)
 
 	g.GET("/audit-logs", authz.RequirePermission(authz.PermAuditRead), m.auditLog)
 

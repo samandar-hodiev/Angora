@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Columns2, Mic, PenLine } from "lucide-react";
+import { ArrowLeft, ArrowRight, Columns2, Languages, Mic, PenLine } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -12,6 +12,8 @@ import { Meter } from "@/components/ui/data-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { GrammarRelatedTopic, GrammarTopic } from "@engora/types";
+
+import { useProfile } from "@/features/profile/hooks";
 
 import { useGrammarComparison, useGrammarTopic } from "../hooks";
 import { ExplainPanel, TutorPanel, VisualPanel } from "./ai-panels";
@@ -26,7 +28,10 @@ import { MasteryBar, StateBadge } from "./shared";
  * the topic moves into a right rail where it can be glanced at without interrupting the text.
  */
 export function GrammarTopicView({ slug }: { slug: string }) {
-  const topic = useGrammarTopic(slug);
+  // Undefined means "whatever my profile says", which is what almost every learner gets.
+  // A value here is an explicit choice made on this page.
+  const [language, setLanguage] = useState<string | undefined>();
+  const topic = useGrammarTopic(slug, language);
   const compareParam = useSearchParams().get("compare");
 
   if (topic.isPending) return <TopicSkeleton />;
@@ -63,6 +68,7 @@ export function GrammarTopicView({ slug }: { slug: string }) {
 
         {t.content ? (
           <>
+            <LanguageNotice current={t.content_language} onChange={setLanguage} />
             <CanonicalContent topic={t} />
             {/* A second pass over the same rule, written for this learner's level. */}
             <section aria-labelledby="ai-title" className="grid gap-3">
@@ -462,5 +468,57 @@ function TopicSkeleton() {
       </div>
       <Skeleton className="h-64 rounded-xl" />
     </div>
+  );
+}
+
+const languageNames: Record<string, string> = { en: "English", uz: "O'zbekcha", ru: "Русский" };
+
+/**
+ * Which language this explanation is in.
+ *
+ * It says nothing at all to a learner reading the language they asked for — which is most
+ * of them, most of the time, and a banner on every page would be noise. It speaks up in
+ * exactly two cases: the text is in their language and they might want the English, or the
+ * topic has no translation yet and they are reading English instead. The second is the one
+ * worth saying out loud: without it, a learner wonders why one topic is in Uzbek and the
+ * next is not.
+ */
+function LanguageNotice({ current, onChange }: { current?: string; onChange: (lang: string | undefined) => void }) {
+  const profile = useProfile();
+  const [dismissed, setDismissed] = useState(false);
+
+  const preferred = (profile.data?.native_language ?? "en").toLowerCase();
+  if (!current || dismissed || !(preferred in languageNames)) return null;
+
+  if (current === preferred) {
+    if (current === "en") return null;
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-caption text-fg-muted">
+        <Languages className="size-3.5" aria-hidden />
+        Shown in {languageNames[current]}.
+        <button
+          type="button"
+          onClick={() => onChange("en")}
+          className="underline underline-offset-2 transition-colors duration-micro hover:text-foreground"
+        >
+          Read it in English
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-caption text-fg-muted">
+      <Languages className="size-3.5" aria-hidden />
+      This topic has no {languageNames[preferred]} explanation yet, so it is in{" "}
+      {languageNames[current] ?? current}.
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="underline underline-offset-2 transition-colors duration-micro hover:text-foreground"
+      >
+        Got it
+      </button>
+    </p>
   );
 }

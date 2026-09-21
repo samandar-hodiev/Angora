@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { isApiError } from "@/lib/api";
 
@@ -37,12 +38,14 @@ import {
 } from "../components/primitives";
 import {
   useContentDetail,
+  useContentVersions,
+  useRestoreContentVersion,
   useContentTaxonomy,
   useLiveContent,
   useSaveContent,
   useSetContentStatus,
 } from "../hooks";
-import { formatDate, formatNumber } from "../lib/format";
+import { formatDate, formatDateTime, formatNumber } from "../lib/format";
 import type { LiveContentRow } from "../types";
 
 /**
@@ -319,6 +322,7 @@ function ContentEditor({ id, onClose }: { id: string | null; onClose: () => void
     level: "B1",
     difficulty: 5,
     body: "{}",
+    note: "",
   });
 
   // Fill the form the first time the record arrives.
@@ -331,6 +335,7 @@ function ContentEditor({ id, onClose }: { id: string | null; onClose: () => void
       level: detail.data.level ?? "B1",
       difficulty: detail.data.difficulty,
       body: JSON.stringify(detail.data.body ?? {}, null, 2),
+      note: "",
     });
   }
 
@@ -415,12 +420,31 @@ function ContentEditor({ id, onClose }: { id: string | null; onClose: () => void
               </p>
             </div>
 
+            {id && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="content-note">What changed?</Label>
+                <Input
+                  id="content-note"
+                  value={form.note}
+                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  placeholder="Shortened paragraph 3 — learners were timing out"
+                  maxLength={300}
+                />
+                <p className="text-caption text-fg-muted">
+                  Optional, and stored with the revision. A diff can show what changed; only you can say why.
+                </p>
+              </div>
+            )}
+
             {detail.data && (
               <dl className="grid">
                 <KeyValue label="Questions">{detail.data.question_count}</KeyValue>
                 <KeyValue label="Status">{detail.data.status}</KeyValue>
+                <KeyValue label="Revision">{detail.data.version}</KeyValue>
               </dl>
             )}
+
+            {id && <RevisionHistory id={id} currentVersion={detail.data?.version ?? 1} />}
           </div>
         )}
 
@@ -442,6 +466,7 @@ function ContentEditor({ id, onClose }: { id: string | null; onClose: () => void
                     level: form.level,
                     difficulty: form.difficulty,
                     body: JSON.parse(form.body || "{}"),
+                    note: form.note.trim() || undefined,
                   },
                 },
                 {
@@ -464,5 +489,91 @@ function ContentEditor({ id, onClose }: { id: string | null; onClose: () => void
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * What this item used to say.
+ *
+ * Restoring never rewinds: bringing version 3 back produces a new version with version 3's
+ * text, so the history still shows that a restore happened and what it replaced. That is
+ * the entire reason for keeping a history — a log you can edit is not a log.
+ */
+function RevisionHistory({ id, currentVersion }: { id: string; currentVersion: number }) {
+  const versions = useContentVersions(id);
+  const restore = useRestoreContentVersion();
+  const [confirming, setConfirming] = useState<number | null>(null);
+
+  if (versions.isError) {
+    return <LiveDataState error={versions.error} onRetry={() => void versions.refetch()} />;
+  }
+
+  return (
+    <section className="grid gap-2 rounded-lg border p-3" aria-labelledby="revision-history">
+      <h3 id="revision-history" className="text-label text-fg-muted">
+        Revision history
+      </h3>
+      {versions.isPending ? (
+        <Skeleton className="h-20" />
+      ) : (versions.data ?? []).length <= 1 ? (
+        <p className="text-caption text-fg-muted">This item has not been edited since it was created.</p>
+      ) : (
+        <ul className="grid gap-1">
+          {(versions.data ?? []).map((version) => (
+            <li key={version.version} className="flex items-start justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-surface-hover">
+              <span className="grid min-w-0 gap-0.5">
+                <span className="flex items-center gap-2 text-body-sm">
+                  <span className="tabular-nums">v{version.version}</span>
+                  <span className="truncate text-fg-secondary">{version.title}</span>
+                  {version.is_current && <Badge variant="outline">current</Badge>}
+                </span>
+                <span className="truncate text-caption text-fg-muted">
+                  {formatDateTime(version.created_at)}
+                  {version.author ? ` · ${version.author}` : ""}
+                  {version.note ? ` · ${version.note}` : ""}
+                </span>
+              </span>
+              {!version.is_current && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setConfirming(version.version)}
+                >
+                  Restore
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ConfirmDialog
+        open={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title={`Restore version ${confirming ?? ""}?`}
+        description={`The current text becomes version ${currentVersion + 1} of the history, and version ${confirming ?? ""}'s text goes live. Nothing is deleted.`}
+        confirmLabel="Restore"
+        loading={restore.isPending}
+        onConfirm={() => {
+          if (confirming === null) return;
+          restore.mutate(
+            { id, version: confirming },
+            {
+              onSuccess: () => {
+                toast({ title: `Version ${confirming} restored`, variant: "success" });
+                setConfirming(null);
+              },
+              onError: (error) =>
+                toast({
+                  title: "It could not be restored",
+                  description: isApiError(error) ? error.message : undefined,
+                  variant: "error",
+                }),
+            },
+          );
+        }}
+      />
+    </section>
   );
 }

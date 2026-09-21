@@ -11,6 +11,8 @@ import { Meter } from "@/components/ui/data-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
+import { CheckoutButton } from "@/features/payments/components/checkout";
+
 import { useCurrentSubscription, useFeature, usePlans } from "../hooks";
 import { describeEntitlement, formatPlanPrice, usagePercent } from "../lib/entitlements";
 
@@ -127,9 +129,13 @@ export function PlanList() {
                 </li>
               ))}
             </ul>
-            <Button className="mt-auto w-full" variant={isCurrent ? "outline" : "default"} disabled>
-              {isCurrent ? "Your plan" : "Checkout available soon"}
-            </Button>
+            <CheckoutButton
+              className="mt-auto w-full"
+              planCode={plan.code}
+              planName={plan.name}
+              payable={Boolean(plan.price_uzs && plan.price_uzs > 0)}
+              isCurrent={isCurrent}
+            />
           </article>
         );
       })}

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -70,17 +71,21 @@ type SpeakingFeedback struct {
 }
 
 type SpeakingSession struct {
-	ID             uuid.UUID         `json:"id"`
-	TaskID         *uuid.UUID        `json:"task_id"`
-	Prompt         string            `json:"prompt"`
+	ID     uuid.UUID  `json:"id"`
+	TaskID *uuid.UUID `json:"task_id"`
+	Prompt string     `json:"prompt"`
+	/** practice for a single recording, live for a coached conversation. */
+	Mode           string            `json:"mode"`
 	Status         string            `json:"status"`
 	Score          *float64          `json:"overall_score"`
 	DurationMs     *int              `json:"duration_ms"`
 	Transcript     string            `json:"transcript,omitempty"`
 	WordsPerMinute *float64          `json:"words_per_minute,omitempty"`
 	Feedback       *SpeakingFeedback `json:"feedback,omitempty"`
-	CreatedAt      time.Time         `json:"created_at"`
-	CompletedAt    *time.Time        `json:"completed_at"`
+	/** Present for a live session: the conversation, in order. */
+	Turns       []SpeakingTurn `json:"turns,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	CompletedAt *time.Time     `json:"completed_at"`
 }
 
 func (m *Module) registerSpeakingRoutes(v1 *gin.RouterGroup) {
@@ -89,6 +94,8 @@ func (m *Module) registerSpeakingRoutes(v1 *gin.RouterGroup) {
 	g.POST("/sessions", m.submitSpeaking)
 	g.GET("/sessions", m.listSpeakingSessions)
 	g.GET("/sessions/:id", m.speakingSession)
+	g.GET("/sessions/:id/turns", m.speakingTurns)
+	g.GET("/live", m.liveSpeaking)
 }
 
 func (m *Module) speakingTasks(c *gin.Context) {
@@ -420,11 +427,11 @@ func (m *Module) listSpeakingSessions(c *gin.Context) {
 	page = page.Normalize()
 
 	rows, err := m.pool.Query(c.Request.Context(), `
-		SELECT sp.id, sp.content_item_id, coalesce(ci.title, ''), sp.status, sp.overall_score::float8,
-		       sp.duration_ms, sp.created_at, sp.completed_at, count(*) OVER ()
+		SELECT sp.id, sp.content_item_id, coalesce(ci.title, ''), sp.mode, sp.status,
+		       sp.overall_score::float8, sp.duration_ms, sp.created_at, sp.completed_at, count(*) OVER ()
 		FROM speaking_sessions sp
 		LEFT JOIN content_items ci ON ci.id = sp.content_item_id
-		WHERE sp.user_id = $1 AND sp.mode = 'practice'
+		WHERE sp.user_id = $1 AND sp.mode IN ('practice', 'live')
 		ORDER BY sp.created_at DESC
 		OFFSET $2 LIMIT $3`, p.UserID, page.Offset(), page.PageSize)
 	if err != nil {
@@ -437,7 +444,7 @@ func (m *Module) listSpeakingSessions(c *gin.Context) {
 	var total int64
 	for rows.Next() {
 		var s SpeakingSession
-		if err := rows.Scan(&s.ID, &s.TaskID, &s.Prompt, &s.Status, &s.Score, &s.DurationMs,
+		if err := rows.Scan(&s.ID, &s.TaskID, &s.Prompt, &s.Mode, &s.Status, &s.Score, &s.DurationMs,
 			&s.CreatedAt, &s.CompletedAt, &total); err != nil {
 			httpx.Fail(c, err)
 			return
@@ -471,15 +478,16 @@ func (m *Module) respondWithSpeakingSession(c *gin.Context, id, userID uuid.UUID
 		raw        []byte
 		transcript *string
 	)
-	err := m.pool.QueryRow(c.Request.Context(), `
-		SELECT sp.id, sp.content_item_id, coalesce(ci.title, ''), sp.status, sp.overall_score::float8,
-		       sp.duration_ms, sp.created_at, sp.completed_at, a.result, t.text
+	ctx := c.Request.Context()
+	err := m.pool.QueryRow(ctx, `
+		SELECT sp.id, sp.content_item_id, coalesce(ci.title, ''), sp.mode, sp.status,
+		       sp.overall_score::float8, sp.duration_ms, sp.created_at, sp.completed_at, a.result, t.text
 		FROM speaking_sessions sp
 		LEFT JOIN content_items ci ON ci.id = sp.content_item_id
 		LEFT JOIN ai_analyses a ON a.id = sp.analysis_id
 		LEFT JOIN transcripts t ON t.id = sp.transcript_id
 		WHERE sp.id = $1 AND sp.user_id = $2`, id, userID).
-		Scan(&s.ID, &s.TaskID, &s.Prompt, &s.Status, &s.Score, &s.DurationMs, &s.CreatedAt,
+		Scan(&s.ID, &s.TaskID, &s.Prompt, &s.Mode, &s.Status, &s.Score, &s.DurationMs, &s.CreatedAt,
 			&s.CompletedAt, &raw, &transcript)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, apperr.NotFound("Session"))
@@ -488,6 +496,22 @@ func (m *Module) respondWithSpeakingSession(c *gin.Context, id, userID uuid.UUID
 	if err != nil {
 		httpx.Fail(c, err)
 		return
+	}
+	if s.Mode == "live" {
+		// A live session's transcript_id points at its last turn, because a transcripts row
+		// belongs to one recording. The conversation itself lives in speaking_turns.
+		turns, err := m.turnsOf(ctx, id, userID)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		s.Turns = turns
+		parts := make([]string, 0, len(turns))
+		for _, t := range turns {
+			parts = append(parts, t.Transcript)
+		}
+		joined := strings.Join(parts, "\n\n")
+		transcript = &joined
 	}
 	if transcript != nil {
 		s.Transcript = *transcript

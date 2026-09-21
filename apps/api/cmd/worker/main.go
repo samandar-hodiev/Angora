@@ -43,6 +43,7 @@ func run() error {
 
 	worker := jobs.NewWorker(container.Jobs, log, container.Reporter)
 	app.RegisterJobHandlers(worker, container)
+	app.StartScheduler(ctx, container)
 
 	log.Info("worker started", slog.Any("job_types", worker.Types()), slog.Int("concurrency", worker.Concurrency))
 	worker.Run(ctx)

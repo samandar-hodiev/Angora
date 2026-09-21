@@ -64,6 +64,10 @@ type Module struct {
 	store     Storage
 	maxUpload int64
 	track     Tracker
+	// conversation drives the live coach's side of a spoken conversation. Optional.
+	conversation Conversationalist
+	// origins are the browser origins allowed to open a WebSocket session.
+	origins []string
 }
 
 type Deps struct {
@@ -81,6 +85,13 @@ type Deps struct {
 	Storage        Storage
 	MaxUploadBytes int64
 	Tracker        Tracker
+	// Conversation generates the live coach's follow-up questions. Nil falls back to a
+	// fixed set of open questions rather than disabling the coach.
+	Conversation Conversationalist
+	// AllowedOrigins are the browser origins permitted to open a live session. WebSocket
+	// upgrades are not covered by CORS, so this list is the only thing between a logged-in
+	// learner and a session opened by somebody else's page.
+	AllowedOrigins []string
 }
 
 func NewModule(d Deps) *Module {
@@ -89,7 +100,8 @@ func NewModule(d Deps) *Module {
 		maxUpload = 12 << 20
 	}
 	return &Module{pool: d.Pool, plans: d.Plans, usage: d.Usage, evaluator: d.Evaluator,
-		speaker: d.Speaker, store: d.Storage, maxUpload: maxUpload, track: d.Tracker}
+		speaker: d.Speaker, store: d.Storage, maxUpload: maxUpload, track: d.Tracker,
+		conversation: d.Conversation, origins: d.AllowedOrigins}
 }
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {

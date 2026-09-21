@@ -109,6 +109,25 @@ export function GrammarCmsView() {
         ),
     },
     {
+      key: "languages",
+      header: "Languages",
+      hideBelow: "xl",
+      // Which translations a learner can actually get. A topic published only in English is
+      // not broken — it is simply not translated yet, and that is what this column says.
+      cell: (row) =>
+        row.languages.length === 0 ? (
+          <span className="text-fg-muted">—</span>
+        ) : (
+          <span className="flex flex-wrap gap-1">
+            {row.languages.map((code) => (
+              <Badge key={code} variant="outline" className="uppercase">
+                {code}
+              </Badge>
+            ))}
+          </span>
+        ),
+    },
+    {
       key: "practice",
       header: "Practice",
       hideBelow: "xl",

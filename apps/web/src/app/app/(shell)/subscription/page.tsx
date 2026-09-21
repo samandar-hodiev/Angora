@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHeader, SectionTitle } from "@/components/common/page-header";
+import { PaymentHistory } from "@/features/payments/components/payment-history";
 import { CurrentPlan, PlanList } from "@/features/subscription/components/subscription-views";
 
 export const metadata: Metadata = { title: "Subscription" };
@@ -13,6 +14,10 @@ export default function SubscriptionPage() {
       <section aria-labelledby="plans-title" className="mt-10">
         <SectionTitle id="plans-title" title="Plans" />
         <PlanList />
+      </section>
+      <section aria-labelledby="payments-title" className="mt-10">
+        <SectionTitle id="payments-title" title="Payments" />
+        <PaymentHistory />
       </section>
     </>
   );

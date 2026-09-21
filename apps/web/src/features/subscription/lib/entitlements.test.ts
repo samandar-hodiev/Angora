@@ -1,7 +1,7 @@
 import type { Entitlements, SubscriptionPlan } from "@engora/types";
 import { describe, expect, it } from "vitest";
 
-import { describeEntitlement, formatPlanPrice, hasFeature, usagePercent } from "./entitlements";
+import { describeEntitlement, formatMinor, formatPlanPrice, hasFeature, usagePercent } from "./entitlements";
 
 const entitlements: Entitlements = {
   plan_code: "free",
@@ -38,8 +38,24 @@ describe("entitlements", () => {
   });
 
   it("formats prices from the plan", () => {
-    const plan = { price_cents: 999, currency: "USD", billing_interval: "month" } as SubscriptionPlan;
+    const plan = { price_cents: 999, currency: "USD", billing_interval: "month", price_uzs: null } as SubscriptionPlan;
     expect(formatPlanPrice(plan, "en-US")).toBe("$9.99 / month");
     expect(formatPlanPrice({ ...plan, price_cents: 0 }, "en-US")).toBe("Free");
+  });
+
+  it("shows the som price when there is one, because that is what gets charged", () => {
+    const plan = {
+      price_cents: 999,
+      currency: "USD",
+      billing_interval: "month",
+      price_uzs: 49000,
+    } as SubscriptionPlan;
+    // Not "$9.99": the provider bills so'm, and the price shown has to be the price paid.
+    expect(formatPlanPrice(plan, "en-US")).toBe("49\u00a0000 so'm / month");
+  });
+
+  it("formats minor units for the currency they are in", () => {
+    expect(formatMinor(4_900_000, "UZS")).toBe("49\u00a0000 so'm");
+    expect(formatMinor(999, "USD")).toBe("$9.99");
   });
 });

@@ -27,6 +27,7 @@ import {
   useAssessmentAttempts,
   useAssessmentConfigs,
   useAssessmentStats,
+  useCreateAssessmentConfig,
 } from "../hooks";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { AssessmentAttempt, AssessmentConfig, AttemptStatus, CEFRLevel } from "../types";
@@ -235,6 +236,7 @@ function ConfigsSection() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium capitalize">{config.kind}</span>
                   <Badge variant="outline">v{config.version}</Badge>
+                  {config.config.adaptive && <Badge variant="outline">adaptive</Badge>}
                   <Badge
                     className={
                       config.status === "active"
@@ -292,6 +294,8 @@ function ConfigsSection() {
           </ul>
         )}
       </SectionCard>
+
+      <AdaptiveModeCard configs={configs.data ?? []} />
 
       <ConfirmDialog
         open={pending !== null}
@@ -441,6 +445,96 @@ function AttemptsSection({ days }: { days: number }) {
           </>
         )}
       </SectionCard>
+    </>
+  );
+}
+
+/**
+ * Adaptive placement.
+ *
+ * The default test picks all four sections up front, around the level the learner said they
+ * were — a guess by somebody who, by definition, does not know their own level. Adaptive
+ * mode keeps reading fixed (nothing better is known yet) and chooses every later section
+ * around what the completed sections actually measured, from the same item bank.
+ *
+ * Switching it on is a configuration change like any other: a new version is created and
+ * activated, and assessments already in progress keep the version they started under.
+ */
+function AdaptiveModeCard({ configs }: { configs: AssessmentConfig[] }) {
+  const create = useCreateAssessmentConfig();
+  const activate = useActivateAssessmentConfig();
+  const [confirming, setConfirming] = useState(false);
+
+  const active = configs.find((c) => c.status === "active");
+  const adaptive = active?.config.adaptive ?? false;
+  const busy = create.isPending || activate.isPending;
+
+  if (!active) return null;
+
+  function apply() {
+    if (!active) return;
+    const next = { ...active.config, adaptive: !adaptive };
+    create.mutate(
+      { kind: active.kind, config: next },
+      {
+        onSuccess: (draft) =>
+          activate.mutate(draft.id, {
+            onSuccess: () =>
+              toast({
+                title: adaptive ? "Adaptive placement switched off" : "Adaptive placement switched on",
+                description: `Running on ${active.kind} v${draft.version}.`,
+                variant: "success",
+              }),
+            onError: (error) =>
+              toast({
+                title: "The new version was created but not activated",
+                description: isApiError(error) ? error.message : undefined,
+                variant: "error",
+              }),
+          }),
+        onError: (error) =>
+          toast({
+            title: "The change could not be saved",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
+      },
+    );
+    setConfirming(false);
+  }
+
+  return (
+    <>
+      <SectionCard
+        className="mt-5"
+        title="Adaptive placement"
+        description={`Currently ${adaptive ? "on" : "off"} for ${active.kind} v${active.version}`}
+        action={
+          <Button size="sm" variant={adaptive ? "outline" : "default"} loading={busy} onClick={() => setConfirming(true)}>
+            {adaptive ? "Switch off" : "Switch on"}
+          </Button>
+        }
+      >
+        <p className="text-body-sm text-fg-secondary">
+          With it off, all four sections are chosen around the level the learner selected before starting. With it on,
+          only reading is — every later section is chosen around what the completed sections measured, from the same
+          item bank.
+        </p>
+        <p className="mt-2 text-caption text-fg-muted">
+          A learner who says C1 and then reads at A2 is not handed a C1 listening section. Nothing about scoring
+          changes: the bands, the combination rules and the level each item targets are the same either way.
+        </p>
+      </SectionCard>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={adaptive ? "Switch adaptive placement off?" : "Switch adaptive placement on?"}
+        description={`A new version of ${active.kind} is created and activated. Tests already in progress keep the version they started under.`}
+        confirmLabel={adaptive ? "Switch off" : "Switch on"}
+        loading={busy}
+        onConfirm={apply}
+      />
     </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Mic } from "lucide-react";
+import { Clock, Mic, Radio } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { AudioRecorder } from "@/components/learning/audio-recorder";
@@ -12,12 +13,24 @@ import { Label } from "@/components/ui/label";
 import { Meter } from "@/components/ui/data-display";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePlatformFeature } from "@/features/platform/hooks";
 import { isApiError } from "@/lib/api";
 
 import { useSpeakingSessions, useSpeakingTasks, useSubmitSpeaking } from "./hooks";
 import type { SpeakingFeedback } from "./api";
 
 const MAX_DURATION_MS = 120_000;
+
+function LiveCoachLink() {
+  return (
+    <Button variant="outline" asChild>
+      <Link href="/app/speaking/live">
+        <Radio aria-hidden />
+        Live coach
+      </Link>
+    </Button>
+  );
+}
 
 /**
  * Speaking practice.
@@ -27,6 +40,9 @@ const MAX_DURATION_MS = 120_000;
  * what the feedback was judging.
  */
 export function SpeakingView({ initialContentId }: { initialContentId?: string }) {
+  // The owner's switch for whether the product offers live coaching at all. Whether *this*
+  // learner may use it is a plan question, and the live page asks it separately.
+  const liveCoach = usePlatformFeature("realtime_speaking_coach");
   const tasks = useSpeakingTasks();
   const history = useSpeakingSessions();
   const submit = useSubmitSpeaking();
@@ -71,6 +87,7 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
       <PageHeader
         title="Speaking practice"
         description="Record an answer. You get the transcript back with feedback on fluency, grammar, vocabulary and relevance."
+        actions={liveCoach ? <LiveCoachLink /> : undefined}
       />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">

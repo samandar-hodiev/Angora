@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CreditCard, LogOut, Menu, Shield, UserRound } from "lucide-react";
+import { CreditCard, LogOut, Menu, Shield, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
@@ -16,7 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   initials,
@@ -31,6 +30,7 @@ import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
 import { useSyncAppearance } from "@/features/profile/appearance";
 import { WallpaperLayer } from "@/features/profile/components/wallpaper-layer";
+import { NotificationsMenu } from "@/features/notifications/components/notifications-menu";
 import { useProfile } from "@/features/profile/hooks";
 import { useWallpaper } from "@/features/profile/wallpaper";
 import { apiAssetUrl } from "@/lib/media";
@@ -178,26 +178,6 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
         ))}
       </div>
     </nav>
-  );
-}
-
-function NotificationsMenu() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <IconButton label="Notifications">
-          <Bell />
-        </IconButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
-        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-        <div className="grid justify-items-center gap-1 px-4 py-6 text-center">
-          <Bell className="size-5 text-fg-muted" aria-hidden />
-          <p className="text-label">You&apos;re all caught up</p>
-          <p className="text-caption text-fg-muted">Feedback results and reminders will appear here.</p>
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

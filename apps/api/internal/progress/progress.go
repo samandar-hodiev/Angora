@@ -67,6 +67,7 @@ func NewModule(pool *pgxpool.Pool) *Module { return &Module{pool: pool} }
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g := v1.Group("", authz.RequirePermission(authz.PermLearningPractice))
 	g.GET("/progress", m.handleOverview)
+	g.GET("/progress/forecast", m.handleForecast)
 	g.GET("/history", m.handleHistory)
 }
 

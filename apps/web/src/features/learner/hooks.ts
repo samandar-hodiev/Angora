@@ -15,6 +15,16 @@ export function useProgress() {
   return useQuery({ queryKey: queryKeys.progress.overview, queryFn: learnerApi.progress, enabled: useAuthed() });
 }
 
+export function useForecast() {
+  return useQuery({
+    queryKey: queryKeys.progress.forecast,
+    queryFn: learnerApi.forecast,
+    enabled: useAuthed(),
+    // A projection built from weekly averages does not move between page views.
+    staleTime: 30 * 60_000,
+  });
+}
+
 export function useHistory(page = 1) {
   return useQuery({
     queryKey: queryKeys.progress.history(page),

@@ -121,6 +121,12 @@ export interface GrammarVisual {
 
 export interface GrammarTopic extends GrammarTopicSummary {
   content: GrammarContent | null;
+  /**
+   * The language the explanation is actually in. Not always the one that was asked for: a
+   * topic with no Uzbek explanation yet falls back to English, and the page says so rather
+   * than pretending.
+   */
+  content_language?: "en" | "uz" | "ru";
   prerequisites: GrammarRelatedTopic[];
   related: GrammarRelatedTopic[];
   compare: GrammarRelatedTopic[];

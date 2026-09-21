@@ -15,6 +15,7 @@ import { useGrammarProgress } from "@/features/grammar/hooks";
 import { formatCategory, timeAgo } from "@/lib/learning-format";
 
 import { useMistakeSummary, useProgress } from "../hooks";
+import { ForecastCard } from "./forecast-card";
 
 export function ProgressView() {
   const progress = useProgress();
@@ -90,6 +91,11 @@ export function ProgressView() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="forecast-title" className="mt-10">
+        <SectionTitle id="forecast-title" title="What's next" />
+        <ForecastCard />
       </section>
 
       <div className="mt-10 grid gap-10 lg:grid-cols-2">

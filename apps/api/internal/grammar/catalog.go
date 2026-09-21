@@ -204,27 +204,35 @@ func (m *Module) topic(c *gin.Context) {
 	ctx := c.Request.Context()
 	slug := c.Param("slug")
 
+	language := m.readingLanguage(ctx, p.UserID, c.Query("lang"))
+
 	var (
 		topic    Topic
 		topicID  uuid.UUID
 		body     []byte
+		bodyLang *string
 		progress Progress
 	)
 	err := m.pool.QueryRow(ctx, `
 		SELECT t.id, `+topicColumns+`,
-		       COALESCE(gc.body, 'null'::jsonb),
+		       COALESCE(gc.body, 'null'::jsonb), gc.language,
 		       COALESCE(p.mastery, 0)::float8, COALESCE(p.understanding, 0)::float8,
 		       COALESCE(p.practice, 0)::float8, COALESCE(p.application, 0)::float8,
 		       COALESCE(p.correct, 0),
 		       (SELECT count(*) FROM grammar_questions q
 		         WHERE q.grammar_topic_id = t.id AND q.status = 'published')::int`+
 		topicJoins+`
-		LEFT JOIN grammar_content gc ON gc.grammar_topic_id = t.id AND gc.status = 'published'
-		WHERE t.slug = $2 AND t.status = 'published'`, p.UserID, slug).
+		LEFT JOIN LATERAL (
+			SELECT gcx.body, gcx.language FROM grammar_content gcx
+			WHERE gcx.grammar_topic_id = t.id AND gcx.status = 'published'
+			  AND gcx.language IN ($3, 'en')
+			ORDER BY (gcx.language = $3) DESC LIMIT 1
+		) gc ON true
+		WHERE t.slug = $2 AND t.status = 'published'`, p.UserID, slug, language).
 		Scan(&topicID, &topic.Slug, &topic.Name, &topic.Description, &topic.Category, &topic.CategoryName,
 			&topic.Group, &topic.Level, &topic.CEFRLevels, &topic.Difficulty, &topic.IELTSRelevant,
 			&topic.EstimatedMinutes, &topic.HasPractice, &topic.Mastery, &topic.State, &topic.Attempts,
-			&topic.LastPracticedAt, &body, &progress.Mastery, &progress.Understanding,
+			&topic.LastPracticedAt, &body, &bodyLang, &progress.Mastery, &progress.Understanding,
 			&progress.Practice, &progress.Application, &progress.Correct, &topic.QuestionCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, apperr.NotFound("Grammar topic"))
@@ -243,6 +251,9 @@ func (m *Module) topic(c *gin.Context) {
 			m.log.Error("grammar content is not readable", "topic", slug, "error", err.Error())
 		} else {
 			topic.Content = &content
+			if bodyLang != nil {
+				topic.ContentLanguage = *bodyLang
+			}
 		}
 	}
 	progress.State = topic.State
@@ -477,4 +488,30 @@ func (m *Module) visualsOf(ctx context.Context, topicID uuid.UUID) ([]Visual, er
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+// contentLanguages are the languages a curated explanation can be written in.
+var contentLanguages = map[string]bool{"en": true, "uz": true, "ru": true}
+
+// readingLanguage decides which explanation a learner is shown.
+//
+// An explicit ?lang wins, because a learner who switches the language on the page means it.
+// Otherwise it is the language they said they speak — the same field the AI tutor already
+// writes in, so the curated text and the generated text never disagree about the reader.
+// Anything unrecognised becomes English, which every topic has.
+func (m *Module) readingLanguage(ctx context.Context, userID uuid.UUID, requested string) string {
+	if lang := strings.ToLower(strings.TrimSpace(requested)); contentLanguages[lang] {
+		return lang
+	}
+	if userID == uuid.Nil {
+		return "en"
+	}
+	var native *string
+	_ = m.pool.QueryRow(ctx, `SELECT native_language FROM profiles WHERE user_id = $1`, userID).Scan(&native)
+	if native != nil {
+		if lang := strings.ToLower(strings.TrimSpace(*native)); contentLanguages[lang] {
+			return lang
+		}
+	}
+	return "en"
 }

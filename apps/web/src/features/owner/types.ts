@@ -22,8 +22,18 @@ export type PlanCode = "free" | "premium" | "unlimited";
 export type PlanFilter = PlanCode | "all";
 export const planCodes: PlanCode[] = ["free", "premium", "unlimited"];
 
-export type ContentLanguage = "uz" | "en" | "ru";
-export const contentLanguages: ContentLanguage[] = ["uz", "en", "ru"];
+/**
+ * The languages a curated grammar explanation can be written in. English leads because it
+ * is the one every topic must have: a topic cannot be published without it, and it is what
+ * a learner falls back to when their own language has not been written yet.
+ */
+export type ContentLanguage = "en" | "uz" | "ru";
+export const contentLanguages: ContentLanguage[] = ["en", "uz", "ru"];
+export const contentLanguageLabels: Record<ContentLanguage, string> = {
+  en: "English",
+  uz: "O'zbekcha",
+  ru: "Русский",
+};
 
 export type SkillKey =
   | "grammar"
@@ -587,6 +597,8 @@ export interface AssessmentConfig {
   status: "draft" | "active" | "retired";
   config: {
     grace_seconds?: number;
+    /** Chooses each section after the first around what the earlier sections measured. */
+    adaptive?: boolean;
     sections?: { skill: AssessmentSkill; time_limit_seconds: number; items: Record<string, number>; max_plays?: number; max_attempts?: number }[];
   };
   attempts: number;
@@ -654,6 +666,8 @@ export interface PlanRow {
   billing_interval: "none" | "month" | "year";
   price_cents: number;
   currency: string;
+  /** So'm price used by Click. null means the plan cannot be bought in so'm. */
+  price_uzs: number | null;
   trial_days: number;
   is_default: boolean;
   is_public: boolean;
@@ -894,6 +908,8 @@ export interface LiveContentDetail extends LiveContentRow {
   body: Record<string, unknown>;
   tags: string[];
   question_count: number;
+  /** The revision learners are currently reading. */
+  version: number;
   created_at: ISODate;
 }
 
@@ -917,6 +933,8 @@ export interface LiveGrammarTopicRow {
   estimated_minutes: number;
   has_content: boolean;
   content_status: string | null;
+  /** Languages with a published explanation. */
+  languages: ContentLanguage[];
   question_count: number;
   published_at: ISODate | null;
   updated_at: ISODate;
@@ -927,7 +945,10 @@ export interface LiveGrammarTopicDetail extends LiveGrammarTopicRow {
   body: Record<string, unknown>;
   version: number;
   source: string | null;
+  /** The language `body` is written in: the editor opens one at a time. */
+  language: ContentLanguage;
 }
+
 
 export interface LiveGrammarCategory {
   slug: string;
@@ -961,4 +982,108 @@ export interface LiveWallpaper {
   animated: boolean;
   in_use: number;
   updated_at: ISODate;
+}
+
+// ---- Payments -------------------------------------------------------------------------------
+
+export type PaymentStatus = "created" | "prepared" | "paid" | "canceled" | "failed";
+
+export interface PaymentRow {
+  id: UUID;
+  learner_id: UUID;
+  learner_email: string;
+  plan_code: string;
+  plan_name: string;
+  provider: string;
+  status: PaymentStatus;
+  /** Minor units of `currency`: tiyin for UZS. */
+  amount_minor: number;
+  currency: string;
+  error_note: string;
+  has_subscription: boolean;
+  paid_at: ISODate | null;
+  created_at: ISODate;
+}
+
+export interface RevenueDay {
+  date: ISODate;
+  amount_minor: number;
+  payments: number;
+}
+
+export interface PlanMoney {
+  plan_code: string;
+  plan_name: string;
+  payments: number;
+  amount_minor: number;
+}
+
+export interface RevenueReport {
+  days: number;
+  currency: string;
+  paid_minor: number;
+  payments: number;
+  attempts: number;
+  failure_rate: number;
+  paying_users: number;
+  average_minor: number;
+  daily: RevenueDay[];
+  by_plan: PlanMoney[];
+  /** Callbacks whose signature did not verify: a rotated secret, or somebody probing. */
+  callback_signature_failures: number;
+}
+
+// ---- Notification templates ------------------------------------------------------------------
+
+export interface NotificationTemplateRow {
+  code: string;
+  locale: ContentLanguage;
+  name: string;
+  description: string;
+  in_app: boolean;
+  email: boolean;
+  subject: string;
+  body: string;
+  variables: string[];
+  is_active: boolean;
+  /** Placeholders in the text that `variables` does not declare — a typo worth showing. */
+  missing_variables: string[] | null;
+  sent_30d: number;
+  updated_at: ISODate;
+}
+
+export interface TemplatePreview {
+  subject: string;
+  body: string;
+  missing_variables: string[] | null;
+}
+
+export interface SentNotificationRow {
+  id: UUID;
+  learner_id: UUID;
+  learner_email: string;
+  template_code: string | null;
+  channel: "in_app" | "push" | "email";
+  title: string;
+  sent_at: ISODate | null;
+  read_at: ISODate | null;
+  created_at: ISODate;
+}
+
+// ---- Content revisions ------------------------------------------------------------------------
+
+export interface ContentVersionRow {
+  version: number;
+  title: string;
+  difficulty: number;
+  tags: string[];
+  status: string;
+  note: string;
+  author: string | null;
+  is_current: boolean;
+  created_at: ISODate;
+}
+
+export interface ContentVersionDetail extends ContentVersionRow {
+  body: Record<string, unknown>;
 }

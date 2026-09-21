@@ -87,6 +87,14 @@ type Deps struct {
 	EmailCodes EmailCodeStore
 	// Tracker receives product analytics events; nil disables them.
 	Tracker analytics.Tracker
+	// Notifier sends the welcome message; nil disables it. A failure here never stops a
+	// signup: the account exists whether or not the greeting arrived.
+	Notifier Notifier
+}
+
+// Notifier delivers a notification template to a learner.
+type Notifier interface {
+	Notify(ctx context.Context, userID uuid.UUID, templateCode string, vars map[string]any) error
 }
 
 type Options struct {
@@ -111,6 +119,7 @@ type Service struct {
 	google     GoogleVerifier
 	emailCodes EmailCodeStore
 	tracker    analytics.Tracker
+	notifier   Notifier
 	refreshTTL time.Duration
 	resetTTL   time.Duration
 	webURL     string
@@ -133,6 +142,7 @@ func NewService(d Deps, o Options) (*Service, error) {
 		users: d.Users, tokens: d.Tokens, resets: d.Resets, hasher: d.Hasher, issuer: d.Issuer,
 		audit: d.Audit, mailer: d.Mailer, identities: d.Identities, google: d.Google, emailCodes: d.EmailCodes,
 		tracker:    trackerOrNop(d.Tracker),
+		notifier:   d.Notifier,
 		refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
 		webURL: strings.TrimRight(o.WebURL, "/"), devCodes: o.ExposeDevCodes, now: time.Now, dummyHash: dummy,
 	}, nil
@@ -169,6 +179,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, client ClientI
 	s.audit.Record(ctx, audit.Entry{ActorID: &user.ID, Action: audit.ActionRegistered,
 		EntityType: "user", EntityID: user.ID.String(), IP: client.IP, UserAgent: client.UserAgent,
 		Metadata: map[string]any{"platform": client.Platform}})
+	s.welcome(ctx, user)
 
 	session, err := s.startSession(ctx, user, newFamilyID(), client)
 	session.IsNewUser = err == nil
@@ -410,4 +421,19 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+// welcome greets a brand-new account. Deliberately silent on failure: a greeting that did
+// not arrive is not a reason to fail a registration that did.
+func (s *Service) welcome(ctx context.Context, user users.User) {
+	if s.notifier == nil {
+		return
+	}
+	// users.User carries no display name, and the profile may not have one yet, so the
+	// local part of the address is the greeting of last resort.
+	name := "there"
+	if at := strings.Index(user.Email, "@"); at > 0 {
+		name = user.Email[:at]
+	}
+	_ = s.notifier.Notify(ctx, user.ID, "welcome", map[string]any{"name": name})
 }

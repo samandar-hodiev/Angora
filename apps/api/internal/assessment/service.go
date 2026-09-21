@@ -53,6 +53,12 @@ type ProgressNotifier interface {
 	PlacementProgressed(ctx context.Context, userID, assessmentID uuid.UUID, step onboarding.Step) error
 }
 
+// Notifier tells the learner their result is ready. Optional: a missing notifier must
+// never stop an assessment from being scored.
+type Notifier interface {
+	Notify(ctx context.Context, userID uuid.UUID, templateCode string, vars map[string]any) error
+}
+
 type Deps struct {
 	Pool           *pgxpool.Pool
 	Storage        storage.ObjectStorage
@@ -60,6 +66,7 @@ type Deps struct {
 	Evaluator      Evaluator
 	Plans          PlanGenerator
 	Progress       ProgressNotifier
+	Notifier       Notifier
 	Tracker        analytics.Tracker
 	Log            *slog.Logger
 	MaxUploadBytes int64
@@ -72,6 +79,7 @@ type Service struct {
 	evaluator Evaluator
 	plans     PlanGenerator
 	progress  ProgressNotifier
+	notifier  Notifier
 	tracker   analytics.Tracker
 	log       *slog.Logger
 	maxUpload int64
@@ -81,7 +89,8 @@ type Service struct {
 func NewService(d Deps) *Service {
 	return &Service{
 		pool: d.Pool, store: d.Storage, queue: d.Queue, evaluator: d.Evaluator, plans: d.Plans,
-		progress: d.Progress, tracker: d.Tracker, log: d.Log, maxUpload: d.MaxUploadBytes, now: time.Now,
+		progress: d.Progress, notifier: d.Notifier, tracker: d.Tracker, log: d.Log,
+		maxUpload: d.MaxUploadBytes, now: time.Now,
 	}
 }
 
@@ -184,9 +193,17 @@ func loadSection(ctx context.Context, q levels.Querier, assessmentID uuid.UUID, 
 
 func (s *Service) sectionView(cfg Config, r sectionRow) Section {
 	sc, _ := cfg.Section(r.Skill)
+	itemCount := r.ItemCount
+	if itemCount == 0 {
+		// An adaptive section has no items until it starts. The overview still has to say
+		// how long it is, so it reports what the configuration promises.
+		for _, n := range sc.Items {
+			itemCount += n
+		}
+	}
 	v := Section{
 		Skill: r.Skill, Position: int(r.Position), Status: r.Status, TimeLimitSeconds: r.TimeLimit,
-		ItemCount: r.ItemCount, AnsweredCount: min(r.AnsweredCount, r.ItemCount), StartedAt: r.StartedAt, DeadlineAt: r.DeadlineAt,
+		ItemCount: itemCount, AnsweredCount: min(r.AnsweredCount, itemCount), StartedAt: r.StartedAt, DeadlineAt: r.DeadlineAt,
 		SubmittedAt: r.SubmittedAt, CompletedAt: r.CompletedAt, ErrorCode: r.ErrorCode, MaxPlays: sc.MaxPlays,
 	}
 	if r.Skill == scoring.SkillSpeaking {
@@ -287,12 +304,20 @@ func (s *Service) StartPlacement(ctx context.Context, userID uuid.UUID, start ce
 
 	id := uuid.New()
 	rng := rand.New(rand.NewPCG(binary.BigEndian.Uint64(id[:8]), binary.BigEndian.Uint64(id[8:])))
+	// An adaptive test only fixes its first section now. The rest are chosen when they
+	// start, around what the earlier sections measured (see adaptive.go). The bank is still
+	// checked for every section here, so a test can never begin and then strand the learner
+	// at section three because the content was never there.
+	later := adaptiveSkills(cfg)
 	picks := map[string][]pick{}
 	for _, sec := range cfg.Sections {
 		p, err := selectItems(bySkill[sec.Skill], start, sec.Items, rng)
 		if err != nil {
 			logger.FromContext(ctx, s.log).Error("placement content missing", slog.String("skill", sec.Skill), slog.String("start", start.String()))
 			return uuid.Nil, errUnavailable
+		}
+		if cfg.Adaptive && later[sec.Skill] {
+			continue
 		}
 		picks[sec.Skill] = p
 	}
@@ -549,6 +574,14 @@ func (s *Service) StartSection(ctx context.Context, userID, id uuid.UUID, skill 
 		case SectionInProgress:
 			return nil
 		case SectionAvailable:
+			// An adaptive section has no items until it opens. Filling happens inside the
+			// same transaction that starts the clock, so a learner can never see a started
+			// section with nothing in it.
+			if sec.ItemCount == 0 {
+				if err := s.fillSection(ctx, tx, a, sec); err != nil {
+					return err
+				}
+			}
 			now := s.now()
 			started = true
 			_, err := tx.Exec(ctx, `
@@ -1099,6 +1132,9 @@ func (s *Service) maybeFinalize(ctx context.Context, id uuid.UUID) error {
 	var userID uuid.UUID
 	var overall scoring.Overall
 	finalized := false
+	// Read before the transaction writes the new one: "your level moved from B1 to B2"
+	// needs the level the learner had until a moment ago.
+	previousLevel := ""
 	err := database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		var status string
 		if err := tx.QueryRow(ctx, `SELECT user_id, status FROM assessments WHERE id = $1 FOR UPDATE`, id).Scan(&userID, &status); err != nil {
@@ -1113,6 +1149,13 @@ func (s *Service) maybeFinalize(ctx context.Context, id uuid.UUID) error {
 		}
 		if pending > 0 {
 			return nil
+		}
+		var prev *string
+		_ = tx.QueryRow(ctx, `
+			SELECT l.code FROM profiles p JOIN levels l ON l.id = p.current_level_id
+			WHERE p.user_id = $1`, userID).Scan(&prev)
+		if prev != nil {
+			previousLevel = *prev
 		}
 
 		rows, err := tx.Query(ctx, `SELECT skill, score::float8, cefr, confidence::float8, subscores FROM assessment_skill_results WHERE assessment_id = $1`, id)
@@ -1220,6 +1263,22 @@ func (s *Service) maybeFinalize(ctx context.Context, id uuid.UUID) error {
 		logger.FromContext(ctx, s.log).Error("generate plan after assessment failed", slog.String("error", err.Error()))
 	}
 	s.notify(ctx, userID, id, onboarding.StepPlacementResults)
+	if s.notifier != nil {
+		if err := s.notifier.Notify(ctx, userID, "assessment_completed", map[string]any{
+			"score": fmt.Sprintf("%.0f", overall.Score), "level": overall.Level.String(),
+		}); err != nil {
+			logger.FromContext(ctx, s.log).Warn("assessment notification failed", slog.String("error", err.Error()))
+		}
+		// Only when it actually moved. "Your level is now B1" sent to somebody who was
+		// already B1 reads as noise, and noise is what makes people mute notifications.
+		if previousLevel != "" && previousLevel != overall.Level.String() {
+			if err := s.notifier.Notify(ctx, userID, "level_changed", map[string]any{
+				"level": overall.Level.String(), "previous": previousLevel,
+			}); err != nil {
+				logger.FromContext(ctx, s.log).Warn("level change notification failed", slog.String("error", err.Error()))
+			}
+		}
+	}
 	s.tracker.Track(ctx, analytics.Server(analytics.EventPlacementCompleted, userID, map[string]any{
 		"assessment_id": id, "cefr": overall.Level.String(), "score": overall.Score, "confidence": overall.Confidence,
 	}))

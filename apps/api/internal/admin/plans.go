@@ -40,21 +40,23 @@ type PlanEntitlementRow struct {
 }
 
 type PlanRow struct {
-	ID              uuid.UUID            `json:"id"`
-	Code            string               `json:"code"`
-	Name            string               `json:"name"`
-	Description     string               `json:"description"`
-	BillingInterval string               `json:"billing_interval"`
-	PriceCents      int                  `json:"price_cents"`
-	Currency        string               `json:"currency"`
-	TrialDays       int                  `json:"trial_days"`
-	IsDefault       bool                 `json:"is_default"`
-	IsPublic        bool                 `json:"is_public"`
-	IsActive        bool                 `json:"is_active"`
-	Subscribers     int64                `json:"subscribers"`
-	MRRCents        int64                `json:"mrr_cents"`
-	Entitlements    []PlanEntitlementRow `json:"entitlements"`
-	UpdatedAt       time.Time            `json:"updated_at"`
+	ID              uuid.UUID `json:"id"`
+	Code            string    `json:"code"`
+	Name            string    `json:"name"`
+	Description     string    `json:"description"`
+	BillingInterval string    `json:"billing_interval"`
+	PriceCents      int       `json:"price_cents"`
+	Currency        string    `json:"currency"`
+	/** So'm price, used by Click. null means the plan cannot be bought in so'm. */
+	PriceUZS     *int64               `json:"price_uzs"`
+	TrialDays    int                  `json:"trial_days"`
+	IsDefault    bool                 `json:"is_default"`
+	IsPublic     bool                 `json:"is_public"`
+	IsActive     bool                 `json:"is_active"`
+	Subscribers  int64                `json:"subscribers"`
+	MRRCents     int64                `json:"mrr_cents"`
+	Entitlements []PlanEntitlementRow `json:"entitlements"`
+	UpdatedAt    time.Time            `json:"updated_at"`
 }
 
 type EntitlementRow struct {
@@ -78,7 +80,7 @@ func (m *Module) plans(c *gin.Context) {
 
 	rows, err := m.pool.Query(ctx, `
 		SELECT p.id, p.code, p.name, p.description, p.billing_interval, p.price_cents, p.currency,
-		       p.trial_days, p.is_default, p.is_public, p.is_active, p.updated_at,
+		       p.price_uzs, p.trial_days, p.is_default, p.is_public, p.is_active, p.updated_at,
 		       (SELECT count(*) FROM subscriptions s
 		        WHERE s.plan_id = p.id AND s.status IN ('trialing', 'active', 'past_due')),
 		       coalesce((SELECT count(*) FROM subscriptions s
@@ -103,7 +105,7 @@ func (m *Module) plans(c *gin.Context) {
 		var p PlanRow
 		var raw []byte
 		if err := rows.Scan(&p.ID, &p.Code, &p.Name, &p.Description, &p.BillingInterval, &p.PriceCents,
-			&p.Currency, &p.TrialDays, &p.IsDefault, &p.IsPublic, &p.IsActive, &p.UpdatedAt,
+			&p.Currency, &p.PriceUZS, &p.TrialDays, &p.IsDefault, &p.IsPublic, &p.IsActive, &p.UpdatedAt,
 			&p.Subscribers, &p.MRRCents, &raw); err != nil {
 			httpx.Fail(c, err)
 			return

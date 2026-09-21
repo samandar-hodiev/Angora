@@ -41,16 +41,19 @@ type PlanEntitlement struct {
 }
 
 type Plan struct {
-	ID              uuid.UUID         `json:"id"`
-	Code            string            `json:"code"`
-	Name            string            `json:"name"`
-	Description     string            `json:"description"`
-	BillingInterval string            `json:"billing_interval"`
-	PriceCents      int               `json:"price_cents"`
-	Currency        string            `json:"currency"`
-	TrialDays       int               `json:"trial_days"`
-	IsDefault       bool              `json:"is_default"`
-	Entitlements    []PlanEntitlement `json:"entitlements"`
+	ID              uuid.UUID `json:"id"`
+	Code            string    `json:"code"`
+	Name            string    `json:"name"`
+	Description     string    `json:"description"`
+	BillingInterval string    `json:"billing_interval"`
+	PriceCents      int       `json:"price_cents"`
+	Currency        string    `json:"currency"`
+	// PriceUZS is what a so'm provider charges. nil means the plan is not sold in so'm,
+	// and the client must not offer a checkout it cannot complete.
+	PriceUZS     *int64            `json:"price_uzs"`
+	TrialDays    int               `json:"trial_days"`
+	IsDefault    bool              `json:"is_default"`
+	Entitlements []PlanEntitlement `json:"entitlements"`
 }
 
 type Subscription struct {

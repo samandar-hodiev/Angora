@@ -253,6 +253,7 @@ func (s *Service) LoginWithGoogle(ctx context.Context, in GoogleLoginInput, clie
 			s.audit.Record(ctx, audit.Entry{ActorID: &user.ID, Action: audit.ActionRegistered,
 				EntityType: "user", EntityID: user.ID.String(), IP: client.IP, UserAgent: client.UserAgent,
 				Metadata: map[string]any{"platform": client.Platform, "provider": ProviderGoogle}})
+			s.welcome(ctx, user)
 		default:
 			return Session{}, fmt.Errorf("load account: %w", lookupErr)
 		}

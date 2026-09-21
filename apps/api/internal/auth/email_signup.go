@@ -279,6 +279,7 @@ func (s *Service) VerifyEmailSignup(ctx context.Context, in EmailVerifyInput, cl
 	s.tracker.Track(ctx, analytics.Event{Name: analytics.EventEmailVerificationCompleted, UserID: &user.ID, Source: "server", Platform: client.Platform})
 	s.tracker.Track(ctx, analytics.Event{Name: analytics.EventSignupCompleted, UserID: &user.ID, Source: "server", Platform: client.Platform,
 		Properties: map[string]any{"method": "email"}})
+	s.welcome(ctx, user)
 
 	session, err := s.startSession(ctx, user, newFamilyID(), client)
 	if err != nil {

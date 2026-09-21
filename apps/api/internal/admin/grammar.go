@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -41,8 +42,10 @@ type GrammarTopicRow struct {
 	IELTSRelevant bool      `json:"ielts_relevant"`
 	EstimatedMins int       `json:"estimated_minutes"`
 	/** Whether a published explanation exists, and how much practice is authored. */
-	HasContent    bool       `json:"has_content"`
-	ContentStatus *string    `json:"content_status"`
+	HasContent    bool    `json:"has_content"`
+	ContentStatus *string `json:"content_status"`
+	/** Languages with a published explanation, so the list shows what is still untranslated. */
+	Languages     []string   `json:"languages"`
 	QuestionCount int        `json:"question_count"`
 	PublishedAt   *time.Time `json:"published_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
@@ -54,6 +57,8 @@ type GrammarTopicDetail struct {
 	Body     json.RawMessage `json:"body"`
 	Version  int             `json:"version"`
 	Source   *string         `json:"source"`
+	/** The language of the explanation in `body`. The editor opens one language at a time. */
+	Language string `json:"language"`
 }
 
 type GrammarFilter struct {
@@ -76,8 +81,12 @@ func (m *Module) grammarTopics(c *gin.Context) {
 		SELECT t.id, t.slug, t.name, t.description, cat.slug, cat.name, l.code, t.cefr_levels,
 		       t.status, t.ielts_relevant, t.estimated_minutes,
 		       EXISTS (SELECT 1 FROM grammar_content gc WHERE gc.grammar_topic_id = t.id),
-		       (SELECT gc.status FROM grammar_content gc WHERE gc.grammar_topic_id = t.id
+		       (SELECT gc.status FROM grammar_content gc
+		         WHERE gc.grammar_topic_id = t.id AND gc.language = 'en'
 		         ORDER BY gc.version DESC LIMIT 1),
+		       COALESCE((SELECT array_agg(DISTINCT gc.language ORDER BY gc.language)
+		                 FROM grammar_content gc
+		                 WHERE gc.grammar_topic_id = t.id AND gc.status = 'published'), '{}'),
 		       (SELECT count(*) FROM grammar_questions q WHERE q.grammar_topic_id = t.id AND q.status = 'published'),
 		       t.published_at, t.updated_at, count(*) OVER ()
 		FROM grammar_topics t
@@ -102,7 +111,7 @@ func (m *Module) grammarTopics(c *gin.Context) {
 		var r GrammarTopicRow
 		if err := rows.Scan(&r.ID, &r.Slug, &r.Name, &r.Description, &r.Category, &r.CategoryName, &r.Level,
 			&r.CEFRLevels, &r.Status, &r.IELTSRelevant, &r.EstimatedMins, &r.HasContent, &r.ContentStatus,
-			&r.QuestionCount, &r.PublishedAt, &r.UpdatedAt, &total); err != nil {
+			&r.Languages, &r.QuestionCount, &r.PublishedAt, &r.UpdatedAt, &total); err != nil {
 			httpx.Fail(c, err)
 			return
 		}
@@ -157,7 +166,7 @@ func (m *Module) grammarCategories(c *gin.Context) {
 }
 
 func (m *Module) grammarTopic(c *gin.Context) {
-	d, err := m.loadGrammarTopic(c, c.Param("slug"))
+	d, err := m.loadGrammarTopic(c, c.Param("slug"), editorLanguage(c.Query("lang")))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -165,24 +174,45 @@ func (m *Module) grammarTopic(c *gin.Context) {
 	httpx.OK(c, d)
 }
 
-func (m *Module) loadGrammarTopic(c *gin.Context, slug string) (GrammarTopicDetail, error) {
+// editorLanguages are the languages a curated explanation can be authored in. English is
+// the one every topic must have: it is what the AI tutor is given as context and what a
+// learner falls back to when their own language has not been written yet.
+var editorLanguages = map[string]bool{"en": true, "uz": true, "ru": true}
+
+func editorLanguage(requested string) string {
+	if lang := strings.ToLower(strings.TrimSpace(requested)); editorLanguages[lang] {
+		return lang
+	}
+	return "en"
+}
+
+// loadGrammarTopic opens one topic in one language. The editor works on a single language
+// at a time, so `body`, `version` and `content_status` all describe that language and
+// nothing has to be disambiguated downstream.
+func (m *Module) loadGrammarTopic(c *gin.Context, slug, language string) (GrammarTopicDetail, error) {
 	var d GrammarTopicDetail
+	d.Language = language
 	err := m.pool.QueryRow(c.Request.Context(), `
 		SELECT t.id, t.slug, t.name, t.description, cat.slug, cat.name, l.code, t.cefr_levels,
 		       t.status, t.ielts_relevant, t.estimated_minutes,
 		       gc.id IS NOT NULL, gc.status, gc.body, coalesce(gc.version, 0), gc.source,
+		       COALESCE((SELECT array_agg(DISTINCT x.language ORDER BY x.language)
+		                 FROM grammar_content x
+		                 WHERE x.grammar_topic_id = t.id AND x.status = 'published'), '{}'),
 		       (SELECT count(*) FROM grammar_questions q WHERE q.grammar_topic_id = t.id AND q.status = 'published'),
 		       t.keywords, t.published_at, t.updated_at
 		FROM grammar_topics t
 		LEFT JOIN grammar_categories cat ON cat.id = t.category_id
 		LEFT JOIN levels l ON l.id = t.level_id
 		LEFT JOIN LATERAL (
-			SELECT * FROM grammar_content WHERE grammar_topic_id = t.id ORDER BY version DESC LIMIT 1
+			SELECT * FROM grammar_content
+			WHERE grammar_topic_id = t.id AND language = $2
+			ORDER BY version DESC LIMIT 1
 		) gc ON true
-		WHERE t.slug = $1`, slug).
+		WHERE t.slug = $1`, slug, language).
 		Scan(&d.ID, &d.Slug, &d.Name, &d.Description, &d.Category, &d.CategoryName, &d.Level, &d.CEFRLevels,
 			&d.Status, &d.IELTSRelevant, &d.EstimatedMins, &d.HasContent, &d.ContentStatus, &d.Body,
-			&d.Version, &d.Source, &d.QuestionCount, &d.Keywords, &d.PublishedAt, &d.UpdatedAt)
+			&d.Version, &d.Source, &d.Languages, &d.QuestionCount, &d.Keywords, &d.PublishedAt, &d.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return d, apperr.NotFound("Grammar topic")
 	}
@@ -200,6 +230,8 @@ type GrammarTopicInput struct {
 	IELTSRelevant *bool            `json:"ielts_relevant"`
 	Keywords      *[]string        `json:"keywords"`
 	Body          *json.RawMessage `json:"body"`
+	/** Which language `body` is written in. Defaults to English. */
+	Language *string `json:"language" binding:"omitempty,oneof=en uz ru"`
 }
 
 type GrammarCreateInput struct {
@@ -258,7 +290,7 @@ func (m *Module) createGrammarTopic(c *gin.Context) {
 		IP: c.ClientIP(), UserAgent: c.Request.UserAgent(),
 	})
 
-	d, err := m.loadGrammarTopic(c, in.Slug)
+	d, err := m.loadGrammarTopic(c, in.Slug, "en")
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -279,7 +311,11 @@ func (m *Module) updateGrammarTopic(c *gin.Context) {
 		return
 	}
 
-	current, err := m.loadGrammarTopic(c, slug)
+	language := "en"
+	if in.Language != nil {
+		language = *in.Language
+	}
+	current, err := m.loadGrammarTopic(c, slug, language)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -303,19 +339,23 @@ func (m *Module) updateGrammarTopic(c *gin.Context) {
 	// The explanation is versioned separately: a new body is a new draft version rather than
 	// an edit of the published one, so what learners are reading never changes underneath them.
 	if in.Body != nil {
+		// Versions are per language: writing the Uzbek explanation does not create a new
+		// version of the English one, and the two can be edited independently.
 		if _, err := m.pool.Exec(ctx, `
-			INSERT INTO grammar_content (grammar_topic_id, body, version, status, source)
-			SELECT t.id, $2,
-			       coalesce((SELECT max(version) FROM grammar_content WHERE grammar_topic_id = t.id), 0) + 1,
+			INSERT INTO grammar_content (grammar_topic_id, language, body, version, status, source)
+			SELECT t.id, $3, $2,
+			       coalesce((SELECT max(version) FROM grammar_content
+			                  WHERE grammar_topic_id = t.id AND language = $3), 0) + 1,
 			       'draft', 'curated'
-			FROM grammar_topics t WHERE t.slug = $1`, slug, *in.Body); err != nil {
+			FROM grammar_topics t WHERE t.slug = $1`, slug, *in.Body, language); err != nil {
 			httpx.Fail(c, err)
 			return
 		}
 		m.audit.Record(ctx, audit.Entry{
 			ActorID: &principal.UserID, Action: ActionGrammarContentSaved, EntityType: "grammar_content",
-			EntityID: current.ID.String(), Metadata: map[string]any{"slug": slug, "version": current.Version + 1},
-			IP: c.ClientIP(), UserAgent: c.Request.UserAgent(),
+			EntityID: current.ID.String(),
+			Metadata: map[string]any{"slug": slug, "language": language, "version": current.Version + 1},
+			IP:       c.ClientIP(), UserAgent: c.Request.UserAgent(),
 		})
 	}
 
@@ -325,7 +365,7 @@ func (m *Module) updateGrammarTopic(c *gin.Context) {
 		IP: c.ClientIP(), UserAgent: c.Request.UserAgent(),
 	})
 
-	d, err := m.loadGrammarTopic(c, slug)
+	d, err := m.loadGrammarTopic(c, slug, language)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -350,13 +390,16 @@ func (m *Module) setGrammarStatus(c *gin.Context) {
 		return
 	}
 
-	current, err := m.loadGrammarTopic(c, slug)
+	current, err := m.loadGrammarTopic(c, slug, "en")
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
+	// English is required, not merely "some language": it is what the AI tutor is given as
+	// context and what every learner falls back to, so a topic published in Uzbek alone
+	// would be unreadable for everyone else.
 	if in.Status == "published" && !current.HasContent {
-		httpx.Fail(c, apperr.Conflict("Write the explanation before publishing this topic"))
+		httpx.Fail(c, apperr.Conflict("Write the English explanation before publishing this topic"))
 		return
 	}
 
@@ -378,7 +421,10 @@ func (m *Module) setGrammarStatus(c *gin.Context) {
 	}
 
 	if in.Status == "published" {
-		// One published explanation per topic: retire the old one, then publish the newest.
+		// One published explanation per topic per language: retire the old ones, then
+		// publish the newest of each language that has been written. Publishing the topic
+		// therefore ships every translation that is ready, and never blocks on one that
+		// is not.
 		if _, err := tx.Exec(ctx, `
 			UPDATE grammar_content SET status = 'archived'
 			WHERE grammar_topic_id = $1 AND status = 'published'`, current.ID); err != nil {
@@ -387,8 +433,11 @@ func (m *Module) setGrammarStatus(c *gin.Context) {
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE grammar_content SET status = 'published', published_at = now()
-			WHERE id = (SELECT id FROM grammar_content WHERE grammar_topic_id = $1
-			             ORDER BY version DESC LIMIT 1)`, current.ID); err != nil {
+			WHERE id IN (
+				SELECT DISTINCT ON (language) id FROM grammar_content
+				WHERE grammar_topic_id = $1
+				ORDER BY language, version DESC
+			)`, current.ID); err != nil {
 			httpx.Fail(c, err)
 			return
 		}
@@ -406,7 +455,7 @@ func (m *Module) setGrammarStatus(c *gin.Context) {
 		IP:       c.ClientIP(), UserAgent: c.Request.UserAgent(),
 	})
 
-	d, err := m.loadGrammarTopic(c, slug)
+	d, err := m.loadGrammarTopic(c, slug, "en")
 	if err != nil {
 		httpx.Fail(c, err)
 		return

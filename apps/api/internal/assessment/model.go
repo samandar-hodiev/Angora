@@ -65,8 +65,12 @@ type SectionConfig struct {
 
 // Config is stored in assessment_configs and snapshotted onto each assessment.
 type Config struct {
-	GraceSeconds int             `json:"grace_seconds"`
-	Sections     []SectionConfig `json:"sections"`
+	GraceSeconds int `json:"grace_seconds"`
+	// Adaptive chooses each section after the first around what the completed sections
+	// measured, rather than around the level the learner declared. See adaptive.go.
+	// Off by default: an existing configuration keeps behaving exactly as it did.
+	Adaptive bool            `json:"adaptive,omitempty"`
+	Sections []SectionConfig `json:"sections"`
 }
 
 func (c Config) Section(skill string) (SectionConfig, bool) {

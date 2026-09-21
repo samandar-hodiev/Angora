@@ -226,6 +226,9 @@ func Authenticate(issuer *TokenIssuer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
+			header = websocketAuthorization(c)
+		}
+		if header == "" {
 			c.Next()
 			return
 		}
@@ -244,4 +247,26 @@ func Authenticate(issuer *TokenIssuer) gin.HandlerFunc {
 		authz.SetPrincipal(c, principal)
 		c.Next()
 	}
+}
+
+// websocketAuthorization reads the access token from the WebSocket handshake.
+//
+// The browser's WebSocket API cannot set request headers, and the usual workaround — the
+// token in a query string — puts a credential into access logs, proxy logs and browser
+// history. Sec-WebSocket-Protocol can carry it instead: the client opens the socket with
+// the subprotocols ["bearer", "<token>"], which travels as a header and is never part of
+// the URL. Only upgrade requests are read this way.
+func websocketAuthorization(c *gin.Context) string {
+	if !strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+		return ""
+	}
+	parts := strings.Split(c.GetHeader("Sec-WebSocket-Protocol"), ",")
+	if len(parts) < 2 || !strings.EqualFold(strings.TrimSpace(parts[0]), "bearer") {
+		return ""
+	}
+	token := strings.TrimSpace(parts[1])
+	if token == "" {
+		return ""
+	}
+	return "Bearer " + token
 }

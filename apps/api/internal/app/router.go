@@ -19,7 +19,9 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/learning"
 	"github.com/samandar-hodiev/engora/apps/api/internal/levels"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mistakes"
+	"github.com/samandar-hodiev/engora/apps/api/internal/notifications"
 	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
+	"github.com/samandar-hodiev/engora/apps/api/internal/payments"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/ratelimit"
@@ -85,6 +87,11 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	profiles.NewModule(c.DB, c.Audit, c.Log, c.Storage, c.Analytics).RegisterRoutes(v1)
 	learning.NewModule(c.DB, c.Redis).RegisterRoutes(v1)
 	subscriptions.NewHandler(c.Subscriptions).RegisterRoutes(v1)
+	payments.NewModule(payments.Deps{
+		Pool: c.DB, Plans: c.SubscriptionStore, Provider: c.Payments, Audit: c.Audit,
+		Notifier: c.Notifications,
+	}).RegisterRoutes(v1)
+	notifications.NewModule(c.Notifications).RegisterRoutes(v1)
 	progress.NewModule(c.DB).RegisterRoutes(v1)
 	mistakes.NewModule(c.DB).RegisterRoutes(v1)
 	vocabulary.NewModule(c.DB).RegisterRoutes(v1)
@@ -98,6 +105,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		Pool: c.DB, Plans: c.Subscriptions, Usage: c.Subscriptions,
 		Evaluator: c.Evaluator, Speaker: c.Evaluator, Storage: c.Storage,
 		MaxUploadBytes: cfg.Storage.MaxUploadBytes, Tracker: c.Analytics,
+		Conversation: c.AI, AllowedOrigins: cfg.HTTP.CORSAllowedOrigins,
 	}).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
 	levels.NewModule(c.DB).RegisterRoutes(v1)

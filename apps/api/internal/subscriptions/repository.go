@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
@@ -21,7 +22,7 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 
 var errNoDefaultPlan = errors.New("no default subscription plan configured")
 
-const planColumns = `id, code, name, description, billing_interval, price_cents, currency, trial_days, is_default`
+const planColumns = `id, code, name, description, billing_interval, price_cents, currency, price_uzs, trial_days, is_default`
 
 func (s *PostgresStore) PublicPlans(ctx context.Context) ([]Plan, error) {
 	return s.plans(ctx, `WHERE is_public AND is_active ORDER BY sort_order, price_cents`)
@@ -44,7 +45,7 @@ func (s *PostgresStore) PlanByID(ctx context.Context, id uuid.UUID) (Plan, error
 		return Plan{}, err
 	}
 	if len(plans) == 0 {
-		return Plan{}, errors.New("subscription plan not found")
+		return Plan{}, ErrPlanNotFound
 	}
 	return plans[0], nil
 }
@@ -61,7 +62,7 @@ func (s *PostgresStore) plans(ctx context.Context, where string, args ...any) ([
 	for rows.Next() {
 		var p Plan
 		if err := rows.Scan(&p.ID, &p.Code, &p.Name, &p.Description, &p.BillingInterval,
-			&p.PriceCents, &p.Currency, &p.TrialDays, &p.IsDefault); err != nil {
+			&p.PriceCents, &p.Currency, &p.PriceUZS, &p.TrialDays, &p.IsDefault); err != nil {
 			return nil, err
 		}
 		p.Entitlements = []PlanEntitlement{}
@@ -168,4 +169,101 @@ func (s *PostgresStore) IncrementUsage(ctx context.Context, userID uuid.UUID, ke
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// PlanByCode looks a plan up by its stable code. Checkout uses it so a client never sends
+// a plan UUID, and an inactive plan can never be bought.
+func (s *PostgresStore) PlanByCode(ctx context.Context, code string) (Plan, error) {
+	plans, err := s.plans(ctx, `WHERE code = $1 AND is_active`, code)
+	if err != nil {
+		return Plan{}, err
+	}
+	if len(plans) == 0 {
+		return Plan{}, ErrPlanNotFound
+	}
+	return plans[0], nil
+}
+
+// ErrPlanNotFound is returned when no active plan carries the requested code.
+var ErrPlanNotFound = errors.New("subscription plan not found")
+
+// Activation is a paid period a provider has confirmed.
+type Activation struct {
+	UserID                 uuid.UUID
+	PlanID                 uuid.UUID
+	Provider               string
+	ProviderSubscriptionID string
+}
+
+// Activate grants a plan after money has actually arrived, and returns the new
+// subscription.
+//
+// Renewing the plan you already have extends it rather than restarting it: a learner who
+// pays a week early keeps that week. Switching plans replaces the old subscription, since
+// two live subscriptions would make "which entitlements apply?" ambiguous, and that
+// question has to have one answer.
+func (s *PostgresStore) Activate(ctx context.Context, in Activation) (uuid.UUID, error) {
+	var interval string
+	if err := s.pool.QueryRow(ctx,
+		`SELECT billing_interval FROM subscription_plans WHERE id = $1 AND is_active`, in.PlanID).
+		Scan(&interval); err != nil {
+		if database.IsNotFound(err) {
+			return uuid.Nil, ErrPlanNotFound
+		}
+		return uuid.Nil, err
+	}
+
+	var id uuid.UUID
+	err := database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		now := time.Now().UTC()
+		var (
+			liveID   *uuid.UUID
+			livePlan *uuid.UUID
+			liveEnd  *time.Time
+		)
+		err := tx.QueryRow(ctx, `
+			SELECT id, plan_id, current_period_end FROM subscriptions
+			WHERE user_id = $1 AND status IN ('trialing', 'active')
+			  AND (current_period_end IS NULL OR current_period_end > now())
+			ORDER BY created_at DESC LIMIT 1
+			FOR UPDATE`, in.UserID).Scan(&liveID, &livePlan, &liveEnd)
+		if err != nil && !database.IsNotFound(err) {
+			return err
+		}
+
+		start := now
+		if liveID != nil {
+			if *livePlan == in.PlanID && liveEnd != nil && liveEnd.After(now) {
+				start = *liveEnd
+			}
+			if _, err := tx.Exec(ctx,
+				`UPDATE subscriptions SET status = 'expired', canceled_at = now() WHERE id = $1`, *liveID); err != nil {
+				return err
+			}
+		}
+
+		var end *time.Time
+		switch interval {
+		case "month":
+			e := start.AddDate(0, 1, 0)
+			end = &e
+		case "year":
+			e := start.AddDate(1, 0, 0)
+			end = &e
+		}
+
+		return tx.QueryRow(ctx, `
+			INSERT INTO subscriptions (user_id, plan_id, status, provider, provider_subscription_id,
+			                           current_period_start, current_period_end)
+			VALUES ($1, $2, 'active', $3, $4, $5, $6) RETURNING id`,
+			in.UserID, in.PlanID, in.Provider, nullString(in.ProviderSubscriptionID), start, end).Scan(&id)
+	})
+	return id, err
+}
+
+func nullString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

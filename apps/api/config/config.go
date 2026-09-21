@@ -31,6 +31,7 @@ type Config struct {
 	AI            AIConfig
 	Storage       StorageConfig
 	Mail          MailConfig
+	Payments      PaymentsConfig
 	Observability ObservabilityConfig
 	Jobs          JobsConfig
 }
@@ -59,6 +60,26 @@ type MailConfig struct {
 	SMTPPassword string
 	ResendAPIKey string
 	BrevoAPIKey  string
+}
+
+// PaymentsConfig selects the billing provider. "none" leaves checkout unavailable, which
+// is the right default for a developer machine: nobody should be able to half-configure a
+// payment provider and discover it in production.
+type PaymentsConfig struct {
+	Provider string // click | none
+	Click    ClickConfig
+}
+
+// ClickConfig holds the merchant credentials issued by Click. SecretKey signs every
+// callback Click sends us and must never leave the server.
+type ClickConfig struct {
+	ServiceID   string
+	MerchantID  string
+	SecretKey   string
+	CheckoutURL string
+	// ReturnURL is where Click sends the learner's browser after payment. Empty falls
+	// back to the web app's billing page.
+	ReturnURL string
 }
 
 func (a AppConfig) IsProduction() bool { return a.Env == EnvProduction }
@@ -196,6 +217,16 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			ResendAPIKey: r.str("RESEND_API_KEY", ""),
 			BrevoAPIKey:  r.str("BREVO_API_KEY", ""),
 		},
+		Payments: PaymentsConfig{
+			Provider: strings.ToLower(r.str("PAYMENTS_PROVIDER", "none")),
+			Click: ClickConfig{
+				ServiceID:   r.str("CLICK_SERVICE_ID", ""),
+				MerchantID:  r.str("CLICK_MERCHANT_ID", ""),
+				SecretKey:   r.str("CLICK_SECRET_KEY", ""),
+				CheckoutURL: r.str("CLICK_CHECKOUT_URL", "https://my.click.uz/services/pay"),
+				ReturnURL:   r.str("CLICK_RETURN_URL", ""),
+			},
+		},
 		Observability: ObservabilityConfig{
 			ErrorTracker: strings.ToLower(r.str("ERROR_TRACKER", "log")),
 		},
@@ -294,6 +325,19 @@ func (c *Config) validate() []error {
 	case "none":
 	default:
 		errs = append(errs, fmt.Errorf("MAIL_PROVIDER %q is not supported", c.Mail.Provider))
+	}
+
+	switch c.Payments.Provider {
+	case "click":
+		if c.Payments.Click.ServiceID == "" || c.Payments.Click.MerchantID == "" || c.Payments.Click.SecretKey == "" {
+			errs = append(errs, errors.New("CLICK_SERVICE_ID, CLICK_MERCHANT_ID and CLICK_SECRET_KEY are required when PAYMENTS_PROVIDER=click"))
+		}
+	case "none":
+		if c.App.IsProduction() {
+			errs = append(errs, errors.New("PAYMENTS_PROVIDER is required in production"))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("PAYMENTS_PROVIDER %q is not supported", c.Payments.Provider))
 	}
 
 	if c.App.IsProduction() && len(c.HTTP.CORSAllowedOrigins) == 0 {

@@ -52,6 +52,7 @@ func run() error {
 		worker := jobs.NewWorker(container.Jobs, log.With(slog.String("process", "embedded-worker")), container.Reporter)
 		worker.Concurrency = 2
 		app.RegisterJobHandlers(worker, container)
+		app.StartScheduler(ctx, container)
 		go worker.Run(ctx)
 		log.Info("embedded job worker started", slog.Any("job_types", worker.Types()))
 	}

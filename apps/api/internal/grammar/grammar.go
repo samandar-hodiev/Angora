@@ -160,13 +160,17 @@ type Progress struct {
 // Topic is the full topic page: canonical content plus everything around it.
 type Topic struct {
 	TopicSummary
-	Content       *Content       `json:"content"`
-	Prerequisites []RelatedTopic `json:"prerequisites"`
-	Related       []RelatedTopic `json:"related"`
-	Compare       []RelatedTopic `json:"compare"`
-	Next          []RelatedTopic `json:"next"`
-	Progress      Progress       `json:"progress"`
-	QuestionCount int            `json:"question_count"`
+	Content *Content `json:"content"`
+	/** The language the explanation is actually in. Not always what was asked for: a topic
+	 * that has no Uzbek explanation yet falls back to English, and the page says so rather
+	 * than pretending. */
+	ContentLanguage string         `json:"content_language,omitempty"`
+	Prerequisites   []RelatedTopic `json:"prerequisites"`
+	Related         []RelatedTopic `json:"related"`
+	Compare         []RelatedTopic `json:"compare"`
+	Next            []RelatedTopic `json:"next"`
+	Progress        Progress       `json:"progress"`
+	QuestionCount   int            `json:"question_count"`
 	// Visuals already generated for this topic, so the page can show one without a request.
 	Visuals []Visual `json:"visuals"`
 }

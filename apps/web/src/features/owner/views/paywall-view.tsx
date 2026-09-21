@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/choice";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -32,8 +33,8 @@ import {
   SectionCard,
   SegmentedControl,
 } from "../components/primitives";
-import { useEntitlements, usePlans, useRevokePlanEntitlement, useSetPlanEntitlement } from "../hooks";
-import { formatCurrency, formatNumber } from "../lib/format";
+import { useEntitlements, usePlans, useRevokePlanEntitlement, useSetPlanEntitlement, useUpdatePlan } from "../hooks";
+import { formatNumber } from "../lib/format";
 import type { EntitlementRow, LimitPeriod, PlanRow } from "../types";
 
 /**
@@ -95,6 +96,7 @@ function AccessCell({ access, emphasis }: { access: Access; emphasis: boolean })
 
 export function PaywallView() {
   const plansQuery = usePlans();
+  const [pricing, setPricing] = useState<PlanRow | null>(null);
   const entitlementsQuery = useEntitlements();
 
   const [search, setSearch] = useState("");
@@ -191,7 +193,7 @@ export function PaywallView() {
           </p>
         </SectionCard>
 
-        <SectionCard title="Plans" description="Live from the catalogue">
+        <SectionCard title="Plans and prices" description="Live from the catalogue">
           {plansQuery.isPending ? (
             <Skeleton className="h-24 w-full" />
           ) : failed ? (
@@ -199,16 +201,34 @@ export function PaywallView() {
           ) : (
             <ul className="grid gap-2">
               {plans.map((plan) => (
-                <li key={plan.id} className="flex items-baseline justify-between gap-3 text-body-sm">
-                  <span className="flex items-center gap-2">
-                    {plan.name}
-                    {plan.is_default && <Badge variant="outline">default</Badge>}
-                  </span>
-                  <span className="text-fg-muted tabular-nums">
-                    {plan.price_cents === 0 ? "Free" : `${formatCurrency(plan.price_cents)} / ${plan.billing_interval}`}
-                    {" · "}
-                    {formatNumber(plan.subscribers)} subscribers
-                  </span>
+                <li key={plan.id} className="grid gap-1 rounded-lg border p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="flex items-center gap-2 text-body-sm">
+                      {plan.name}
+                      {plan.is_default && <Badge variant="outline">default</Badge>}
+                      {!plan.is_public && <Badge variant="secondary">hidden</Badge>}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => setPricing(plan)}>
+                      <Pencil aria-hidden />
+                      <span className="sr-only">Edit {plan.name}</span>
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption text-fg-muted tabular-nums">
+                    <span>
+                      {plan.price_uzs
+                        ? `${formatSom(plan.price_uzs)} / ${plan.billing_interval}`
+                        : plan.price_cents === 0
+                          ? "Free"
+                          : "No so'm price"}
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span>{formatNumber(plan.subscribers)} subscribers</span>
+                  </div>
+                  {!plan.price_uzs && plan.price_cents > 0 && (
+                    <p className="text-caption text-warning">
+                      Cannot be bought with Click until a so&apos;m price is set.
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
@@ -281,7 +301,127 @@ export function PaywallView() {
       {previewing && previewed && (
         <LearnerPreviewDialog entitlement={previewing} plan={previewed} onClose={() => setPreviewing(null)} />
       )}
+
+      {pricing && <PlanPricingDialog plan={pricing} onClose={() => setPricing(null)} />}
     </>
+  );
+}
+
+/** So'm, written the way prices are written in Uzbekistan. */
+function formatSom(som: number): string {
+  return `${new Intl.NumberFormat("en-US").format(som).replace(/,/g, " ")} so'm`;
+}
+
+/**
+ * Pricing and visibility for one plan.
+ *
+ * What is missing here is deliberate. The plan code is not editable — existing subscriptions
+ * point at it. The billing interval is not editable — changing it would silently re-price
+ * everyone already subscribed. And an edit never touches an existing subscription: someone
+ * who paid last month paid last month's price.
+ */
+function PlanPricingDialog({ plan, onClose }: { plan: PlanRow; onClose: () => void }) {
+  const save = useUpdatePlan();
+  const [name, setName] = useState(plan.name);
+  const [som, setSom] = useState(plan.price_uzs ? String(plan.price_uzs) : "");
+  const [cents, setCents] = useState(String(plan.price_cents));
+  const [trialDays, setTrialDays] = useState(String(plan.trial_days));
+  const [isPublic, setIsPublic] = useState(plan.is_public);
+
+  const somValue = Number(som.replace(/\s/g, ""));
+  const invalidSom = som !== "" && (!Number.isFinite(somValue) || somValue < 0);
+
+  function submit() {
+    save.mutate(
+      {
+        id: plan.id,
+        input: {
+          name,
+          price_uzs: som === "" ? 0 : somValue,
+          price_cents: Number(cents) || 0,
+          trial_days: Number(trialDays) || 0,
+          is_public: isPublic,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({ title: `${name} updated`, variant: "success" });
+          onClose();
+        },
+        onError: (error) =>
+          toast({
+            title: "The plan could not be saved",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
+      },
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{plan.name}</DialogTitle>
+          <DialogDescription>
+            Billed {plan.billing_interval === "none" ? "once" : `per ${plan.billing_interval}`}. Learners already
+            subscribed keep the price they signed up at.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="plan-name">Name</Label>
+            <Input id="plan-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="plan-som">Price in so&apos;m</Label>
+            <Input
+              id="plan-som"
+              inputMode="numeric"
+              value={som}
+              onChange={(e) => setSom(e.target.value)}
+              placeholder="49000"
+              aria-invalid={invalidSom}
+            />
+            <p className="text-caption text-fg-muted">
+              What Click charges. Leave empty to take this plan off Click entirely.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="plan-cents">Price in cents (display)</Label>
+              <Input id="plan-cents" inputMode="numeric" value={cents} onChange={(e) => setCents(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="plan-trial">Trial days</Label>
+              <Input id="plan-trial" inputMode="numeric" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} />
+            </div>
+          </div>
+
+          <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
+            <span className="grid gap-0.5">
+              <span className="text-body-sm">Visible to learners</span>
+              <span className="text-caption text-fg-muted">
+                {plan.is_default ? "The default plan is always visible." : "Hidden plans can still be assigned."}
+              </span>
+            </span>
+            <Switch checked={isPublic} onCheckedChange={setIsPublic} disabled={plan.is_default} />
+          </label>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={save.isPending || invalidSom || name.trim().length < 2}>
+            {save.isPending ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
