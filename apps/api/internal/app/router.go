@@ -92,7 +92,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	assessment.NewHandler(c.Assessment).RegisterRoutes(v1)
 	analytics.RegisterRoutes(v1, c.Analytics, ratelimit.Middleware(ratelimit.NewRedisLimiter(c.Redis), "analytics",
 		120, time.Minute, c.Log))
-	admin.NewModule(c.DB).RegisterRoutes(v1)
+	admin.NewModule(c.DB, c.Audit).RegisterRoutes(v1)
 	jobs.RegisterRoutes(v1, c.Jobs)
 
 	v1.GET("/admin/system/metrics", authz.RequirePermission(authz.PermSystemRead), func(ctx *gin.Context) {

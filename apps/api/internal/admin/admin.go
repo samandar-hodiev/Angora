@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/httpx"
 )
@@ -93,16 +94,41 @@ type ContentFilter struct {
 }
 
 type Module struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	audit audit.Recorder
 }
 
-func NewModule(pool *pgxpool.Pool) *Module { return &Module{pool: pool} }
+func NewModule(pool *pgxpool.Pool, recorder audit.Recorder) *Module {
+	if recorder == nil {
+		recorder = audit.Nop{}
+	}
+	return &Module{pool: pool, audit: recorder}
+}
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g := v1.Group("/admin")
 	g.GET("/overview", authz.RequirePermission(authz.PermUsersRead), m.overview)
 	g.GET("/ai-usage", authz.RequirePermission(authz.PermAIUsageRead), m.aiUsage)
 	g.GET("/content", authz.RequirePermission(authz.PermContentManage), m.content)
+
+	// Question bank and assessment configuration. Reads and writes are separate
+	// permissions so an analyst role can inspect the bank without being able to change
+	// what learners are asked.
+	read := authz.RequirePermission(authz.PermAssessmentsRead)
+	manage := authz.RequirePermission(authz.PermAssessmentsManage)
+
+	g.GET("/questions", read, m.questions)
+	g.GET("/questions/stats", read, m.questionStats)
+	g.GET("/questions/:id", read, m.question)
+	g.POST("/questions", manage, m.createQuestion)
+	g.PATCH("/questions/:id", manage, m.updateQuestion)
+	g.POST("/questions/:id/status", manage, m.setQuestionStatus)
+
+	g.GET("/assessment-configs", read, m.assessmentConfigs)
+	g.POST("/assessment-configs", manage, m.createAssessmentConfig)
+	g.POST("/assessment-configs/:id/activate", manage, m.activateAssessmentConfig)
+	g.GET("/assessment-attempts", read, m.assessmentAttempts)
+	g.GET("/assessment-stats", read, m.assessmentStats)
 }
 
 func (m *Module) overview(c *gin.Context) {

@@ -85,6 +85,12 @@ export const queryKeys = {
     wallpapers: ["owner", "wallpapers"] as const,
     learners: (filters: Record<string, string | number | undefined>) => ["owner", "learners", filters] as const,
     learner: (id: string) => ["owner", "learner", id] as const,
+    questions: (filters: Record<string, string | number | undefined>) => ["owner", "questions", filters] as const,
+    question: (id: string) => ["owner", "question", id] as const,
+    questionStats: ["owner", "questions", "stats"] as const,
+    assessmentConfigs: ["owner", "assessment-configs"] as const,
+    assessmentAttempts: (filters: Record<string, string | number | undefined>) => ["owner", "assessment-attempts", filters] as const,
+    assessmentStats: (days: number) => ["owner", "assessment-stats", days] as const,
   },
   admin: {
     overview: ["admin", "overview"] as const,

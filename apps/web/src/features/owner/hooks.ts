@@ -13,10 +13,14 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { queryKeys } from "@/lib/query/keys";
 
 import * as ownerApi from "./services";
+import * as assessmentApi from "./services/assessments";
 import type { GrammarQuery } from "./services";
 import type {
   ContentLanguage,
   ContentQuery,
+  QuestionInput,
+  QuestionQuery,
+  QuestionStatus,
   ContentStatus,
   FeatureAccess,
   LearnerQuery,
@@ -239,5 +243,85 @@ export function useGenerateGrammarContent(slug: string) {
     }) =>
       ownerApi.generateGrammarContent({ slug, ...input }),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+// ---- Assessment & question bank (live API) --------------------------------------------------
+
+/**
+ * These hooks talk to the real Go API rather than the mock layer. They keep the same shape as
+ * the mock-backed hooks above, so a page does not know or care which side it is reading — and
+ * as later phases replace mocks with endpoints, only the service import changes.
+ */
+
+export function useQuestions(query: QuestionQuery) {
+  return useQuery({
+    queryKey: queryKeys.owner.questions(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.getQuestions(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useQuestion(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.owner.question(id ?? ""),
+    queryFn: () => assessmentApi.getQuestion(id!),
+    enabled: Boolean(id),
+  });
+}
+
+export function useQuestionStats() {
+  return useQuery({ queryKey: queryKeys.owner.questionStats, queryFn: assessmentApi.getQuestionStats });
+}
+
+export function useCreateQuestion() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: QuestionInput) => assessmentApi.createQuestion(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useUpdateQuestion() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: QuestionInput }) => assessmentApi.updateQuestion(id, input),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useSetQuestionStatus() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: QuestionStatus }) => assessmentApi.setQuestionStatus(id, status),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
+  });
+}
+
+export function useAssessmentConfigs() {
+  return useQuery({ queryKey: queryKeys.owner.assessmentConfigs, queryFn: assessmentApi.getAssessmentConfigs });
+}
+
+export function useActivateAssessmentConfig() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => assessmentApi.activateAssessmentConfig(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.assessmentConfigs }),
+  });
+}
+
+export function useAssessmentAttempts(query: { status?: string; level?: string; days?: number; page?: number }) {
+  return useQuery({
+    queryKey: queryKeys.owner.assessmentAttempts(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.getAssessmentAttempts(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAssessmentStats(days: number) {
+  return useQuery({
+    queryKey: queryKeys.owner.assessmentStats(days),
+    queryFn: () => assessmentApi.getAssessmentStats(days),
+    placeholderData: keepPreviousData,
   });
 }

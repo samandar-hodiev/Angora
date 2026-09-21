@@ -459,3 +459,173 @@ export interface LearnerDetail extends Learner {
   minutes_this_week: number;
   overall_mastery: number;
 }
+
+// ---- Assessment & question bank (live API) --------------------------------------------------
+
+/**
+ * These mirror the Go DTOs in apps/api/internal/admin (questions.go, assessments.go) exactly.
+ * Unlike the types above they are not a forward guess: the endpoints exist, so a change here
+ * without a change there is a bug.
+ */
+
+export type AssessmentSkill = "reading" | "listening" | "writing" | "speaking";
+export const assessmentSkills: AssessmentSkill[] = ["reading", "listening", "writing", "speaking"];
+
+export type QuestionStatus = "draft" | "review" | "published" | "archived";
+export const questionStatuses: QuestionStatus[] = ["draft", "review", "published", "archived"];
+
+export type QuestionItemType =
+  | "multiple_choice"
+  | "true_false_not_given"
+  | "vocabulary_in_context"
+  | "writing_task"
+  | "speaking_task";
+
+export const questionItemTypes: QuestionItemType[] = [
+  "multiple_choice",
+  "true_false_not_given",
+  "vocabulary_in_context",
+  "writing_task",
+  "speaking_task",
+];
+
+/** Objective types are marked from the answer key; the rest are AI-evaluated tasks. */
+export const objectiveItemTypes: QuestionItemType[] = [
+  "multiple_choice",
+  "true_false_not_given",
+  "vocabulary_in_context",
+];
+
+export interface QuestionRow {
+  id: UUID;
+  slug: string;
+  kind: string;
+  skill: AssessmentSkill;
+  level: CEFRLevel;
+  difficulty: number;
+  topic: string;
+  item_type: QuestionItemType;
+  stimulus_id: UUID | null;
+  stimulus_title: string | null;
+  position: number;
+  prompt: string;
+  status: QuestionStatus;
+  version: number;
+  option_count: number;
+  published_at: ISODate | null;
+  updated_at: ISODate;
+}
+
+export interface QuestionOption {
+  id: string;
+  text: string;
+}
+
+export interface QuestionDetail extends QuestionRow {
+  options: QuestionOption[];
+  /** `{ "option_id": "b" }` for objective items, null for tasks. */
+  answer_key: { option_id?: string } | null;
+  explanation: string;
+  settings: Record<string, unknown>;
+  created_at: ISODate;
+}
+
+export interface QuestionInput {
+  slug?: string;
+  kind?: string;
+  skill?: AssessmentSkill;
+  level?: CEFRLevel;
+  difficulty?: number;
+  topic?: string;
+  item_type?: QuestionItemType;
+  position?: number;
+  prompt?: string;
+  options?: QuestionOption[];
+  answer_key?: { option_id: string } | null;
+  explanation?: string;
+  settings?: Record<string, unknown>;
+}
+
+export interface QuestionQuery {
+  kind?: string;
+  skill?: AssessmentSkill | "all";
+  level?: CEFRLevel | "all";
+  status?: QuestionStatus | "all";
+  item_type?: QuestionItemType | "all";
+  topic?: string;
+  search?: string;
+  sort?: "updated" | "slug" | "difficulty";
+  page?: number;
+  page_size?: number;
+}
+
+export interface QuestionBucket {
+  key: string;
+  count: number;
+}
+
+export interface QuestionCoverage {
+  skill: AssessmentSkill;
+  level: CEFRLevel;
+  published: number;
+  draft: number;
+}
+
+export interface QuestionStats {
+  total: number;
+  by_status: QuestionBucket[];
+  by_skill: QuestionBucket[];
+  by_level: QuestionBucket[];
+  by_type: QuestionBucket[];
+  coverage: QuestionCoverage[];
+}
+
+export interface AssessmentConfig {
+  id: UUID;
+  kind: string;
+  version: number;
+  status: "draft" | "active" | "retired";
+  config: {
+    grace_seconds?: number;
+    sections?: { skill: AssessmentSkill; time_limit_seconds: number; items: Record<string, number>; max_plays?: number; max_attempts?: number }[];
+  };
+  attempts: number;
+  created_at: ISODate;
+}
+
+export type AttemptStatus = "in_progress" | "processing" | "completed" | "failed" | "abandoned";
+
+export interface AssessmentAttempt {
+  id: UUID;
+  user_id: UUID;
+  email: string;
+  kind: string;
+  source: string;
+  status: AttemptStatus;
+  start_level: CEFRLevel;
+  overall_cefr: CEFRLevel | null;
+  overall_score: number | null;
+  confidence: number | null;
+  started_at: ISODate;
+  completed_at: ISODate | null;
+}
+
+export interface SkillOutcome {
+  skill: AssessmentSkill;
+  avg_score: number;
+  results: number;
+  avg_confidence: number;
+}
+
+export interface AssessmentStats {
+  days: number;
+  started: number;
+  completed: number;
+  abandoned: number;
+  failed: number;
+  in_progress: number;
+  completion_rate: number;
+  median_minutes: number | null;
+  level_distribution: QuestionBucket[];
+  by_skill: SkillOutcome[];
+}

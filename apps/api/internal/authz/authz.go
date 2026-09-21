@@ -28,6 +28,8 @@ const (
 	PermLearningPractice    Permission = "learning:practice"
 	PermContentRead         Permission = "content:read"
 	PermContentManage       Permission = "content:manage"
+	PermAssessmentsRead     Permission = "assessments:read"
+	PermAssessmentsManage   Permission = "assessments:manage"
 	PermUsersRead           Permission = "users:read"
 	PermUsersManage         Permission = "users:manage"
 	PermSubscriptionsManage Permission = "subscriptions:manage"
@@ -46,6 +48,8 @@ var rolePermissions = map[Role]map[Permission]struct{}{
 	RoleUser: setOf(learner...),
 	RoleAdmin: setOf(append(learner,
 		PermContentManage,
+		PermAssessmentsRead,
+		PermAssessmentsManage,
 		PermUsersRead,
 		PermUsersManage,
 		PermSubscriptionsManage,

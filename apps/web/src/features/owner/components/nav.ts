@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ClipboardList,
   CreditCard,
   FileStack,
   Headphones,
@@ -9,6 +10,7 @@ import {
   PenLine,
   Settings,
   SpellCheck,
+  Target,
   Trophy,
   Type,
   Users,
@@ -52,6 +54,13 @@ export const ownerNav: OwnerNavSection[] = [
       { href: "/owner/cms?type=reading", label: "Reading", icon: BookOpen },
       { href: "/owner/cms?type=listening", label: "Listening", icon: Headphones },
       { href: "/owner/cms?type=ielts", label: "IELTS", icon: Trophy },
+    ],
+  },
+  {
+    label: "Assessment",
+    items: [
+      { href: "/owner/assessments", label: "Placement & tests", icon: Target },
+      { href: "/owner/questions", label: "Question bank", icon: ClipboardList },
     ],
   },
   {
