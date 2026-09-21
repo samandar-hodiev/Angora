@@ -873,3 +873,92 @@ export interface RoleInfo {
   role: string;
   permissions: string[];
 }
+
+// ---- Content, grammar authoring and settings (live API) ---------------------------------------
+
+export interface LiveContentRow {
+  id: UUID;
+  type: string;
+  title: string;
+  skill: string | null;
+  level: CEFRLevel | null;
+  topic: string | null;
+  exam: string | null;
+  difficulty: number;
+  status: "draft" | "review" | "published" | "archived";
+  published_at: ISODate | null;
+  updated_at: ISODate;
+}
+
+export interface LiveContentDetail extends LiveContentRow {
+  body: Record<string, unknown>;
+  tags: string[];
+  question_count: number;
+  created_at: ISODate;
+}
+
+export interface ContentTaxonomy {
+  skills: { code: string; name: string }[];
+  levels: { code: string; name: string }[];
+  topics: { code: string; name: string }[];
+}
+
+export interface LiveGrammarTopicRow {
+  id: UUID;
+  slug: string;
+  name: string;
+  description: string;
+  category: string | null;
+  category_name: string | null;
+  level: CEFRLevel | null;
+  cefr_levels: string[];
+  status: "draft" | "review" | "published" | "archived";
+  ielts_relevant: boolean;
+  estimated_minutes: number;
+  has_content: boolean;
+  content_status: string | null;
+  question_count: number;
+  published_at: ISODate | null;
+  updated_at: ISODate;
+}
+
+export interface LiveGrammarTopicDetail extends LiveGrammarTopicRow {
+  keywords: string[];
+  body: Record<string, unknown>;
+  version: number;
+  source: string | null;
+}
+
+export interface LiveGrammarCategory {
+  slug: string;
+  name: string;
+  topics: number;
+  published: number;
+  draft: number;
+  review: number;
+}
+
+export interface LiveSiteSettings {
+  general: { site_name?: string; site_description?: string; support_email?: string; timezone?: string };
+  learner: {
+    interface_language?: string;
+    explanation_language?: string;
+    theme?: string;
+    landing_page?: string;
+    daily_goal_minutes?: number;
+    placement_test?: boolean;
+  };
+  features: Record<string, boolean>;
+  maintenance: { enabled?: boolean; message?: string; allow_owner_access?: boolean };
+  updated_at: ISODate;
+}
+
+export interface LiveWallpaper {
+  id: string;
+  name: string;
+  enabled: boolean;
+  sort_order: number;
+  animated: boolean;
+  in_use: number;
+  updated_at: ISODate;
+}

@@ -1,11 +1,11 @@
 "use client";
 
-import { Archive, Eye, FileStack, Pencil, Send, SpellCheck } from "lucide-react";
+import { Archive, Eye, FileStack, Pencil, Plus, Send } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { EmptyState } from "@/components/common/states";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,9 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { isApiError } from "@/lib/api";
 
 import { DataTable, Pagination, type Column } from "../components/data-table";
+import { LiveDataState } from "../components/live-state";
 import {
   ActionMenu,
   ConfirmDialog,
@@ -28,163 +34,115 @@ import {
   OwnerPageHeader,
   SearchInput,
   SectionCard,
-  StatCardSkeleton,
-  StatusBadge,
 } from "../components/primitives";
-import { useContent, useContentStats, useUpdateContentStatus } from "../hooks";
-import { formatDate, formatNumber, languageLabels, skillLabels, statusLabels } from "../lib/format";
-import type { CEFRLevel, ContentItem, ContentLanguage, ContentStatus, SkillKey } from "../types";
-import { cefrLevels, contentStatuses, skillKeys } from "../types";
+import {
+  useContentDetail,
+  useContentTaxonomy,
+  useLiveContent,
+  useSaveContent,
+  useSetContentStatus,
+} from "../hooks";
+import { formatDate, formatNumber } from "../lib/format";
+import type { LiveContentRow } from "../types";
 
-const PAGE_SIZE = 20;
+/**
+ * Content management, on the content_items table the learner app reads.
+ *
+ * Publishing here is what puts something in front of learners, which is why it is the one
+ * action that asks first — and why the API refuses to publish a reading or listening set
+ * that has no questions to answer.
+ */
 
-const typeOptions = [
-  { value: "all" as const, label: "All types" },
-  ...skillKeys.map((skill) => ({ value: skill, label: skillLabels[skill] })),
-];
+const PAGE_SIZE = 25;
 
-const statusOptions = [
-  { value: "all" as const, label: "All statuses" },
-  ...contentStatuses.map((status) => ({ value: status, label: statusLabels[status] })),
-];
-
-const levelOptions = [
-  { value: "all" as const, label: "All levels" },
-  ...cefrLevels.map((level) => ({ value: level, label: level })),
-];
-
-const languageOptions = [
-  { value: "all" as const, label: "All languages" },
-  { value: "uz" as const, label: "Uzbek" },
-  { value: "en" as const, label: "English" },
-  { value: "ru" as const, label: "Russian" },
-];
-
-const sourceOptions = [
-  { value: "all" as const, label: "Any source" },
-  { value: "curated" as const, label: "Curated" },
-  { value: "ai" as const, label: "AI generated" },
-  { value: "imported" as const, label: "Imported" },
-];
-
-const sortOptions = [
-  { value: "updated" as const, label: "Last updated" },
-  { value: "title" as const, label: "Title A–Z" },
-  { value: "status" as const, label: "Status" },
-];
+const statusStyles: Record<string, string> = {
+  draft: "border-transparent bg-surface-active text-fg-secondary",
+  review: "border-transparent bg-warning/20 text-warning-foreground",
+  published: "border-transparent bg-success/15 text-success",
+  archived: "border-transparent bg-surface-active text-fg-muted line-through",
+};
 
 export function OwnerCmsView() {
   const router = useRouter();
   const params = useSearchParams();
-  const initialType = (params.get("type") as SkillKey | null) ?? "all";
 
   const [search, setSearch] = useState("");
-  const [type, setType] = useState<SkillKey | "all">(initialType);
-  const [level, setLevel] = useState<CEFRLevel | "all">("all");
-  const [status, setStatus] = useState<ContentStatus | "all">("all");
-  const [language, setLanguage] = useState<ContentLanguage | "all">("all");
-  const [source, setSource] = useState<"all" | "curated" | "ai" | "imported">("all");
-  const [sort, setSort] = useState<"updated" | "title" | "status">("updated");
+  const [skill, setSkill] = useState(params.get("type") ?? "all");
+  const [level, setLevel] = useState("all");
+  const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
 
-  const [preview, setPreview] = useState<ContentItem | null>(null);
-  const [pendingPublish, setPendingPublish] = useState<ContentItem | null>(null);
-  const [pendingArchive, setPendingArchive] = useState<ContentItem | null>(null);
+  const [editing, setEditing] = useState<{ id: string | null } | null>(null);
+  const [pending, setPending] = useState<{ row: LiveContentRow; status: string } | null>(null);
 
-  const query = useMemo(
-    () => ({ search, type, level, status, language, source, sort, page, page_size: PAGE_SIZE }),
-    [search, type, level, status, language, source, sort, page],
-  );
+  const query = useMemo(() => ({ search, skill, level, status, page }), [search, skill, level, status, page]);
+  const content = useLiveContent(query);
+  const taxonomy = useContentTaxonomy();
+  const setStatusMutation = useSetContentStatus();
 
-  const content = useContent(query);
-  const stats = useContentStats();
-  const updateStatus = useUpdateContentStatus();
-
-  // Any filter change puts the reader back on the first page; otherwise page 4 of a new filter
-  // silently shows nothing.
-  const withReset = useCallback(<T,>(setter: (value: T) => void) => {
-    return (value: T) => {
-      setter(value);
-      setPage(1);
-    };
-  }, []);
-
-  function resetFilters() {
+  function reset() {
     setSearch("");
-    setType("all");
+    setSkill("all");
     setLevel("all");
     setStatus("all");
-    setLanguage("all");
-    setSource("all");
-    setSort("updated");
     setPage(1);
     router.replace("/owner/cms");
   }
 
-  function applyStatus(item: ContentItem, next: ContentStatus) {
-    updateStatus.mutate(
-      { id: item.id, status: next },
+  function applyStatus(row: LiveContentRow, next: string) {
+    setStatusMutation.mutate(
+      { id: row.id, status: next },
       {
         onSuccess: () =>
           toast({
-            title: next === "published" ? `"${item.title}" published` : `"${item.title}" archived`,
-            description: next === "published" ? "Learners can see it now." : "It is hidden from learners.",
+            title: next === "published" ? `"${row.title}" published` : `"${row.title}" ${next}`,
+            description: next === "published" ? "Learners can open it now." : undefined,
             variant: "success",
           }),
-        onError: () => toast({ title: "That change did not go through", variant: "error" }),
+        onError: (error) =>
+          toast({
+            title: "That change was refused",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
       },
     );
-    setPendingPublish(null);
-    setPendingArchive(null);
+    setPending(null);
   }
 
-  const columns: Column<ContentItem>[] = [
+  const columns: Column<LiveContentRow>[] = [
     {
       key: "title",
       header: "Content",
-      width: "20rem",
-      cell: (item) => (
+      width: "22rem",
+      cell: (row) => (
         <div className="grid min-w-0 gap-0.5">
-          {item.type === "grammar" ? (
-            <Link href={`/owner/cms/grammar/${item.slug}`} className="truncate font-medium hover:underline">
-              {item.title}
-            </Link>
-          ) : (
-            <span className="truncate font-medium">{item.title}</span>
-          )}
-          <span className="truncate text-caption text-fg-muted">{item.category_name}</span>
+          <button type="button" onClick={() => setEditing({ id: row.id })} className="truncate text-left font-medium hover:underline">
+            {row.title}
+          </button>
+          <span className="truncate text-caption text-fg-muted">{row.type.replace(/_/g, " ")}</span>
         </div>
       ),
     },
+    { key: "skill", header: "Skill", hideBelow: "sm", cell: (row) => <span className="text-fg-secondary capitalize">{row.skill ?? "—"}</span> },
     {
-      key: "type",
-      header: "Type",
-      hideBelow: "sm",
-      cell: (item) => <span className="text-fg-secondary">{skillLabels[item.type]}</span>,
+      key: "level",
+      header: "Level",
+      hideBelow: "md",
+      cell: (row) => (row.level ? <LevelBadge level={row.level} /> : <span className="text-fg-muted">—</span>),
     },
-    { key: "level", header: "Level", hideBelow: "md", cell: (item) => <LevelBadge level={item.level} /> },
     {
-      key: "languages",
-      header: "Languages",
-      hideBelow: "lg",
-      cell: (item) => (
-        <span className="text-caption text-fg-muted uppercase">
-          {item.languages.map((code) => languageLabels[code]).join(" / ") || "—"}
-        </span>
-      ),
+      key: "topic",
+      header: "Topic",
+      hideBelow: "xl",
+      cell: (row) => <span className="text-fg-muted">{row.topic ?? "—"}</span>,
     },
-    { key: "status", header: "Status", cell: (item) => <StatusBadge status={item.status} /> },
+    { key: "status", header: "Status", cell: (row) => <Badge className={statusStyles[row.status]}>{row.status}</Badge> },
     {
       key: "updated",
       header: "Updated",
-      hideBelow: "md",
-      cell: (item) => <span className="text-fg-muted tabular-nums">{formatDate(item.updated_at)}</span>,
-    },
-    {
-      key: "author",
-      header: "Author",
-      hideBelow: "xl",
-      cell: (item) => <span className="text-fg-muted">{item.author}</span>,
+      hideBelow: "lg",
+      cell: (row) => <span className="text-fg-muted tabular-nums">{formatDate(row.updated_at)}</span>,
     },
     {
       key: "actions",
@@ -192,30 +150,27 @@ export function OwnerCmsView() {
       align: "right",
       srOnlyHeader: true,
       width: "3rem",
-      cell: (item) => (
+      cell: (row) => (
         <ActionMenu
-          label={`Actions for ${item.title}`}
+          label={`Actions for ${row.title}`}
           items={[
-            { label: "View details", icon: Eye, onSelect: () => setPreview(item) },
-            ...(item.type === "grammar"
-              ? [
-                  { label: "Edit lesson", icon: Pencil, href: `/owner/cms/grammar/${item.slug}` },
-                  { label: "Preview as learner", icon: Eye, href: `/owner/cms/grammar/${item.slug}?tab=preview` },
-                ]
+            { label: "Edit", icon: Pencil, onSelect: () => setEditing({ id: row.id }) },
+            ...(row.skill === "reading" || row.skill === "listening"
+              ? [{ label: "Questions", icon: Eye, href: `/owner/questions?search=${encodeURIComponent(row.title)}` }]
               : []),
             {
               label: "Publish",
               icon: Send,
               separatorBefore: true,
-              disabled: item.status === "published",
-              onSelect: () => setPendingPublish(item),
+              disabled: row.status === "published",
+              onSelect: () => setPending({ row, status: "published" }),
             },
             {
               label: "Archive",
               icon: Archive,
               destructive: true,
-              disabled: item.status === "archived",
-              onSelect: () => setPendingArchive(item),
+              disabled: row.status === "archived",
+              onSelect: () => setPending({ row, status: "archived" }),
             },
           ]}
         />
@@ -228,135 +183,286 @@ export function OwnerCmsView() {
   return (
     <>
       <OwnerPageHeader
-        title="Content management"
-        description="Everything learners can open, across all seven skills."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "CMS" }]}
+        title="Content"
+        description="Everything learners can open, on the table the learner app reads."
+        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Content" }]}
         actions={
-          <Button size="sm" asChild>
-            <Link href="/owner/cms/grammar/new">
-              <SpellCheck aria-hidden />
-              New grammar topic
-            </Link>
-          </Button>
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/owner/cms/grammar">Grammar</Link>
+            </Button>
+            <Button size="sm" onClick={() => setEditing({ id: null })}>
+              <Plus aria-hidden />
+              New content
+            </Button>
+          </>
         }
       />
 
-      <section aria-label="Content totals" className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.isPending && Array.from({ length: 4 }, (_, index) => <StatCardSkeleton key={index} />)}
-        {(stats.data ?? []).slice(0, 4).map((stat) => (
-          <article key={stat.skill} className="grid gap-1 rounded-xl border bg-surface p-4">
-            <h2 className="text-label text-fg-muted">{stat.label}</h2>
-            <p className="text-h3 tabular-nums">{formatNumber(stat.total)}</p>
-            <p className="text-caption text-fg-muted tabular-nums">
-              {formatNumber(stat.published)} published · {formatNumber(stat.review)} in review · {formatNumber(stat.draft)} draft
-            </p>
-          </article>
-        ))}
-      </section>
-
-      <FilterBar
-        onReset={resetFilters}
-        resultLabel={content.isPending ? undefined : `${formatNumber(total)} items`}
-      >
-        <SearchInput value={search} onChange={withReset(setSearch)} label="Search content" placeholder="Search by title" />
-        <FilterSelect label="Content type" value={type} options={typeOptions} onChange={withReset(setType)} />
-        <FilterSelect label="CEFR level" value={level} options={levelOptions} onChange={withReset(setLevel)} />
-        <FilterSelect label="Status" value={status} options={statusOptions} onChange={withReset(setStatus)} />
-        <FilterSelect label="Language" value={language} options={languageOptions} onChange={withReset(setLanguage)} />
-        <FilterSelect label="Source" value={source} options={sourceOptions} onChange={withReset(setSource)} />
-        <FilterSelect label="Sort by" value={sort} options={sortOptions} onChange={withReset(setSort)} />
+      <FilterBar onReset={reset} resultLabel={content.isPending ? undefined : `${formatNumber(total)} items`}>
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          label="Search content"
+          placeholder="Search by title"
+        />
+        <FilterSelect
+          label="Skill"
+          value={skill}
+          options={[
+            { value: "all", label: "All skills" },
+            ...(taxonomy.data?.skills ?? []).map((s) => ({ value: s.code, label: s.name })),
+          ]}
+          onChange={(value) => {
+            setSkill(value);
+            setPage(1);
+          }}
+        />
+        <FilterSelect
+          label="Level"
+          value={level}
+          options={[
+            { value: "all", label: "All levels" },
+            ...(taxonomy.data?.levels ?? []).map((l) => ({ value: l.code, label: l.code })),
+          ]}
+          onChange={(value) => {
+            setLevel(value);
+            setPage(1);
+          }}
+        />
+        <FilterSelect
+          label="Status"
+          value={status}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "draft", label: "Draft" },
+            { value: "review", label: "Review" },
+            { value: "published", label: "Published" },
+            { value: "archived", label: "Archived" },
+          ]}
+          onChange={(value) => {
+            setStatus(value);
+            setPage(1);
+          }}
+        />
       </FilterBar>
 
-      <SectionCard title="All content" description="Filtered view of the catalogue" bodyClassName="p-0">
-        <DataTable
-          caption="Learner-facing content"
-          columns={columns}
-          rows={content.data?.items ?? []}
-          rowKey={(item) => item.id}
-          isLoading={content.isPending}
-          isError={content.isError}
-          error={content.error}
-          onRetry={() => void content.refetch()}
-          minWidth="58rem"
-          empty={
-            <EmptyState
-              icon={FileStack}
-              title="No content matches these filters"
-              description="Try a different status or clear the search to see everything again."
-              action={
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  Clear filters
-                </Button>
+      <SectionCard title="All content" description="Live from the platform database" bodyClassName="p-0">
+        {content.isError ? (
+          <div className="p-4">
+            <LiveDataState error={content.error} onRetry={() => void content.refetch()} />
+          </div>
+        ) : (
+          <>
+            <DataTable
+              caption="Learner-facing content"
+              columns={columns}
+              rows={content.data?.items ?? []}
+              rowKey={(row) => row.id}
+              isLoading={content.isPending}
+              minWidth="60rem"
+              empty={
+                <div className="grid justify-items-center gap-3 py-6 text-center">
+                  <FileStack className="size-8 text-fg-muted" aria-hidden />
+                  <p className="text-h4">No content matches these filters</p>
+                  <Button variant="outline" size="sm" onClick={reset}>
+                    Clear filters
+                  </Button>
+                </div>
               }
             />
-          }
-        />
-        <Pagination
-          page={content.data?.page ?? 1}
-          totalPages={content.data?.total_pages ?? 1}
-          total={total}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPage}
-          label="items"
-        />
+            <Pagination
+              page={content.data?.page ?? 1}
+              totalPages={content.data?.total_pages ?? 1}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              label="items"
+            />
+          </>
+        )}
       </SectionCard>
 
-      <Dialog open={preview !== null} onOpenChange={(open) => !open && setPreview(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{preview?.title}</DialogTitle>
-            <DialogDescription>{preview ? skillLabels[preview.type] : ""} content</DialogDescription>
-          </DialogHeader>
-          {preview && (
-            <dl className="grid">
-              <KeyValue label="Status">
-                <StatusBadge status={preview.status} />
-              </KeyValue>
-              <KeyValue label="Category">{preview.category_name}</KeyValue>
-              <KeyValue label="CEFR level">{preview.level}</KeyValue>
-              <KeyValue label="Languages">
-                {preview.languages.map((code) => languageLabels[code]).join(" / ") || "None yet"}
-              </KeyValue>
-              <KeyValue label="Source">{preview.source}</KeyValue>
-              <KeyValue label="Author">{preview.author}</KeyValue>
-              <KeyValue label="Updated">{formatDate(preview.updated_at)}</KeyValue>
-              <KeyValue label="Published">{preview.published_at ? formatDate(preview.published_at) : "Not published"}</KeyValue>
-              <KeyValue label="Slug">
-                <code className="rounded bg-surface-active px-1.5 py-0.5 font-mono text-caption">{preview.slug}</code>
-              </KeyValue>
-            </dl>
-          )}
-          <DialogFooter>
-            {preview?.type === "grammar" && (
-              <Button variant="outline" asChild>
-                <Link href={`/owner/cms/grammar/${preview.slug}`}>Open editor</Link>
-              </Button>
-            )}
-            <Button onClick={() => setPreview(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {editing && <ContentEditor id={editing.id} onClose={() => setEditing(null)} />}
 
       <ConfirmDialog
-        open={pendingPublish !== null}
-        onOpenChange={(open) => !open && setPendingPublish(null)}
-        title={pendingPublish ? `Publish "${pendingPublish.title}"?` : ""}
-        description="This will make the content available to learners."
-        confirmLabel="Publish"
-        loading={updateStatus.isPending}
-        onConfirm={() => pendingPublish && applyStatus(pendingPublish, "published")}
-      />
-
-      <ConfirmDialog
-        open={pendingArchive !== null}
-        onOpenChange={(open) => !open && setPendingArchive(null)}
-        title={pendingArchive ? `Archive "${pendingArchive.title}"?` : ""}
-        description="Learners will no longer see this item. You can publish it again later."
-        confirmLabel="Archive"
-        destructive
-        loading={updateStatus.isPending}
-        onConfirm={() => pendingArchive && applyStatus(pendingArchive, "archived")}
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={pending?.status === "published" ? `Publish "${pending?.row.title}"?` : `Archive "${pending?.row.title}"?`}
+        description={
+          pending?.status === "published"
+            ? "Learners can open this from their next visit."
+            : "It stops being offered to learners. Nothing already recorded is affected."
+        }
+        confirmLabel={pending?.status === "published" ? "Publish" : "Archive"}
+        destructive={pending?.status === "archived"}
+        loading={setStatusMutation.isPending}
+        onConfirm={() => pending && applyStatus(pending.row, pending.status)}
       />
     </>
+  );
+}
+
+function ContentEditor({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const detail = useContentDetail(id);
+  const taxonomy = useContentTaxonomy();
+  const save = useSaveContent();
+
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    title: "",
+    type: "reading_passage",
+    skill: "reading",
+    level: "B1",
+    difficulty: 5,
+    body: "{}",
+  });
+
+  // Fill the form the first time the record arrives.
+  if (detail.data && loaded !== detail.data.id) {
+    setLoaded(detail.data.id);
+    setForm({
+      title: detail.data.title,
+      type: detail.data.type,
+      skill: detail.data.skill ?? "reading",
+      level: detail.data.level ?? "B1",
+      difficulty: detail.data.difficulty,
+      body: JSON.stringify(detail.data.body ?? {}, null, 2),
+    });
+  }
+
+  let bodyError: string | null = null;
+  try {
+    JSON.parse(form.body || "{}");
+  } catch {
+    bodyError = "The body must be valid JSON.";
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{id ? "Edit content" : "New content"}</DialogTitle>
+          <DialogDescription>
+            {id
+              ? "Changes take effect as soon as they are saved. Publishing is separate."
+              : "Content is created as a draft. Publish when it is ready."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {id && detail.isError ? (
+          <LiveDataState error={detail.error} onRetry={() => void detail.refetch()} />
+        ) : (
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="content-title">Title</Label>
+              <Input id="content-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="content-type">Type</Label>
+                <Input id="content-type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="content-skill">Skill</Label>
+                <NativeSelect id="content-skill" value={form.skill} onChange={(e) => setForm({ ...form, skill: e.target.value })}>
+                  {(taxonomy.data?.skills ?? []).map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="content-level">Level</Label>
+                <NativeSelect id="content-level" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
+                  {(taxonomy.data?.levels ?? []).map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.code}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="content-difficulty">Difficulty (1–10)</Label>
+                <Input
+                  id="content-difficulty"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={form.difficulty}
+                  onChange={(e) => setForm({ ...form, difficulty: Math.min(10, Math.max(1, Number(e.target.value) || 1)) })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="content-body">Body (JSON)</Label>
+              <Textarea
+                id="content-body"
+                rows={10}
+                className="font-mono text-caption"
+                value={form.body}
+                onChange={(e) => setForm({ ...form, body: e.target.value })}
+                aria-invalid={bodyError !== null}
+              />
+              <p className={bodyError ? "text-caption text-error" : "text-caption text-fg-muted"}>
+                {bodyError ?? "The passage, transcript or task prompt, as the learner app expects it."}
+              </p>
+            </div>
+
+            {detail.data && (
+              <dl className="grid">
+                <KeyValue label="Questions">{detail.data.question_count}</KeyValue>
+                <KeyValue label="Status">{detail.data.status}</KeyValue>
+              </dl>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            loading={save.isPending}
+            disabled={bodyError !== null || form.title.trim().length < 2}
+            onClick={() =>
+              save.mutate(
+                {
+                  id: id ?? undefined,
+                  input: {
+                    title: form.title.trim(),
+                    type: form.type,
+                    skill: form.skill,
+                    level: form.level,
+                    difficulty: form.difficulty,
+                    body: JSON.parse(form.body || "{}"),
+                  },
+                },
+                {
+                  onSuccess: () => {
+                    toast({ title: id ? "Content saved" : "Content created", variant: "success" });
+                    onClose();
+                  },
+                  onError: (error) =>
+                    toast({
+                      title: "It could not be saved",
+                      description: isApiError(error) ? error.message : undefined,
+                      variant: "error",
+                    }),
+                },
+              )
+            }
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

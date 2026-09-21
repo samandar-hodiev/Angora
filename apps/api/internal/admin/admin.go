@@ -109,7 +109,20 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g := v1.Group("/admin")
 	g.GET("/overview", authz.RequirePermission(authz.PermUsersRead), m.overview)
 	g.GET("/ai-usage", authz.RequirePermission(authz.PermAIUsageRead), m.aiUsage)
-	g.GET("/content", authz.RequirePermission(authz.PermContentManage), m.content)
+	content := authz.RequirePermission(authz.PermContentManage)
+	g.GET("/content", content, m.content)
+	g.GET("/content/taxonomy", content, m.contentTaxonomy)
+	g.GET("/content/:id", content, m.contentItem)
+	g.POST("/content", content, m.createContent)
+	g.PATCH("/content/:id", content, m.updateContent)
+	g.POST("/content/:id/status", content, m.setContentStatus)
+
+	g.GET("/grammar/categories", content, m.grammarCategories)
+	g.GET("/grammar/topics", content, m.grammarTopics)
+	g.POST("/grammar/topics", content, m.createGrammarTopic)
+	g.GET("/grammar/topics/:slug", content, m.grammarTopic)
+	g.PATCH("/grammar/topics/:slug", content, m.updateGrammarTopic)
+	g.POST("/grammar/topics/:slug/status", content, m.setGrammarStatus)
 
 	// Question bank and assessment configuration. Reads and writes are separate
 	// permissions so an analyst role can inspect the bank without being able to change
@@ -139,6 +152,12 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.DELETE("/plans/:id/entitlements/:key", billing, m.deletePlanEntitlement)
 
 	g.GET("/audit-logs", authz.RequirePermission(authz.PermAuditRead), m.auditLog)
+
+	// Settings are platform defaults, so changing them is a system-level action.
+	g.GET("/settings", authz.RequirePermission(authz.PermUsersRead), m.siteSettings)
+	g.PATCH("/settings", authz.RequirePermission(authz.PermSettingsManage), m.updateSiteSettings)
+	g.GET("/wallpapers", authz.RequirePermission(authz.PermUsersRead), m.wallpapers)
+	g.PATCH("/wallpapers/:id", authz.RequirePermission(authz.PermSettingsManage), m.updateWallpaper)
 
 	// Learners. Reading a record and changing one are different permissions: support can do
 	// both, an analyst only the first.

@@ -16,10 +16,10 @@ import { useSession } from "@/features/auth/hooks";
  * every /owner route is expected to sit behind that check server-side, and the UI here is a
  * convenience, never the control. Frontend gating is not security and is not treated as such.
  *
- * Until the backend grows the role and the /api/v1/owner endpoints, the console runs on the
- * mock service layer and is reachable in development (or with NEXT_PUBLIC_OWNER_PREVIEW=1) so
- * the UI can be built and reviewed. In a production build without that flag it falls back to
- * the real session check below.
+ * Until the backend grows an OWNER role, the console is reachable in development (or with
+ * NEXT_PUBLIC_OWNER_PREVIEW=1) so it can be worked on; the data it reads and writes is the
+ * real platform database either way. In a production build without that flag it falls back to
+ * the session check below, and every endpoint it calls enforces its own permission regardless.
  */
 
 export const OWNER_ROLES = ["OWNER", "ADMIN"];

@@ -36,9 +36,8 @@ import { useSession } from "@/features/auth/hooks";
 import { cn } from "@/lib/utils";
 
 import { ownerPreviewMode } from "../guard";
-import { useActivityFeed } from "../hooks";
+import { useAuditLogs } from "../hooks";
 import { formatRelative } from "../lib/format";
-import { MOCK_TODAY } from "../lib/mock";
 import { isNavActive, ownerNav } from "./nav";
 
 /**
@@ -187,9 +186,9 @@ export function OwnerShell({ children }: { children: ReactNode }) {
           <span className="font-medium md:hidden">Owner</span>
 
           {ownerPreviewMode && (
-            <Tooltip content="The /api/v1/owner endpoints do not exist yet. Everything here runs on the mock service layer and nothing is saved.">
+            <Tooltip content="The owner role is not enforced by the API yet, so this console is reachable in development. Everything it shows and changes is real platform data.">
               <Badge variant="warning" className="hidden sm:inline-flex">
-                Preview data
+                Dev access
               </Badge>
             </Tooltip>
           )}
@@ -265,8 +264,11 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
 }
 
 function NotificationsMenu() {
-  const { data } = useActivityFeed(5);
-  const count = data?.length ?? 0;
+  // The audit log is the platform's own record of what changed; a separate notification
+  // feed would be a second version of the same truth.
+  const { data } = useAuditLogs({ days: 7, page: 1 });
+  const entries = data?.items.slice(0, 6) ?? [];
+  const count = entries.length;
 
   return (
     <DropdownMenu>
@@ -281,15 +283,17 @@ function NotificationsMenu() {
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel>Recent activity</DropdownMenuLabel>
         {count === 0 && <p className="px-2.5 py-6 text-center text-body-sm text-fg-muted">Nothing new right now.</p>}
-        {data?.map((event) => (
-          <DropdownMenuItem key={event.id} className="grid gap-0.5 whitespace-normal">
-            <span className="text-body-sm">{event.message}</span>
-            <span className="text-caption text-fg-muted">{formatRelative(event.created_at, `${MOCK_TODAY}T12:00:00Z`)}</span>
+        {entries.map((entry) => (
+          <DropdownMenuItem key={entry.id} className="grid gap-0.5 whitespace-normal">
+            <span className="text-body-sm">{entry.action.replace(/[._]/g, " ")}</span>
+            <span className="text-caption text-fg-muted">
+              {entry.actor_email ?? "System"} · {formatRelative(entry.created_at, new Date().toISOString())}
+            </span>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/owner/analytics">View all activity</Link>
+          <Link href="/owner/audit">View the audit log</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

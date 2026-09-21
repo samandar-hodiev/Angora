@@ -12,6 +12,14 @@
 import { apiClient } from "@/lib/api";
 
 import type {
+  ContentTaxonomy,
+  LiveContentDetail,
+  LiveContentRow,
+  LiveGrammarCategory,
+  LiveGrammarTopicDetail,
+  LiveGrammarTopicRow,
+  LiveSiteSettings,
+  LiveWallpaper,
   AIFailureRow,
   AIQualityRow,
   AnalyticsOverview,
@@ -228,3 +236,65 @@ export function getAIUsage(days: number): Promise<{
 }> {
   return apiClient.get("/admin/ai-usage", { query: { days } });
 }
+
+// ---- Content, grammar authoring and settings -------------------------------------------------
+
+export async function getLiveContent(query: {
+  search?: string;
+  type?: string;
+  skill?: string;
+  level?: string;
+  status?: string;
+  page?: number;
+}): Promise<Paged<LiveContentRow>> {
+  const result = await apiClient.getPage<LiveContentRow>("/admin/content", {
+    query: {
+      type: query.type === "all" ? undefined : query.type,
+      skill: query.skill === "all" ? undefined : query.skill,
+      level: query.level === "all" ? undefined : query.level,
+      status: query.status === "all" ? undefined : query.status,
+      page: query.page,
+      page_size: 25,
+    },
+  });
+  return paged(result, 25);
+}
+
+export const contentApi = {
+  detail: (id: string) => apiClient.get<LiveContentDetail>(`/admin/content/${id}`),
+  taxonomy: () => apiClient.get<ContentTaxonomy>("/admin/content/taxonomy"),
+  create: (input: Record<string, unknown>) => apiClient.post<LiveContentDetail>("/admin/content", input),
+  update: (id: string, input: Record<string, unknown>) => apiClient.patch<LiveContentDetail>(`/admin/content/${id}`, input),
+  setStatus: (id: string, status: string) => apiClient.post<LiveContentDetail>(`/admin/content/${id}/status`, { status }),
+};
+
+export const grammarAdminApi = {
+  categories: () => apiClient.get<LiveGrammarCategory[]>("/admin/grammar/categories"),
+  topics: async (query: { search?: string; category?: string; level?: string; status?: string; page?: number }) => {
+    const result = await apiClient.getPage<LiveGrammarTopicRow>("/admin/grammar/topics", {
+      query: {
+        search: query.search || undefined,
+        category: query.category === "all" ? undefined : query.category,
+        level: query.level === "all" ? undefined : query.level,
+        status: query.status === "all" ? undefined : query.status,
+        page: query.page,
+        page_size: 25,
+      },
+    });
+    return paged(result, 25);
+  },
+  topic: (slug: string) => apiClient.get<LiveGrammarTopicDetail>(`/admin/grammar/topics/${slug}`),
+  create: (input: Record<string, unknown>) => apiClient.post<LiveGrammarTopicDetail>("/admin/grammar/topics", input),
+  update: (slug: string, input: Record<string, unknown>) =>
+    apiClient.patch<LiveGrammarTopicDetail>(`/admin/grammar/topics/${slug}`, input),
+  setStatus: (slug: string, status: string) =>
+    apiClient.post<LiveGrammarTopicDetail>(`/admin/grammar/topics/${slug}/status`, { status }),
+};
+
+export const settingsApi = {
+  get: () => apiClient.get<LiveSiteSettings>("/admin/settings"),
+  update: (patch: Partial<LiveSiteSettings>) => apiClient.patch<LiveSiteSettings>("/admin/settings", patch),
+  wallpapers: () => apiClient.get<LiveWallpaper[]>("/admin/wallpapers"),
+  updateWallpaper: (id: string, input: { enabled?: boolean; sort_order?: number }) =>
+    apiClient.patch<LiveWallpaper[]>(`/admin/wallpapers/${id}`, input),
+};

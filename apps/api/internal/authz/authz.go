@@ -60,6 +60,7 @@ const (
 	PermSubscriptionsManage Permission = "subscriptions:manage"
 	PermAIUsageRead         Permission = "ai_usage:read"
 	PermAuditRead           Permission = "audit:read"
+	PermSettingsManage      Permission = "settings:manage"
 	PermSystemRead          Permission = "system:read"
 )
 
@@ -105,6 +106,7 @@ var rolePermissions = map[Role]map[Permission]struct{}{
 		PermSubscriptionsManage,
 		PermAIUsageRead,
 		PermAuditRead,
+		PermSettingsManage,
 		PermSystemRead,
 	)...),
 }

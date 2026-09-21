@@ -1,99 +1,82 @@
 "use client";
 
-import { Check, Eye, Minus, Pencil, Plus, Send, SpellCheck } from "lucide-react";
+import { Check, Eye, Minus, Pencil, Send, SpellCheck } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { EmptyState } from "@/components/common/states";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import { DataTable, Pagination, type Column } from "../components/data-table";
+import { LiveDataState } from "../components/live-state";
 import {
   ActionMenu,
   ConfirmDialog,
   FilterBar,
   FilterSelect,
-  LanguagePills,
   LevelBadge,
   OwnerPageHeader,
   SearchInput,
   SectionCard,
-  StatusBadge,
 } from "../components/primitives";
-import { useGrammarCategories, useGrammarTopics, useUpdateContentStatus } from "../hooks";
-import { formatDate, formatNumber, statusLabels } from "../lib/format";
-import type { CEFRLevel, ContentStatus, GrammarTopicRow } from "../types";
-import { cefrLevels, contentStatuses } from "../types";
+import { useGrammarAdminCategories, useGrammarAdminTopics, useSetGrammarTopicStatus } from "../hooks";
+import { formatDate, formatNumber } from "../lib/format";
+import type { LiveGrammarTopicRow } from "../types";
+import { cefrLevels } from "../types";
 
-const PAGE_SIZE = 20;
+/**
+ * Grammar authoring, on the topics the learner app serves.
+ *
+ * A topic and its explanation publish together: the API refuses to publish a topic whose
+ * explanation is still a draft, because a catalogue entry that opens onto nothing is worse
+ * than one that is not there yet.
+ */
 
-const statusOptions = [
-  { value: "all" as const, label: "All statuses" },
-  ...contentStatuses.map((status) => ({ value: status, label: statusLabels[status] })),
-];
+const PAGE_SIZE = 25;
 
-const levelOptions = [
-  { value: "all" as const, label: "All levels" },
-  ...cefrLevels.map((level) => ({ value: level, label: level })),
-];
-
-const languageOptions = [
-  { value: "all" as const, label: "Any language" },
-  { value: "uz" as const, label: "Published in UZ" },
-  { value: "en" as const, label: "Published in EN" },
-  { value: "ru" as const, label: "Published in RU" },
-];
+const statusStyles: Record<string, string> = {
+  draft: "border-transparent bg-surface-active text-fg-secondary",
+  review: "border-transparent bg-warning/20 text-warning-foreground",
+  published: "border-transparent bg-success/15 text-success",
+  archived: "border-transparent bg-surface-active text-fg-muted line-through",
+};
 
 export function GrammarCmsView() {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<string>("all");
-  const [level, setLevel] = useState<CEFRLevel | "all">("all");
-  const [status, setStatus] = useState<ContentStatus | "all">("all");
-  const [language, setLanguage] = useState<"all" | "uz" | "en" | "ru">("all");
+  const [category, setCategory] = useState("all");
+  const [level, setLevel] = useState("all");
+  const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
-  const [pendingPublish, setPendingPublish] = useState<GrammarTopicRow | null>(null);
+  const [pending, setPending] = useState<{ row: LiveGrammarTopicRow; status: string } | null>(null);
 
-  const categories = useGrammarCategories();
-  const query = useMemo(
-    () => ({ search, category, level, status, language, page, page_size: PAGE_SIZE }),
-    [search, category, level, status, language, page],
-  );
-  const topics = useGrammarTopics(query);
-  const updateStatus = useUpdateContentStatus();
+  const categories = useGrammarAdminCategories();
+  const query = useMemo(() => ({ search, category, level, status, page }), [search, category, level, status, page]);
+  const topics = useGrammarAdminTopics(query);
+  const setStatusMutation = useSetGrammarTopicStatus();
 
-  const categoryOptions = [
-    { value: "all", label: "All categories" },
-    ...(categories.data ?? []).map((entry) => ({ value: entry.slug, label: entry.name })),
-  ];
-
-  function resetFilters() {
+  function reset() {
     setSearch("");
     setCategory("all");
     setLevel("all");
     setStatus("all");
-    setLanguage("all");
     setPage(1);
   }
 
-  function selectCategory(slug: string) {
-    setCategory((current) => (current === slug ? "all" : slug));
-    setPage(1);
-  }
-
-  const columns: Column<GrammarTopicRow>[] = [
+  const columns: Column<LiveGrammarTopicRow>[] = [
     {
       key: "topic",
       header: "Topic",
-      width: "18rem",
-      cell: (topic) => (
+      width: "20rem",
+      cell: (row) => (
         <div className="grid min-w-0 gap-0.5">
-          <Link href={`/owner/cms/grammar/${topic.slug}`} className="truncate font-medium hover:underline">
-            {topic.name}
+          <Link href={`/owner/cms/grammar/${row.slug}`} className="truncate font-medium hover:underline">
+            {row.name}
           </Link>
-          <span className="truncate text-caption text-fg-muted">{topic.description}</span>
+          <span className="truncate text-caption text-fg-muted">{row.description}</span>
         </div>
       ),
     },
@@ -101,44 +84,47 @@ export function GrammarCmsView() {
       key: "category",
       header: "Category",
       hideBelow: "md",
-      cell: (topic) => <span className="text-fg-secondary">{topic.category_name}</span>,
+      cell: (row) => <span className="text-fg-secondary">{row.category_name ?? "—"}</span>,
     },
-    { key: "level", header: "CEFR", cell: (topic) => <LevelBadge level={topic.level} /> },
     {
-      key: "languages",
-      header: "Languages",
-      hideBelow: "lg",
-      cell: (topic) => <LanguagePills languages={topic.languages} />,
+      key: "level",
+      header: "CEFR",
+      cell: (row) => (row.level ? <LevelBadge level={row.level} /> : <span className="text-fg-muted">—</span>),
     },
-    { key: "status", header: "Status", cell: (topic) => <StatusBadge status={topic.status} /> },
+    {
+      key: "content",
+      header: "Explanation",
+      hideBelow: "lg",
+      cell: (row) =>
+        row.has_content ? (
+          <span className={cn("inline-flex items-center gap-1", row.content_status === "published" ? "text-success" : "text-warning-foreground")}>
+            <Check className="size-3.5" aria-hidden />
+            {row.content_status}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-fg-muted">
+            <Minus className="size-3.5" aria-hidden />
+            None
+          </span>
+        ),
+    },
     {
       key: "practice",
       header: "Practice",
-      hideBelow: "lg",
-      cell: (topic) =>
-        topic.question_count > 0 ? (
-          <span className="tabular-nums">{topic.question_count} questions</span>
+      hideBelow: "xl",
+      cell: (row) =>
+        row.question_count > 0 ? (
+          <span className="tabular-nums">{row.question_count} questions</span>
         ) : (
           <span className="text-fg-muted">None</span>
         ),
     },
-    {
-      key: "visual",
-      header: "Visual",
-      hideBelow: "xl",
-      cell: (topic) => <Availability available={topic.has_visual} />,
-    },
-    {
-      key: "tutor",
-      header: "AI tutor",
-      hideBelow: "xl",
-      cell: (topic) => <Availability available={topic.has_ai_tutor} />,
-    },
+    { key: "status", header: "Status", cell: (row) => <Badge className={statusStyles[row.status]}>{row.status}</Badge> },
     {
       key: "updated",
       header: "Updated",
-      hideBelow: "md",
-      cell: (topic) => <span className="text-fg-muted tabular-nums">{formatDate(topic.updated_at)}</span>,
+      hideBelow: "lg",
+      cell: (row) => <span className="text-fg-muted tabular-nums">{formatDate(row.updated_at)}</span>,
     },
     {
       key: "actions",
@@ -146,18 +132,18 @@ export function GrammarCmsView() {
       align: "right",
       srOnlyHeader: true,
       width: "3rem",
-      cell: (topic) => (
+      cell: (row) => (
         <ActionMenu
-          label={`Actions for ${topic.name}`}
+          label={`Actions for ${row.name}`}
           items={[
-            { label: "Edit lesson", icon: Pencil, href: `/owner/cms/grammar/${topic.slug}` },
-            { label: "Preview as learner", icon: Eye, href: `/owner/cms/grammar/${topic.slug}?tab=preview` },
+            { label: "Edit lesson", icon: Pencil, href: `/owner/cms/grammar/${row.slug}` },
+            { label: "Preview as learner", icon: Eye, href: `/owner/cms/grammar/${row.slug}?tab=preview` },
             {
               label: "Publish",
               icon: Send,
               separatorBefore: true,
-              disabled: topic.status === "published",
-              onSelect: () => setPendingPublish(topic),
+              disabled: row.status === "published",
+              onSelect: () => setPending({ row, status: "published" }),
             },
           ]}
         />
@@ -171,16 +157,8 @@ export function GrammarCmsView() {
     <>
       <OwnerPageHeader
         title="Grammar"
-        description="The 149 topics behind the learner grammar library, by category and status."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "CMS", href: "/owner/cms" }, { label: "Grammar" }]}
-        actions={
-          <Button size="sm" asChild>
-            <Link href="/owner/cms/grammar/new">
-              <Plus aria-hidden />
-              Create grammar topic
-            </Link>
-          </Button>
-        }
+        description="The topics behind the learner grammar library, with their explanations and practice."
+        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Content", href: "/owner/cms" }, { label: "Grammar" }]}
       />
 
       <SectionCard
@@ -201,6 +179,8 @@ export function GrammarCmsView() {
               <Skeleton key={index} className="h-16 w-full" />
             ))}
           </div>
+        ) : categories.isError ? (
+          <LiveDataState error={categories.error} onRetry={() => void categories.refetch()} />
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {categories.data?.map((entry) => {
@@ -210,7 +190,10 @@ export function GrammarCmsView() {
                   <button
                     type="button"
                     aria-pressed={active}
-                    onClick={() => selectCategory(entry.slug)}
+                    onClick={() => {
+                      setCategory(active ? "all" : entry.slug);
+                      setPage(1);
+                    }}
                     className={cn(
                       "grid w-full gap-1 rounded-lg border bg-surface p-3 text-left transition-colors duration-micro",
                       "outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40",
@@ -234,7 +217,7 @@ export function GrammarCmsView() {
         )}
       </SectionCard>
 
-      <FilterBar onReset={resetFilters} resultLabel={topics.isPending ? undefined : `${formatNumber(total)} topics`}>
+      <FilterBar onReset={reset} resultLabel={topics.isPending ? undefined : `${formatNumber(total)} topics`}>
         <SearchInput
           value={search}
           onChange={(value) => {
@@ -247,16 +230,16 @@ export function GrammarCmsView() {
         <FilterSelect
           label="Category"
           value={category}
-          options={categoryOptions}
+          options={[{ value: "all", label: "All categories" }, ...(categories.data ?? []).map((c) => ({ value: c.slug, label: c.name }))]}
           onChange={(value) => {
             setCategory(value);
             setPage(1);
           }}
         />
         <FilterSelect
-          label="CEFR level"
+          label="Level"
           value={level}
-          options={levelOptions}
+          options={[{ value: "all", label: "All levels" }, ...cefrLevels.map((l) => ({ value: l, label: l }))]}
           onChange={(value) => {
             setLevel(value);
             setPage(1);
@@ -265,90 +248,80 @@ export function GrammarCmsView() {
         <FilterSelect
           label="Status"
           value={status}
-          options={statusOptions}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "draft", label: "Draft" },
+            { value: "review", label: "Review" },
+            { value: "published", label: "Published" },
+            { value: "archived", label: "Archived" },
+          ]}
           onChange={(value) => {
             setStatus(value);
             setPage(1);
           }}
         />
-        <FilterSelect
-          label="Language"
-          value={language}
-          options={languageOptions}
-          onChange={(value) => {
-            setLanguage(value);
-            setPage(1);
-          }}
-        />
       </FilterBar>
 
-      <SectionCard title="Topics" description="Grammar lessons and their editorial state" bodyClassName="p-0">
-        <DataTable
-          caption="Grammar topics"
-          columns={columns}
-          rows={topics.data?.items ?? []}
-          rowKey={(topic) => topic.id}
-          isLoading={topics.isPending}
-          isError={topics.isError}
-          error={topics.error}
-          onRetry={() => void topics.refetch()}
-          minWidth="68rem"
-          empty={
-            <EmptyState
-              icon={SpellCheck}
-              title="No grammar topics found"
-              description="Nothing matches these filters. Clear them, or create the topic you were looking for."
-              action={
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  Clear filters
-                </Button>
+      <SectionCard title="Topics" description="Live from the platform database" bodyClassName="p-0">
+        {topics.isError ? (
+          <div className="p-4">
+            <LiveDataState error={topics.error} onRetry={() => void topics.refetch()} />
+          </div>
+        ) : (
+          <>
+            <DataTable
+              caption="Grammar topics"
+              columns={columns}
+              rows={topics.data?.items ?? []}
+              rowKey={(row) => row.id}
+              isLoading={topics.isPending}
+              minWidth="64rem"
+              empty={
+                <div className="grid justify-items-center gap-3 py-6 text-center">
+                  <SpellCheck className="size-8 text-fg-muted" aria-hidden />
+                  <p className="text-h4">No topics match these filters</p>
+                  <Button variant="outline" size="sm" onClick={reset}>
+                    Clear filters
+                  </Button>
+                </div>
               }
             />
-          }
-        />
-        <Pagination
-          page={topics.data?.page ?? 1}
-          totalPages={topics.data?.total_pages ?? 1}
-          total={total}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPage}
-          label="topics"
-        />
+            <Pagination
+              page={topics.data?.page ?? 1}
+              totalPages={topics.data?.total_pages ?? 1}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              label="topics"
+            />
+          </>
+        )}
       </SectionCard>
 
       <ConfirmDialog
-        open={pendingPublish !== null}
-        onOpenChange={(open) => !open && setPendingPublish(null)}
-        title={pendingPublish ? `Publish "${pendingPublish.name}"?` : ""}
-        description="This will make the content available to learners."
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={pending ? `Publish "${pending.row.name}"?` : ""}
+        description="The topic and its latest explanation go live together. Learners see it from their next visit."
         confirmLabel="Publish"
-        loading={updateStatus.isPending}
+        loading={setStatusMutation.isPending}
         onConfirm={() => {
-          if (!pendingPublish) return;
-          updateStatus.mutate(
-            { id: pendingPublish.id, status: "published" },
+          if (!pending) return;
+          setStatusMutation.mutate(
+            { slug: pending.row.slug, status: pending.status },
             {
-              onSuccess: () =>
-                toast({ title: `"${pendingPublish.name}" published`, description: "Learners can open it now.", variant: "success" }),
+              onSuccess: () => toast({ title: `"${pending.row.name}" published`, variant: "success" }),
+              onError: (error) =>
+                toast({
+                  title: "That change was refused",
+                  description: isApiError(error) ? error.message : undefined,
+                  variant: "error",
+                }),
             },
           );
-          setPendingPublish(null);
+          setPending(null);
         }}
       />
     </>
-  );
-}
-
-function Availability({ available }: { available: boolean }) {
-  return available ? (
-    <span className="inline-flex items-center gap-1 text-success">
-      <Check className="size-3.5" aria-hidden />
-      Available
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-fg-muted">
-      <Minus className="size-3.5" aria-hidden />
-      None
-    </span>
   );
 }

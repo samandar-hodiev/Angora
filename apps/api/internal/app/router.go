@@ -13,11 +13,13 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/grammar"
 	"github.com/samandar-hodiev/engora/apps/api/internal/health"
+	"github.com/samandar-hodiev/engora/apps/api/internal/ielts"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/learning"
 	"github.com/samandar-hodiev/engora/apps/api/internal/levels"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mistakes"
 	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
+	"github.com/samandar-hodiev/engora/apps/api/internal/platform"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/ratelimit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/practice"
@@ -77,6 +79,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		cfg.HTTP.RateLimitAuthPerMinute, time.Minute, c.Log)
 	auth.NewHandler(c.Auth).RegisterRoutes(v1, authLimit)
 
+	platform.NewSettingsHandler(c.DB).RegisterRoutes(r, v1)
 	users.NewHandler(c.Users).RegisterRoutes(v1)
 	profiles.NewModule(c.DB, c.Audit, c.Log, c.Storage, c.Analytics).RegisterRoutes(v1)
 	learning.NewModule(c.DB, c.Redis).RegisterRoutes(v1)
@@ -88,6 +91,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		Pool: c.DB, Redis: c.Redis, Tutor: c.GrammarTutor,
 		Storage: c.Storage, Tracker: c.Analytics, Plans: c.Subscriptions, Log: c.Log,
 	}).RegisterRoutes(v1)
+	ielts.NewModule(ielts.Deps{Pool: c.DB, Plans: c.Subscriptions}).RegisterRoutes(v1)
 	practice.NewModule(practice.Deps{
 		Pool: c.DB, Plans: c.Subscriptions, Usage: c.Subscriptions,
 		Evaluator: c.Evaluator, Speaker: c.Evaluator, Storage: c.Storage,
