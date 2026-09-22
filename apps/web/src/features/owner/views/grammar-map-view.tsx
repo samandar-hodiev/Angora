@@ -120,11 +120,21 @@ function LevelDots({ topic }: { topic: MapTopic }) {
   );
 }
 
-export function GrammarMapView() {
+/**
+ * The language lives above this component because the schema dialog reads it too: "written"
+ * means written in the language you are looking at, and two controls disagreeing about that
+ * would make the same topic green in one place and grey in the other.
+ */
+export function GrammarMapView({
+  language,
+  onLanguageChange,
+}: {
+  language: string;
+  onLanguageChange: (language: string) => void;
+}) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [level, setLevel] = useState("all");
-  const [language, setLanguage] = useState("en");
 
   const query = useMemo(
     () => ({ lang: language, search, status, level }),
@@ -169,7 +179,7 @@ export function GrammarMapView() {
           label="Language"
           value={language}
           options={contentLanguages.map((code) => ({ value: code, label: contentLanguageLabels[code] }))}
-          onChange={setLanguage}
+          onChange={onLanguageChange}
         />
       </FilterBar>
 

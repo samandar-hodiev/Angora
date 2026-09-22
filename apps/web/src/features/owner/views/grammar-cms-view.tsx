@@ -358,6 +358,7 @@ function GrammarAllContentView() {
 export function GrammarCmsView() {
   const [view, setView] = useState<"map" | "all">("map");
   const [schemaOpen, setSchemaOpen] = useState(false);
+  const [language, setLanguage] = useState("en");
 
   return (
     <>
@@ -389,8 +390,12 @@ export function GrammarCmsView() {
           </div>
         }
       />
-      {view === "map" ? <GrammarMapView /> : <GrammarAllContentView />}
-      <GrammarSchemaDialog open={schemaOpen} onOpenChange={setSchemaOpen} language="en" />
+      {view === "map" ? (
+        <GrammarMapView language={language} onLanguageChange={setLanguage} />
+      ) : (
+        <GrammarAllContentView />
+      )}
+      <GrammarSchemaDialog open={schemaOpen} onOpenChange={setSchemaOpen} language={language} />
     </>
   );
 }
