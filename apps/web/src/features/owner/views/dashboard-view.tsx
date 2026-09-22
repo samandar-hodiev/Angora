@@ -298,7 +298,10 @@ export function OwnerDashboardView() {
         </SectionCard>
       </div>
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      {/* Halves, like the row below it. These two rows sit directly on top of each other,
+          so a 1.2/1 split here and a 1/1 split there put the seam in two different places
+          and the eye reads it as a mistake — which it was. */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <SectionCard
           title="Recent registrations"
           description="Newest accounts"
@@ -359,7 +362,7 @@ export function OwnerDashboardView() {
         </SectionCard>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard title="AI" description={`Cost and reliability · last ${numericDays} days`}>
           {overview.isPending || !data ? (
             <Skeleton className="h-32 w-full" />

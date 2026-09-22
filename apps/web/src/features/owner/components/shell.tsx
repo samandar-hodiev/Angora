@@ -35,7 +35,7 @@ import {
   initials,
 } from "@/components/ui/overlay";
 import { useSession } from "@/features/auth/hooks";
-import { apiAssetUrl } from "@/lib/media";
+import { AuroraCurtain } from "@/features/profile/components/wallpaper-layer";
 import { cn } from "@/lib/utils";
 
 import { ownerPreviewMode } from "../guard";
@@ -101,7 +101,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
 }
 
 function OwnerShellBody({ children }: { children: ReactNode }) {
-  const { prefs, resolvedTheme, t } = useOwnerConsole();
+  const { prefs, resolvedTheme, t, wallpaperImage, wallpaperAnimated } = useOwnerConsole();
   const remembered = useSyncExternalStore(subscribeCollapsed, readCollapsed, collapsedOnServer);
   // "Always expanded" and "always collapsed" win over whatever was left last time; that is
   // what the operator asked for by choosing them.
@@ -113,7 +113,7 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
   }
 
   const accessibility = prefs.accessibility as Record<string, unknown>;
-  const wallpaper = prefs.wallpaper;
+  const hasWallpaper = wallpaperImage !== null;
 
   return (
     <div
@@ -135,21 +135,21 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
       {/* The console background. Fixed and behind everything, dimmed by the amount the
           operator chose, and never over the content: a table you cannot read is not a
           nicer table. */}
-      {wallpaper.enabled && wallpaper.url && (
+      {hasWallpaper && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
-          {/* A background image, like the learner wallpaper: a CSS background rather than
-              an <img>, because it is decoration with no content to describe. */}
-          <span
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${apiAssetUrl(wallpaper.url) ?? ""})` }}
-          />
-          <span className="absolute inset-0 bg-background" style={{ opacity: wallpaper.overlay / 100 }} />
+          {/* A CSS background rather than an <img>: the built-in presets are gradients with
+              no image to load, and an uploaded photo is decoration with nothing to describe. */}
+          <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: wallpaperImage }} />
+          {wallpaperAnimated && <AuroraCurtain />}
+          {/* Dimmed by the amount the operator chose. A console is tables and numbers
+              first, and a table you cannot read is not a nicer table. */}
+          <span className="absolute inset-0 bg-background" style={{ opacity: prefs.wallpaper.overlay / 100 }} />
         </div>
       )}
       <aside
         className={cn(
           "sticky top-0 hidden h-dvh flex-col border-r md:flex",
-          wallpaper.enabled && wallpaper.url ? "bg-surface/85 backdrop-blur-sm" : "bg-surface",
+          hasWallpaper ? "bg-surface/85 backdrop-blur-sm" : "bg-surface",
         )}
       >
         <div className={cn("flex h-14 items-center gap-2 border-b px-3", collapsed && "justify-center px-0")}>

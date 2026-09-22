@@ -76,8 +76,17 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 }
 
 type Wallpaper struct {
-	URL     *string `json:"url"`
-	Enabled bool    `json:"enabled"`
+	/**
+	 * What is showing: "none", one of the web app's built-in preset ids, or "custom".
+	 *
+	 * The preset ids are not validated here on purpose. They are CSS gradients that live in
+	 * the client, the set changes when a designer adds one, and a Go enum that has to be
+	 * kept in step with a stylesheet is a migration waiting to be forgotten. Nothing is
+	 * rendered from this value directly — the client matches it against its own list and
+	 * falls back to none — so an unknown id is inert.
+	 */
+	Preset string  `json:"preset"`
+	URL    *string `json:"url"`
 	/** How much the image is dimmed, 0–100. A console is tables before it is a picture. */
 	Overlay int `json:"overlay"`
 }
@@ -102,7 +111,7 @@ func defaults() Preferences {
 	return Preferences{
 		Locale: "uz", Theme: "dark", Timezone: "Asia/Tashkent",
 		DateFormat: "dmy", TimeFormat: "24h", SidebarMode: "remember",
-		Wallpaper:     Wallpaper{Enabled: false, Overlay: 70},
+		Wallpaper:     Wallpaper{Preset: "none", Overlay: 70},
 		Notifications: map[string]bool{},
 		Accessibility: map[string]any{},
 	}
@@ -113,11 +122,11 @@ func (m *Module) load(ctx context.Context, userID uuid.UUID) (Preferences, error
 	var notifications, accessibility []byte
 	err := m.pool.QueryRow(ctx, `
 		SELECT locale, theme, timezone, date_format, time_format, sidebar_mode,
-		       wallpaper_url, wallpaper_enabled, wallpaper_overlay,
+		       wallpaper_url, wallpaper_preset, wallpaper_overlay,
 		       notifications, accessibility, updated_at
 		FROM owner_preferences WHERE user_id = $1`, userID).
 		Scan(&out.Locale, &out.Theme, &out.Timezone, &out.DateFormat, &out.TimeFormat, &out.SidebarMode,
-			&out.Wallpaper.URL, &out.Wallpaper.Enabled, &out.Wallpaper.Overlay,
+			&out.Wallpaper.URL, &out.Wallpaper.Preset, &out.Wallpaper.Overlay,
 			&notifications, &accessibility, &out.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, nil
@@ -160,8 +169,9 @@ type PreferencesInput struct {
 	TimeFormat  *string `json:"time_format" binding:"omitempty,oneof=12h 24h"`
 	SidebarMode *string `json:"sidebar_mode" binding:"omitempty,oneof=expanded collapsed remember"`
 
-	WallpaperEnabled *bool `json:"wallpaper_enabled"`
-	WallpaperOverlay *int  `json:"wallpaper_overlay" binding:"omitempty,min=0,max=100"`
+	/** "none", a built-in preset id, or "custom". Max length is the only check: see Wallpaper.Preset. */
+	WallpaperPreset  *string `json:"wallpaper_preset" binding:"omitempty,max=32"`
+	WallpaperOverlay *int    `json:"wallpaper_overlay" binding:"omitempty,min=0,max=100"`
 
 	Notifications map[string]bool `json:"notifications"`
 	Accessibility map[string]any  `json:"accessibility"`
@@ -200,12 +210,12 @@ func (m *Module) updatePreferences(c *gin.Context) {
 	d := defaults()
 	if _, err := m.pool.Exec(c.Request.Context(), `
 		INSERT INTO owner_preferences (user_id, locale, theme, timezone, date_format, time_format,
-		                               sidebar_mode, wallpaper_enabled, wallpaper_overlay,
+		                               sidebar_mode, wallpaper_preset, wallpaper_overlay,
 		                               notifications, accessibility)
 		VALUES ($1, coalesce($2::text, $12::text), coalesce($3::text, $13::text),
 		        coalesce($4::text, $14::text), coalesce($5::text, $15::text),
 		        coalesce($6::text, $16::text), coalesce($7::text, $17::text),
-		        coalesce($8::boolean, false), coalesce($9::smallint, 70),
+		        coalesce($8::text, 'none'), coalesce($9::smallint, 70),
 		        coalesce($10::jsonb, '{}'::jsonb), coalesce($11::jsonb, '{}'::jsonb))
 		ON CONFLICT (user_id) DO UPDATE SET
 			locale            = coalesce($2::text, owner_preferences.locale),
@@ -214,12 +224,12 @@ func (m *Module) updatePreferences(c *gin.Context) {
 			date_format       = coalesce($5::text, owner_preferences.date_format),
 			time_format       = coalesce($6::text, owner_preferences.time_format),
 			sidebar_mode      = coalesce($7::text, owner_preferences.sidebar_mode),
-			wallpaper_enabled = coalesce($8::boolean, owner_preferences.wallpaper_enabled),
+			wallpaper_preset  = coalesce($8::text, owner_preferences.wallpaper_preset),
 			wallpaper_overlay = coalesce($9::smallint, owner_preferences.wallpaper_overlay),
 			notifications     = coalesce($10::jsonb, owner_preferences.notifications),
 			accessibility     = coalesce($11::jsonb, owner_preferences.accessibility)`,
 		p.UserID, in.Locale, in.Theme, in.Timezone, in.DateFormat, in.TimeFormat, in.SidebarMode,
-		in.WallpaperEnabled, in.WallpaperOverlay, notifications, accessibility,
+		in.WallpaperPreset, in.WallpaperOverlay, notifications, accessibility,
 		d.Locale, d.Theme, d.Timezone, d.DateFormat, d.TimeFormat, d.SidebarMode); err != nil {
 		httpx.Fail(c, err)
 		return

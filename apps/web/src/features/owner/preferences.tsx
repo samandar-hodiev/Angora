@@ -2,11 +2,28 @@
 
 import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
+import { apiAssetUrl } from "@/lib/media";
+import { isAnimatedPreset, presetById } from "@/lib/wallpapers";
+
 import { ownerEn, type OwnerMessages } from "./locales/en";
 import { ownerRu } from "./locales/ru";
 import { ownerUz } from "./locales/uz";
 import { useOwnerPreferences } from "./hooks";
-import type { OwnerLocale, OwnerPreferences } from "./types";
+import type { OwnerLocale, OwnerPreferences, OwnerWallpaper } from "./types";
+
+/** Only a path the API itself issued becomes CSS, so a tampered preference cannot inject
+ *  anything into the stylesheet. */
+const assetPath = /^\/api\/v1\/owner-wallpapers\/[A-Za-z0-9/_.-]+$/;
+
+export function ownerWallpaperImage(wallpaper: OwnerWallpaper): string | null {
+  if (wallpaper.preset === "none") return null;
+  if (wallpaper.preset === "custom") {
+    if (!wallpaper.url || !assetPath.test(wallpaper.url)) return null;
+    const url = apiAssetUrl(wallpaper.url);
+    return url ? `url("${url}")` : null;
+  }
+  return presetById(wallpaper.preset)?.image ?? null;
+}
 
 /**
  * The Owner Console's own preferences, applied.
@@ -50,7 +67,7 @@ export const defaultOwnerPreferences: OwnerPreferences = {
   date_format: "dmy",
   time_format: "24h",
   sidebar_mode: "remember",
-  wallpaper: { url: null, enabled: false, overlay: 70 },
+  wallpaper: { preset: "none", url: null, overlay: 70 },
   notifications: {},
   accessibility: {},
   updated_at: null,
@@ -58,6 +75,10 @@ export const defaultOwnerPreferences: OwnerPreferences = {
 
 interface OwnerConsole {
   prefs: OwnerPreferences;
+  /** The console background as CSS, or null when none is selected. */
+  wallpaperImage: string | null;
+  /** True for the one preset that moves, so the shell knows to mount the curtain. */
+  wallpaperAnimated: boolean;
   /** True until the operator's own preferences have arrived; the defaults are in use. */
   loading: boolean;
   t: OwnerMessages;
@@ -105,6 +126,8 @@ export function OwnerPreferencesProvider({ children }: { children: ReactNode }) 
 
     return {
       prefs,
+      wallpaperImage: ownerWallpaperImage(prefs.wallpaper),
+      wallpaperAnimated: isAnimatedPreset(presetById(prefs.wallpaper.preset)),
       loading: query.isPending,
       t: dictionaries[prefs.locale] ?? ownerEn,
       resolvedTheme,
@@ -125,6 +148,8 @@ export function useOwnerConsole(): OwnerConsole {
   if (context) return context;
   return {
     prefs: defaultOwnerPreferences,
+    wallpaperImage: null,
+    wallpaperAnimated: false,
     loading: true,
     t: ownerUz,
     resolvedTheme: "dark",

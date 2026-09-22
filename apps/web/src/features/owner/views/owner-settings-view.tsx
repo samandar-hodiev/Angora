@@ -4,6 +4,7 @@ import {
   Accessibility,
   Bell,
   Globe,
+  ImageOff,
   KeyRound,
   Monitor,
   Moon,
@@ -28,8 +29,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { useSession } from "@/features/auth/hooks";
 import { isApiError } from "@/lib/api";
-import { apiAssetUrl } from "@/lib/media";
+import { AuroraCurtain } from "@/features/profile/components/wallpaper-layer";
 import { cn } from "@/lib/utils";
+import { isAnimatedPreset, presetById, wallpaperPresets } from "@/lib/wallpapers";
 
 import { LiveDataState } from "../components/live-state";
 import { ConfirmDialog, KeyValue, OwnerPageHeader, SectionCard } from "../components/primitives";
@@ -43,7 +45,7 @@ import {
   useUpdateOwnerPreferences,
   useUploadOwnerWallpaper,
 } from "../hooks";
-import { ownerLocales, useOwnerConsole } from "../preferences";
+import { ownerLocales, ownerWallpaperImage, useOwnerConsole } from "../preferences";
 import type { OwnerLocale, OwnerTheme } from "../types";
 
 /**
@@ -301,7 +303,7 @@ function Appearance() {
 }
 
 function WallpaperCard() {
-  const { t, prefs } = useOwnerConsole();
+  const { t, prefs, wallpaperImage } = useOwnerConsole();
   const { save } = useSave();
   const upload = useUploadOwnerWallpaper();
   const remove = useRemoveOwnerWallpaper();
@@ -309,7 +311,7 @@ function WallpaperCard() {
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const wallpaper = prefs.wallpaper;
-  const preview = apiAssetUrl(wallpaper.url);
+  const hasCustom = Boolean(wallpaper.url);
 
   function pick(file: File | undefined) {
     if (!file) return;
@@ -336,15 +338,14 @@ function WallpaperCard() {
 
   return (
     <SectionCard title={t.settings.wallpaper.title} description={t.settings.wallpaper.description}>
-      <div className="grid gap-4">
-        <div className="relative aspect-[16/6] overflow-hidden rounded-lg border bg-surface-subtle">
-          {preview ? (
+      <div className="grid gap-5">
+        {/* What the console will actually look like, dimmed exactly as it will be. */}
+        <div className="relative aspect-[16/5] overflow-hidden rounded-lg border bg-surface-subtle">
+          {wallpaperImage ? (
             <>
-              <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${preview})` }} />
-              <span
-                className="absolute inset-0 bg-background"
-                style={{ opacity: wallpaper.enabled ? wallpaper.overlay / 100 : 1 }}
-              />
+              <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: wallpaperImage }} />
+              {isAnimatedPreset(presetById(wallpaper.preset)) && <AuroraCurtain />}
+              <span className="absolute inset-0 bg-background" style={{ opacity: wallpaper.overlay / 100 }} />
               <span className="absolute inset-0 grid place-items-center text-body-sm text-fg-secondary">
                 {t.settings.general.preview}
               </span>
@@ -356,57 +357,82 @@ function WallpaperCard() {
           )}
         </div>
 
-        <input
-          ref={input}
-          type="file"
-          accept={ACCEPTED.join(",")}
-          className="sr-only"
-          onChange={(e) => {
-            pick(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" loading={upload.isPending} onClick={() => input.current?.click()}>
-            <Upload aria-hidden />
-            {preview ? t.settings.wallpaper.replace : t.settings.wallpaper.upload}
-          </Button>
-          {preview && (
-            <Button variant="ghost" className="text-error" onClick={() => setConfirmRemove(true)}>
-              <Trash2 aria-hidden />
-              {t.settings.wallpaper.remove}
-            </Button>
+        {/* The same eleven built-ins the learner app offers, from the same definitions.
+            They are gradients, so choosing one costs no request and no storage. */}
+        <div
+          role="radiogroup"
+          aria-label={t.settings.wallpaper.builtIn}
+          className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+        >
+          <Swatch
+            label={t.settings.wallpaper.noneOption}
+            image={null}
+            selected={wallpaper.preset === "none"}
+            onSelect={() => save({ wallpaper_preset: "none" })}
+          />
+          {wallpaperPresets.map((preset) => (
+            <Swatch
+              key={preset.id}
+              label={preset.label}
+              image={preset.image}
+              animated={isAnimatedPreset(preset)}
+              selected={wallpaper.preset === preset.id}
+              onSelect={() => save({ wallpaper_preset: preset.id })}
+            />
+          ))}
+          {hasCustom && (
+            <Swatch
+              label={t.settings.wallpaper.yours}
+              image={ownerWallpaperImage({ ...wallpaper, preset: "custom" })}
+              selected={wallpaper.preset === "custom"}
+              onSelect={() => save({ wallpaper_preset: "custom" })}
+            />
           )}
         </div>
-        <p className="text-caption text-fg-muted">{t.settings.wallpaper.rules}</p>
 
-        {preview && (
-          <div className="grid gap-4 border-t pt-4">
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-body-sm">{t.settings.wallpaper.enabled}</span>
-              <Switch
-                checked={wallpaper.enabled}
-                onCheckedChange={(checked) => save({ wallpaper_enabled: checked })}
-              />
-            </label>
-            <div className="grid gap-1.5">
-              <Label htmlFor="owner-overlay">
-                {t.settings.wallpaper.overlay} — {wallpaper.overlay}%
-              </Label>
-              <input
-                id="owner-overlay"
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                defaultValue={wallpaper.overlay}
-                className="accent-[var(--primary)]"
-                onPointerUp={(e) => save({ wallpaper_overlay: Number(e.currentTarget.value) })}
-                onKeyUp={(e) => save({ wallpaper_overlay: Number(e.currentTarget.value) })}
-              />
-              <p className="text-caption text-fg-muted">{t.settings.wallpaper.overlayHint}</p>
-            </div>
+        <div className="grid gap-2 border-t pt-4">
+          <input
+            ref={input}
+            type="file"
+            accept={ACCEPTED.join(",")}
+            className="sr-only"
+            onChange={(e) => {
+              pick(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" loading={upload.isPending} onClick={() => input.current?.click()}>
+              <Upload aria-hidden />
+              {hasCustom ? t.settings.wallpaper.replace : t.settings.wallpaper.upload}
+            </Button>
+            {hasCustom && (
+              <Button variant="ghost" className="text-error" onClick={() => setConfirmRemove(true)}>
+                <Trash2 aria-hidden />
+                {t.settings.wallpaper.remove}
+              </Button>
+            )}
+          </div>
+          <p className="text-caption text-fg-muted">{t.settings.wallpaper.rules}</p>
+        </div>
+
+        {wallpaper.preset !== "none" && (
+          <div className="grid gap-1.5 border-t pt-4">
+            <Label htmlFor="owner-overlay">
+              {t.settings.wallpaper.overlay} — {wallpaper.overlay}%
+            </Label>
+            <input
+              id="owner-overlay"
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              defaultValue={wallpaper.overlay}
+              className="accent-[var(--primary)]"
+              onPointerUp={(e) => save({ wallpaper_overlay: Number(e.currentTarget.value) })}
+              onKeyUp={(e) => save({ wallpaper_overlay: Number(e.currentTarget.value) })}
+            />
+            <p className="text-caption text-fg-muted">{t.settings.wallpaper.overlayHint}</p>
           </div>
         )}
       </div>
@@ -415,7 +441,7 @@ function WallpaperCard() {
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
         title={t.settings.wallpaper.remove}
-        description={t.settings.wallpaper.none}
+        description={t.settings.wallpaper.removeHint}
         confirmLabel={t.settings.wallpaper.remove}
         loading={remove.isPending}
         onConfirm={() => {
@@ -426,6 +452,45 @@ function WallpaperCard() {
         }}
       />
     </SectionCard>
+  );
+}
+
+/** One background in the picker. A radio, so arrow keys walk the set. */
+function Swatch({
+  label,
+  image,
+  animated,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  image: string | null;
+  animated?: boolean;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        "grid gap-1.5 rounded-lg border p-1.5 text-left outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+        selected ? "border-primary ring-1 ring-primary" : "hover:border-primary/40",
+      )}
+    >
+      <span
+        aria-hidden
+        className="relative grid h-12 place-items-center overflow-clip rounded-md border bg-surface-active bg-cover bg-center"
+        style={image ? { backgroundImage: image } : undefined}
+      >
+        {!image && <ImageOff className="size-4 text-fg-muted" />}
+        {/* The moving preset previews itself, so the swatch shows what the console gets. */}
+        {animated && <AuroraCurtain />}
+      </span>
+      <span className="truncate px-0.5 text-caption text-fg-secondary">{label}</span>
+    </button>
   );
 }
 

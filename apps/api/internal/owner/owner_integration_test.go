@@ -172,18 +172,17 @@ func TestOwnerPreferencesPostgres(t *testing.T) {
 		if w := upload(t, png(), "image/png"); w.Code != http.StatusOK {
 			t.Fatalf("upload status = %d body = %s", w.Code, w.Body.String())
 		}
-		var key, url *string
-		var enabled bool
+		var key, url, preset *string
 		if err := pool.QueryRow(ctx, `
-			SELECT wallpaper_storage_key, wallpaper_url, wallpaper_enabled
-			FROM owner_preferences WHERE user_id = $1`, operator.ID).Scan(&key, &url, &enabled); err != nil {
+			SELECT wallpaper_storage_key, wallpaper_url, wallpaper_preset
+			FROM owner_preferences WHERE user_id = $1`, operator.ID).Scan(&key, &url, &preset); err != nil {
 			t.Fatal(err)
 		}
 		if key == nil || url == nil {
 			t.Fatal("the upload did not record a storage key")
 		}
-		if !enabled {
-			t.Error("uploading a background should switch it on — nobody uploads one to leave it off")
+		if preset == nil || *preset != "custom" {
+			t.Errorf("wallpaper_preset = %v, want custom — nobody uploads a background to leave it hidden", preset)
 		}
 		// The row holds a reference, never the image itself.
 		if len(*key) > 200 {
@@ -203,12 +202,35 @@ func TestOwnerPreferencesPostgres(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
 		}
+		var key, preset *string
+		_ = pool.QueryRow(ctx, `SELECT wallpaper_storage_key, wallpaper_preset FROM owner_preferences WHERE user_id = $1`,
+			operator.ID).Scan(&key, &preset)
+		if key != nil {
+			t.Errorf("storage key = %v, want it cleared", key)
+		}
+		// Back to none, not to whichever preset was chosen before: they asked for the
+		// picture to go away, not for a different one.
+		if preset == nil || *preset != "none" {
+			t.Errorf("wallpaper_preset = %v, want none", preset)
+		}
+	})
+
+	t.Run("a built-in background is selected without uploading anything", func(t *testing.T) {
+		w, body := do(http.MethodPatch, "/admin/owner/preferences", map[string]any{"wallpaper_preset": "aurora"})
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+		}
+		data, _ := body["data"].(map[string]any)
+		wallpaper, _ := data["wallpaper"].(map[string]any)
+		if wallpaper["preset"] != "aurora" {
+			t.Errorf("preset = %v, want aurora", wallpaper["preset"])
+		}
+		// A preset is CSS in the client; the server stores the id and holds no image.
 		var key *string
-		var enabled bool
-		_ = pool.QueryRow(ctx, `SELECT wallpaper_storage_key, wallpaper_enabled FROM owner_preferences WHERE user_id = $1`,
-			operator.ID).Scan(&key, &enabled)
-		if key != nil || enabled {
-			t.Errorf("key = %v, enabled = %v, want both cleared", key, enabled)
+		_ = pool.QueryRow(ctx, `SELECT wallpaper_storage_key FROM owner_preferences WHERE user_id = $1`,
+			operator.ID).Scan(&key)
+		if key != nil {
+			t.Errorf("storage key = %v, want none: a preset is not an upload", key)
 		}
 	})
 

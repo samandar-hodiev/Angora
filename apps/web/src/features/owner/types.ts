@@ -1101,8 +1101,9 @@ export type OwnerTimeFormat = "12h" | "24h";
 export type OwnerSidebarMode = "expanded" | "collapsed" | "remember";
 
 export interface OwnerWallpaper {
+  /** "none", one of the built-in preset ids, or "custom". */
+  preset: string;
   url: string | null;
-  enabled: boolean;
   /** How much the image is dimmed, 0–100. A console is tables before it is a picture. */
   overlay: number;
 }

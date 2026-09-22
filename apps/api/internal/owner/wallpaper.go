@@ -132,8 +132,11 @@ func (m *Module) serveWallpaper(c *gin.Context) {
 }
 
 // swapWallpaper points the preference row at a newly stored object (or clears it) and
-// returns the key it replaced, so those bytes can be deleted afterwards. Uploading a
-// background also switches it on: nobody uploads one in order to leave it off.
+// returns the key it replaced, so those bytes can be deleted afterwards.
+//
+// Uploading also selects the image: nobody uploads a background in order to leave it
+// hidden. Removing falls back to "none" rather than to whichever preset was selected
+// before, because the operator asked for the picture to go away, not for a different one.
 func (m *Module) swapWallpaper(ctx context.Context, userID uuid.UUID, key *string) (*string, error) {
 	var url *string
 	if key != nil {
@@ -151,12 +154,12 @@ func (m *Module) swapWallpaper(ctx context.Context, userID uuid.UUID, key *strin
 			return err
 		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO owner_preferences (user_id, wallpaper_storage_key, wallpaper_url, wallpaper_enabled)
-			VALUES ($1, $2::text, $3::text, $2::text IS NOT NULL)
+			INSERT INTO owner_preferences (user_id, wallpaper_storage_key, wallpaper_url, wallpaper_preset)
+			VALUES ($1, $2::text, $3::text, CASE WHEN $2::text IS NULL THEN 'none' ELSE 'custom' END)
 			ON CONFLICT (user_id) DO UPDATE SET
 				wallpaper_storage_key = $2::text,
 				wallpaper_url         = $3::text,
-				wallpaper_enabled     = ($2::text IS NOT NULL)`,
+				wallpaper_preset      = CASE WHEN $2::text IS NULL THEN 'none' ELSE 'custom' END`,
 			userID, key, url)
 		return err
 	})
