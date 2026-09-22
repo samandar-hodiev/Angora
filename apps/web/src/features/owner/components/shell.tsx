@@ -237,13 +237,13 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {/* Left-aligned, not centred. The console sits next to a fixed sidebar, and a
-            centred column pushes the first card a couple of hundred pixels away from the
-            navigation it belongs to on any screen wider than the cap — which is most desks.
-            The cap is still there, because a table stretched across an ultrawide monitor is
-            its own kind of unreadable. */}
+        {/* The gap to the sidebar and the gap to the right edge are the same gap: the
+            main padding, and nothing else. The cap is set high enough that it does not
+            bind on any ordinary desk monitor, and it centres when it finally does, so the
+            two sides stay equal at every width rather than dumping the remainder on the
+            right. */}
         <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="w-full max-w-[120rem]">{children}</div>
+          <div className="mx-auto w-full max-w-[160rem]">{children}</div>
         </main>
       </div>
     </div>

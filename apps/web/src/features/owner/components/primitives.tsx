@@ -364,8 +364,8 @@ export function SearchInput({
   }, [draft, delay, value]);
 
   return (
-    <div className={cn("relative min-w-0 flex-1 basis-72 sm:max-w-sm", className)}>
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
+    <div className={cn("relative min-w-0 flex-1 basis-80 sm:max-w-md", className)}>
+      <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
       <Input
         type="search"
         value={draft}
@@ -380,7 +380,9 @@ export function SearchInput({
         }}
         // A shade darker than the bar around it. A field that matches its container
         // reads as a label until you click it, and a search box has to look typeable.
-        className="h-9 border-(--glass-border) bg-background/60 pr-9 pl-9 focus-visible:bg-background/80"
+        // rounded-xl matches the bar's own corner, so the field reads as part of it rather
+        // than as a smaller box dropped inside it.
+        className="h-11 rounded-xl border-(--glass-border) bg-background/55 pr-10 pl-10 focus-visible:bg-background/75"
       />
       {draft && (
         <button
@@ -390,7 +392,7 @@ export function SearchInput({
             setDraft("");
             onChangeRef.current("");
           }}
-          className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-fg-muted transition-colors duration-micro hover:bg-surface-hover hover:text-foreground"
+          className="absolute top-1/2 right-2.5 grid size-6 -translate-y-1/2 place-items-center rounded-md text-fg-muted transition-colors duration-micro hover:bg-surface-hover hover:text-foreground"
         >
           <X className="size-3.5" aria-hidden />
         </button>
@@ -419,7 +421,7 @@ export function FilterSelect<T extends string>({
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="h-9 min-w-32 border-(--glass-border) bg-background/60 text-body-sm"
+        className="h-11 min-w-32 rounded-xl border-(--glass-border) bg-background/55 text-body-sm"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -441,13 +443,19 @@ export function FilterBar({
   resultLabel?: string;
 }) {
   return (
-    // The one floating surface in a console made of flat cards, so the controls that change
-    // what the table shows sit visibly above it rather than inside it. Same liquid glass the
-    // learner app uses for its header and sidebar — no new visual language, just the one
-    // that already exists applied where it earns its keep.
-    <div className="glass-card relative isolate mb-4 flex flex-wrap items-center gap-2 overflow-hidden rounded-xl p-3">
+    // Pinned under the header rather than scrolled away: the controls that decide what the
+    // table shows should still be there when you are forty rows into it. `top` is the
+    // header's own height plus a 12px gap, so the two never touch and never overlap.
+    //
+    // z-20 keeps it above the table and below the header, which owns z-30 — a filter bar
+    // that slides over the account menu is worse than one that scrolls away.
+    <div className="filter-glass sticky top-[calc(3.5rem+12px)] z-20 mb-4 flex flex-wrap items-center gap-2 overflow-hidden rounded-xl p-3 isolate">
+      {/* Two slow blobs out of step with each other, one green and one blue. They are what
+          makes the wash move rather than sit; at this opacity they read as light, not as
+          shapes. */}
       <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <span className="absolute -top-8 left-1/4 h-20 w-1/2 animate-liquid rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-70 blur-2xl motion-reduce:animate-none" />
+        <span className="absolute -top-10 left-[8%] h-24 w-1/2 animate-liquid rounded-full bg-[radial-gradient(closest-side,oklch(69.6%_0.17_162.48_/_0.22),transparent)] blur-2xl motion-reduce:animate-none" />
+        <span className="absolute -bottom-12 right-[6%] h-24 w-2/5 animate-liquid-slow rounded-full bg-[radial-gradient(closest-side,oklch(0.72_0.13_225_/_0.18),transparent)] blur-2xl motion-reduce:animate-none" />
       </span>
       <span className="relative flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</span>
       <div className="relative ml-auto flex items-center gap-2">

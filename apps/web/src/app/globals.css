@@ -19,6 +19,56 @@
    *
    * macOS overlay scrollbars are untouched either way: nothing is drawn until you scroll.
    */
+  /*
+   * The Owner Console's filter bar.
+   *
+   * A very thin wash of the brand green into blue, floated over whatever is behind it. The
+   * colour is deliberately near the limit of what you can see — this strip sits above every
+   * table in the console, and a bar that announces itself on sixteen pages is a bar that
+   * competes with the data on all of them.
+   *
+   * More transparent than `glass-card` because it also has to survive a console wallpaper
+   * behind it; the blur, not the opacity, is what keeps the controls legible.
+   */
+  .filter-glass {
+    background-color: oklch(0.19 0.006 165 / 0.4);
+    background-image:
+      linear-gradient(
+        108deg,
+        oklch(69.6% 0.17 162.48 / 0.11) 0%,
+        oklch(0.72 0.13 225 / 0.085) 52%,
+        oklch(0.72 0.13 225 / 0.02) 100%
+      ),
+      linear-gradient(180deg, oklch(1 0 0 / 0.04), transparent 60%);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-highlight),
+      var(--shadow-glass-card);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+    backdrop-filter: blur(20px) saturate(130%);
+  }
+
+  /* Light mode gets the same hues over a pale base, or the wash would read as grime. */
+  :root:not(.dark) .filter-glass,
+  .light .filter-glass {
+    background-color: oklch(1 0 0 / 0.55);
+    background-image:
+      linear-gradient(
+        108deg,
+        oklch(69.6% 0.17 162.48 / 0.13) 0%,
+        oklch(0.72 0.13 225 / 0.1) 52%,
+        oklch(0.72 0.13 225 / 0.03) 100%
+      ),
+      linear-gradient(180deg, oklch(1 0 0 / 0.5), transparent 60%);
+  }
+
+  /* Without a backdrop filter the wash alone would not separate the bar from the page. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .filter-glass {
+      background-color: var(--surface-elevated);
+    }
+  }
+
   .scrollbar-slim::-webkit-scrollbar {
     width: 6px;
     height: 6px;
