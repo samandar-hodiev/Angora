@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 )
 
@@ -34,10 +35,12 @@ func (r *PostgresRepository) CreateAccount(ctx context.Context, in NewAccount) (
 	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
 		var err error
 		user, err = scanUser(tx.QueryRow(ctx,
-			`INSERT INTO users (email, password_hash, email_verified_at, auth_provider)
-			 VALUES ($1, NULLIF($2, ''), CASE WHEN $3::boolean THEN now() END, COALESCE(NULLIF($4, ''), 'email'))
+			`INSERT INTO users (email, password_hash, email_verified_at, auth_provider, role, must_change_password, created_by)
+			 VALUES ($1, NULLIF($2, ''), CASE WHEN $3::boolean THEN now() END, COALESCE(NULLIF($4, ''), 'email'),
+			         COALESCE(NULLIF($5, ''), 'USER'), $6::boolean, $7::uuid)
 			 RETURNING `+userColumns,
 			in.Email, in.PasswordHash, in.EmailVerified, in.AuthProvider,
+			string(in.Role), in.MustChangePassword, in.CreatedBy,
 		))
 		if err != nil {
 			if database.IsUniqueViolation(err) {
@@ -55,6 +58,18 @@ func (r *PostgresRepository) CreateAccount(ctx context.Context, in NewAccount) (
 		return nil
 	})
 	return user, err
+}
+
+// SetRole changes what an account is allowed to do. The caller decides whether it may.
+func (r *PostgresRepository) SetRole(ctx context.Context, id uuid.UUID, role authz.Role) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET role = $2 WHERE id = $1`, id, string(role))
+	if err != nil {
+		return fmt.Errorf("set role: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (User, error) {

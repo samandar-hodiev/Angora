@@ -121,6 +121,9 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 		Mailer:     c.Mailer,
 		Notifier:   c.Notifications,
 	}
+	if cfg.Auth.OwnerEmail == "" {
+		log.Warn("owner sign-in disabled: OWNER_EMAIL is not set")
+	}
 	if len(cfg.Auth.GoogleClientIDs) > 0 {
 		authDeps.Google = auth.NewGoogleVerifier(cfg.Auth.GoogleClientIDs)
 	} else {
@@ -128,6 +131,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	}
 	c.Auth, err = auth.NewService(authDeps, auth.Options{
 		RefreshTTL: cfg.Auth.RefreshTokenTTL, ResetTTL: time.Hour, WebURL: cfg.App.WebURL,
+		OwnerEmail: cfg.Auth.OwnerEmail,
 		// Only when nothing can deliver email locally; never in production.
 		ExposeDevCodes: cfg.App.Env == config.EnvDevelopment && cfg.Mail.Provider == "log",
 	})

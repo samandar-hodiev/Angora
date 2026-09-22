@@ -12,6 +12,7 @@ import {
   Mic,
   PenLine,
   ScrollText,
+  ShieldCheck,
   Smartphone,
   Sparkles,
   SpellCheck,
@@ -35,6 +36,8 @@ export interface OwnerNavItem {
    * the console always shows where you are, not only what you clicked last.
    */
   children?: OwnerNavItem[];
+  /** Shown only to the platform owner. Hiding it is courtesy; the API is the control. */
+  ownerOnly?: boolean;
 }
 
 export interface OwnerNavSection {
@@ -101,6 +104,8 @@ export const ownerNav: OwnerNavSection[] = [
       { href: "/owner/audit", label: "Audit log", icon: ScrollText },
       // Named for what it configures. It is the Learner App's settings, not this console's.
       { href: "/owner/learner-app", label: "Learner App", icon: Smartphone },
+      // Owner only. The page itself refuses anybody else; this hides a door they cannot open.
+      { href: "/owner/staff", label: "Staff", icon: ShieldCheck, ownerOnly: true },
     ],
   },
 ];

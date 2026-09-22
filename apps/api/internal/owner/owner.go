@@ -27,8 +27,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/storage"
+	"github.com/samandar-hodiev/engora/apps/api/internal/users"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/httpx"
 )
@@ -41,18 +43,35 @@ const MaxWallpaperBytes = 10 << 20
 const WallpaperRoute = "/api/v1/admin/owner/wallpaper"
 
 type Module struct {
-	pool  *pgxpool.Pool
-	store storage.ObjectStorage
-	log   *slog.Logger
+	pool       *pgxpool.Pool
+	store      storage.ObjectStorage
+	log        *slog.Logger
+	users      users.Repository
+	hasher     Hasher
+	audit      audit.Recorder
+	ownerEmail string
 }
 
 type Deps struct {
 	Pool    *pgxpool.Pool
 	Storage storage.ObjectStorage
 	Log     *slog.Logger
+	// The staff list needs to create accounts and hash the passwords the owner chooses. Both
+	// come from the services that already do those jobs; this module adds no second way.
+	Users  users.Repository
+	Hasher Hasher
+	Audit  audit.Recorder
+	// OwnerEmail is refused as a staff address: the owner already has access, and an account
+	// created here would be a second, weaker way in to the same mailbox.
+	OwnerEmail string
 }
 
-func NewModule(d Deps) *Module { return &Module{pool: d.Pool, store: d.Storage, log: d.Log} }
+func NewModule(d Deps) *Module {
+	return &Module{
+		pool: d.Pool, store: d.Storage, log: d.Log,
+		users: d.Users, hasher: d.Hasher, audit: d.Audit, ownerEmail: d.OwnerEmail,
+	}
+}
 
 // RegisterRoutes mounts the console's own settings.
 //
@@ -69,6 +88,9 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.DELETE("/sessions/:id", m.revokeSession)
 	g.POST("/sessions/revoke-others", m.revokeOtherSessions)
 	g.GET("/sign-ins", m.signIns)
+
+	// Who else runs the platform. Owner only — see staff.go.
+	m.registerStaffRoutes(v1)
 
 	// Public read of a stored console background, served only while a preference row still
 	// points at it. Same shape as the learner wallpaper route.

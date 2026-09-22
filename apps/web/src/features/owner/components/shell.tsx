@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { ownerPreviewMode } from "../guard";
 import { useAuditLogs } from "../hooks";
 import { formatRelative } from "../lib/format";
+import { useIsPlatformOwner } from "../guard";
 import { OwnerPreferencesProvider, useOwnerConsole } from "../preferences";
 import { isInsideTree, isNavActive, ownerNav, type OwnerNavItem } from "./nav";
 
@@ -269,6 +270,9 @@ function NavFallback({ collapsed = false }: { collapsed?: boolean }) {
 function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean; inSheet?: boolean }) {
   const pathname = usePathname();
   const search = useSearchParams().toString();
+  // Owner-only rows are hidden rather than shown disabled: an entry that never opens is
+  // noise for everyone who cannot use it. The page and the API refuse them regardless.
+  const isOwner = useIsPlatformOwner();
 
   return (
     <nav aria-label="Owner" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto p-2">
@@ -281,7 +285,9 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
           )}
           {collapsed && <div className="mx-2 my-2 h-px bg-border-subtle" aria-hidden />}
           <ul className="grid gap-0.5">
-            {section.items.map((item) =>
+            {section.items
+              .filter((item) => !item.ownerOnly || isOwner)
+              .map((item) =>
               item.children ? (
                 <NavTree
                   key={item.href}

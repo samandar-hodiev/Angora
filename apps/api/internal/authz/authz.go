@@ -21,6 +21,10 @@ type Role string
 const (
 	RoleUser  Role = "USER"
 	RoleAdmin Role = "ADMIN"
+	// The owner runs the business. The only thing they can do that an administrator cannot
+	// is decide who else gets in — which is exactly the power you do not want spreading by
+	// itself, because an ADMIN who can grant ADMIN is an ADMIN who can grant it to anyone.
+	RoleOwner Role = "OWNER"
 	// Operator roles. They exist so the people who run the platform are not all given the
 	// same key: an editor who publishes lessons has no reason to be able to change prices,
 	// and support staff have no reason to be able to change either.
@@ -32,7 +36,7 @@ const (
 // Roles is every role this build knows, in ascending order of reach. The console lists them
 // with their permissions so whoever grants access can see what it carries.
 func Roles() []Role {
-	return []Role{RoleUser, RoleAnalyst, RoleSupport, RoleContentManager, RoleAdmin}
+	return []Role{RoleUser, RoleAnalyst, RoleSupport, RoleContentManager, RoleAdmin, RoleOwner}
 }
 
 // PermissionsFor returns the permissions a role grants, sorted, for display and for tests.
@@ -62,6 +66,8 @@ const (
 	PermAuditRead           Permission = "audit:read"
 	PermSettingsManage      Permission = "settings:manage"
 	PermSystemRead          Permission = "system:read"
+	// Adding, re-roling and removing the people who run the platform. Owner only.
+	PermStaffManage Permission = "staff:manage"
 )
 
 var learner = []Permission{
@@ -97,19 +103,26 @@ var rolePermissions = map[Role]map[Permission]struct{}{
 		PermAssessmentsManage,
 	)...),
 
-	RoleAdmin: setOf(append(learner,
-		PermContentManage,
-		PermAssessmentsRead,
-		PermAssessmentsManage,
-		PermUsersRead,
-		PermUsersManage,
-		PermSubscriptionsManage,
-		PermAIUsageRead,
-		PermAuditRead,
-		PermSettingsManage,
-		PermSystemRead,
-	)...),
+	RoleAdmin: setOf(adminPermissions...),
+
+	// Everything an administrator can do, plus the staff list.
+	RoleOwner: setOf(append(adminPermissions, PermStaffManage)...),
 }
+
+// adminPermissions is named because two roles share it, and because a permission added to
+// the administrator should reach the owner without anyone remembering to add it twice.
+var adminPermissions = append(learner,
+	PermContentManage,
+	PermAssessmentsRead,
+	PermAssessmentsManage,
+	PermUsersRead,
+	PermUsersManage,
+	PermSubscriptionsManage,
+	PermAIUsageRead,
+	PermAuditRead,
+	PermSettingsManage,
+	PermSystemRead,
+)
 
 func setOf(perms ...Permission) map[Permission]struct{} {
 	s := make(map[Permission]struct{}, len(perms))

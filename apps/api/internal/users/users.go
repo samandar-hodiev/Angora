@@ -49,6 +49,13 @@ type NewAccount struct {
 	EmailVerified bool
 	// AuthProvider is how the account was created: email (default) | google | apple | phone.
 	AuthProvider string
+	// Role the account starts with. Empty means USER. Only two callers set it: owner sign-in
+	// and the owner adding staff, both of which have already established who is asking.
+	Role authz.Role
+	// MustChangePassword marks a password somebody else chose. Staff accounts start this way.
+	MustChangePassword bool
+	// CreatedBy is the operator who created this account, for the staff list.
+	CreatedBy *uuid.UUID
 }
 
 var (
@@ -58,6 +65,7 @@ var (
 
 type Repository interface {
 	CreateAccount(ctx context.Context, in NewAccount) (User, error)
+	SetRole(ctx context.Context, id uuid.UUID, role authz.Role) error
 	GetByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetCredentialsByEmail(ctx context.Context, email string) (Credentials, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error

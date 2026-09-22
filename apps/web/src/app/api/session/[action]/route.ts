@@ -22,6 +22,9 @@ const upstreamPaths = {
   register: "/auth/register",
   google: "/auth/google",
   "email-verify": "/auth/email/verify",
+  // The Owner Console's own door. It ends in a session like any other, so the refresh token
+  // has to land in the same httpOnly cookie rather than in console JavaScript.
+  "owner-verify": "/auth/owner/verify",
   refresh: "/auth/refresh",
   logout: "/auth/logout",
 } as const;
@@ -52,7 +55,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
   }
 
   let payload: unknown;
-  if (action === "login" || action === "register" || action === "google" || action === "email-verify") {
+  if (action === "login" || action === "register" || action === "google" || action === "email-verify" || action === "owner-verify") {
     payload = await request.json().catch(() => null);
     if (!payload || typeof payload !== "object") {
       return errorResponse(400, "BAD_REQUEST", "Request body is not valid JSON");

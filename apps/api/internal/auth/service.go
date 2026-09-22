@@ -14,6 +14,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/analytics"
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
+	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
@@ -22,6 +23,7 @@ import (
 // UserStore is the subset of the users module that authentication needs.
 type UserStore interface {
 	CreateAccount(ctx context.Context, in users.NewAccount) (users.User, error)
+	SetRole(ctx context.Context, id uuid.UUID, role authz.Role) error
 	GetByID(ctx context.Context, id uuid.UUID) (users.User, error)
 	GetCredentialsByEmail(ctx context.Context, email string) (users.Credentials, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
@@ -105,6 +107,9 @@ type Options struct {
 	// ExposeDevCodes returns email verification codes in API responses. Development only,
 	// when no mail provider is configured.
 	ExposeDevCodes bool
+	// OwnerEmail is the single address allowed to sign in to the Owner Console. Empty
+	// disables owner sign-in.
+	OwnerEmail string
 }
 
 type Service struct {
@@ -123,6 +128,7 @@ type Service struct {
 	refreshTTL time.Duration
 	resetTTL   time.Duration
 	webURL     string
+	ownerEmail string
 	devCodes   bool
 	now        func() time.Time
 	// dummyHash is verified when an email is unknown so that "no such user" and
@@ -144,7 +150,8 @@ func NewService(d Deps, o Options) (*Service, error) {
 		tracker:    trackerOrNop(d.Tracker),
 		notifier:   d.Notifier,
 		refreshTTL: o.RefreshTTL, resetTTL: o.ResetTTL,
-		webURL: strings.TrimRight(o.WebURL, "/"), devCodes: o.ExposeDevCodes, now: time.Now, dummyHash: dummy,
+		webURL: strings.TrimRight(o.WebURL, "/"), ownerEmail: normalizeEmail(o.OwnerEmail),
+		devCodes: o.ExposeDevCodes, now: time.Now, dummyHash: dummy,
 	}, nil
 }
 

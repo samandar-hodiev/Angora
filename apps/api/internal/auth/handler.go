@@ -34,6 +34,57 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup, rateLimit gin.HandlerFunc)
 	g.GET("/password/status", authz.RequireAuthenticated(), h.passwordStatus)
 	g.POST("/password/forgot", h.forgotPassword)
 	g.POST("/password/reset", h.resetPassword)
+
+	// The console's own door. Rate limited with the rest, because it sends email.
+	owner := g.Group("/owner")
+	owner.POST("/start", h.ownerStart)
+	owner.POST("/resend", h.ownerResend)
+	owner.POST("/verify", h.ownerVerify)
+}
+
+type OwnerStartInput struct {
+	Email string `json:"email" binding:"required,email,max=254"`
+}
+
+type OwnerVerifyInput struct {
+	Email string `json:"email" binding:"required,email,max=254"`
+	Code  string `json:"code" binding:"required,len=6,numeric"`
+}
+
+func (h *Handler) ownerStart(c *gin.Context) { h.ownerChallenge(c, false) }
+
+func (h *Handler) ownerResend(c *gin.Context) { h.ownerChallenge(c, true) }
+
+func (h *Handler) ownerChallenge(c *gin.Context, resend bool) {
+	var in OwnerStartInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	send := h.svc.StartOwnerSignIn
+	if resend {
+		send = h.svc.ResendOwnerSignIn
+	}
+	ch, err := send(c.Request.Context(), in.Email, clientInfo(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, ch)
+}
+
+func (h *Handler) ownerVerify(c *gin.Context) {
+	var in OwnerVerifyInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	session, err := h.svc.VerifyOwnerSignIn(c.Request.Context(), in.Email, in.Code, clientInfo(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, session)
 }
 
 func (h *Handler) google(c *gin.Context) {

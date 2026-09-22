@@ -23,6 +23,8 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/mail"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
+	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
+	"github.com/samandar-hodiev/engora/apps/api/internal/platform/observability"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
 )
 
@@ -126,6 +128,9 @@ func newAccountFixture(t *testing.T) *accountFixture {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	// The error middleware is what turns a handler's apperr into a response. Without it a
+	// refusal renders as a bare 200, which is how a test can pass while the API says no.
+	router.Use(middleware.Errors(observability.NewErrorReporter("log", log)))
 	v1 := router.Group("/api/v1", func(c *gin.Context) {
 		authz.SetPrincipal(c, authz.Principal{UserID: user.ID, Role: authz.Role(user.Role)})
 		c.Next()
@@ -184,8 +189,8 @@ func TestAccountDeletionPostgres(t *testing.T) {
 
 		res := f.do(t, http.MethodPost, "/api/v1/account/deletion/confirm",
 			map[string]string{"email": f.user.Email, "code": "000000"})
-		if res.Code == http.StatusNoContent {
-			t.Fatal("a wrong code deleted the account")
+		if res.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a wrong code should be a validation failure, got %d: %s", res.Code, res.Body.String())
 		}
 		if !f.exists(t) {
 			t.Fatal("account was deleted by a wrong code")
@@ -199,8 +204,8 @@ func TestAccountDeletionPostgres(t *testing.T) {
 
 		res := f.do(t, http.MethodPost, "/api/v1/account/deletion/confirm",
 			map[string]string{"email": "someone-else@example.test", "code": code})
-		if res.Code == http.StatusNoContent {
-			t.Fatal("the wrong address deleted the account")
+		if res.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a mismatched address should be refused, got %d: %s", res.Code, res.Body.String())
 		}
 		if !f.exists(t) {
 			t.Fatal("account was deleted for a mismatched address")
@@ -255,9 +260,10 @@ func TestAccountDeletionPostgres(t *testing.T) {
 		if res := f.do(t, http.MethodPost, "/api/v1/account/deletion/confirm", body); res.Code != http.StatusNoContent {
 			t.Fatalf("first confirm: got %d, body %s", res.Code, res.Body.String())
 		}
-		// Replaying it must fail on the code, not merely because the row has gone.
-		if res := f.do(t, http.MethodPost, "/api/v1/account/deletion/confirm", body); res.Code == http.StatusNoContent {
-			t.Fatal("the same code worked twice")
+		// Replaying it must fail, and the account must not somehow come back.
+		res := f.do(t, http.MethodPost, "/api/v1/account/deletion/confirm", body)
+		if res.Code == http.StatusNoContent || res.Code < 400 {
+			t.Fatalf("the same code worked twice: got %d", res.Code)
 		}
 	})
 }

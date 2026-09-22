@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { OwnerShell } from "@/features/owner/components/shell";
-import { OwnerGuard } from "@/features/owner/guard";
+import { OwnerArea } from "@/features/owner/components/area";
 
 export const metadata: Metadata = {
   title: { default: "Owner", template: "%s · Engora Owner" },
@@ -14,9 +13,5 @@ export const metadata: Metadata = {
  * own data layer. It never renders learner navigation, and the learner app never links into it.
  */
 export default function OwnerLayout({ children }: { children: ReactNode }) {
-  return (
-    <OwnerGuard>
-      <OwnerShell>{children}</OwnerShell>
-    </OwnerGuard>
-  );
+  return <OwnerArea>{children}</OwnerArea>;
 }

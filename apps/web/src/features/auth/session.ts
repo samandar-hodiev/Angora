@@ -77,7 +77,7 @@ function completeSignIn(session: WebSession, landing: string) {
 const SESSION_ROUTE = "/api/session";
 
 async function callSessionRoute(
-  action: "login" | "register" | "google" | "email-verify" | "refresh" | "logout",
+  action: "login" | "register" | "google" | "email-verify" | "owner-verify" | "refresh" | "logout",
   body?: unknown,
 ) {
   let response: Response;
@@ -145,6 +145,23 @@ export async function loginWithGoogle(
 export async function verifyEmailCode(input: { email: string; code: string; timezone?: string }): Promise<WebSession> {
   const session = await callSessionRoute("email-verify", input);
   return completeSignIn(session!, SETUP_PROFILE_PATH);
+}
+
+export const OWNER_LANDING_PATH = "/owner/dashboard";
+
+/**
+ * Signs in to the Owner Console with an emailed code.
+ *
+ * Deliberately not the learner sign-in: this one lands in the console and never runs the
+ * learner journey guard, because an owner arriving at an onboarding wizard would be a bug,
+ * not a welcome.
+ */
+export async function verifyOwnerCode(
+  input: { email: string; code: string },
+  landing: string = OWNER_LANDING_PATH,
+): Promise<WebSession> {
+  const session = await callSessionRoute("owner-verify", input);
+  return completeSignIn(session!, landing);
 }
 
 export function browserTimezone(): string | undefined {

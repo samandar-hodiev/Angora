@@ -120,7 +120,10 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		120, time.Minute, c.Log))
 	admin.NewModule(c.DB, c.Audit).WithAuthor(c.GrammarAuthor).RegisterRoutes(v1)
 	// The console's own configuration, kept apart from the Learner App's (see internal/owner).
-	owner.NewModule(owner.Deps{Pool: c.DB, Storage: c.Storage, Log: c.Log}).RegisterRoutes(v1)
+	owner.NewModule(owner.Deps{
+		Pool: c.DB, Storage: c.Storage, Log: c.Log,
+		Users: c.Users, Hasher: auth.DefaultArgon2id(), Audit: c.Audit, OwnerEmail: cfg.Auth.OwnerEmail,
+	}).RegisterRoutes(v1)
 	jobs.RegisterRoutes(v1, c.Jobs)
 
 	v1.GET("/admin/system/metrics", authz.RequirePermission(authz.PermSystemRead), func(ctx *gin.Context) {

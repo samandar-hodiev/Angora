@@ -39,13 +39,29 @@ func newFakeUsers() *fakeUsers {
 	return &fakeUsers{byID: map[uuid.UUID]users.Credentials{}, byMail: map[string]uuid.UUID{}}
 }
 
+func (f *fakeUsers) SetRole(_ context.Context, id uuid.UUID, role authz.Role) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, ok := f.byID[id]
+	if !ok {
+		return users.ErrNotFound
+	}
+	c.Role = role
+	f.byID[id] = c
+	return nil
+}
+
 func (f *fakeUsers) CreateAccount(_ context.Context, in users.NewAccount) (users.User, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if _, ok := f.byMail[in.Email]; ok {
 		return users.User{}, users.ErrEmailTaken
 	}
-	u := users.User{ID: uuid.New(), Email: in.Email, Role: authz.RoleUser, Status: users.StatusActive}
+	role := in.Role
+	if role == "" {
+		role = authz.RoleUser
+	}
+	u := users.User{ID: uuid.New(), Email: in.Email, Role: role, Status: users.StatusActive}
 	if in.EmailVerified {
 		now := time.Now()
 		u.EmailVerifiedAt = &now

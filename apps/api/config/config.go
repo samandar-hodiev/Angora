@@ -111,6 +111,11 @@ type AuthConfig struct {
 	// GoogleClientIDs are the OAuth client IDs (web, iOS, Android) whose Google ID tokens are
 	// accepted. Empty disables Google sign-in.
 	GoogleClientIDs []string
+	// OwnerEmail is the one address that can sign in to the Owner Console with a code. It
+	// lives in configuration rather than in the database on purpose: the row that says who
+	// owns the platform should not be reachable from inside the platform. Empty disables
+	// owner sign-in entirely, which is the right default for a build nobody has configured.
+	OwnerEmail string
 }
 
 type AIConfig struct {
@@ -189,6 +194,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			AccessTokenTTL:  r.duration("JWT_ACCESS_TTL", 15*time.Minute),
 			RefreshTokenTTL: r.duration("REFRESH_TOKEN_TTL", 30*24*time.Hour),
 			GoogleClientIDs: r.list("GOOGLE_CLIENT_IDS"),
+			OwnerEmail:      strings.ToLower(strings.TrimSpace(r.str("OWNER_EMAIL", ""))),
 		},
 		AI: AIConfig{
 			Provider:      strings.ToLower(r.str("AI_PROVIDER", "mock")),

@@ -2,7 +2,8 @@
 
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 
 import { EmptyState } from "@/components/common/states";
 import { FullPageLoader } from "@/components/common/full-page-loader";
@@ -10,46 +11,64 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/features/auth/hooks";
 
 /**
- * Owner authorization.
+ * Who may open the console.
  *
- * The console is laid out as if the API already enforced `role = OWNER`, because it will:
- * every /owner route is expected to sit behind that check server-side, and the UI here is a
- * convenience, never the control. Frontend gating is not security and is not treated as such.
+ * The API decides — every /admin endpoint checks its own permission and a session with the
+ * wrong role gets nothing but 403s. What happens here is only about which screen to show:
+ * sending someone to the sign-in page instead of a console full of empty error states.
  *
- * Until the backend grows an OWNER role, the console is reachable in development (or with
- * NEXT_PUBLIC_OWNER_PREVIEW=1) so it can be worked on; the data it reads and writes is the
- * real platform database either way. In a production build without that flag it falls back to
- * the session check below, and every endpoint it calls enforces its own permission regardless.
+ * OWNER is the one role that can manage staff. Everything else on this list runs the
+ * platform in some narrower way, and the pages they cannot use refuse them individually.
  */
 
-export const OWNER_ROLES = ["OWNER", "ADMIN"];
+export const CONSOLE_ROLES = ["OWNER", "ADMIN", "CONTENT_MANAGER", "SUPPORT", "ANALYST"];
 
-/** UI hint only. TODO(api): replace with the entitlement the /api/v1/owner endpoints return. */
-export function useIsOwner(): boolean {
+export function useConsoleAccess(): boolean {
   const role = useSession().user?.role;
-  return role !== undefined && OWNER_ROLES.includes(role);
+  return role !== undefined && CONSOLE_ROLES.includes(role);
 }
 
-export const ownerPreviewMode =
-  process.env.NEXT_PUBLIC_OWNER_PREVIEW === "1" || process.env.NODE_ENV !== "production";
+/** True only for the platform owner. The staff list is the one thing this gates. */
+export function useIsPlatformOwner(): boolean {
+  return useSession().user?.role === "OWNER";
+}
+
+/**
+ * A build can open the console without a session for local work on the layout, but only when
+ * somebody sets the flag on purpose. It used to be on for every development build, which
+ * meant the guard was never actually exercised until production — the one place you do not
+ * want to find out it was wrong.
+ */
+export const ownerPreviewMode = process.env.NEXT_PUBLIC_OWNER_PREVIEW === "1";
 
 export function OwnerGuard({ children }: { children: ReactNode }) {
   const { status } = useSession();
-  const isOwner = useIsOwner();
+  const allowed = useConsoleAccess();
+  const router = useRouter();
+
+  const anonymous = status === "anonymous" && !ownerPreviewMode;
+  useEffect(() => {
+    if (anonymous) router.replace("/owner/login");
+  }, [anonymous, router]);
 
   if (ownerPreviewMode) return children;
-  if (status === "loading") return <FullPageLoader label="Checking your access" />;
-  if (!isOwner) {
+  if (status === "loading" || anonymous) return <FullPageLoader label="Checking your access" />;
+  if (!allowed) {
     return (
       <main id="main" className="mx-auto max-w-lg px-4 py-24">
         <EmptyState
           icon={ShieldAlert}
-          title="Owner access only"
-          description="This console manages the whole platform. Your account doesn't have the owner role."
+          title="This console is not for this account"
+          description="Access to the Owner Console is granted by the owner. Your account does not have it."
           action={
-            <Button asChild>
-              <Link href="/app/dashboard">Back to the app</Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild>
+                <Link href="/app/dashboard">Back to the app</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/owner/login">Sign in to the console</Link>
+              </Button>
+            </div>
           }
         />
       </main>
