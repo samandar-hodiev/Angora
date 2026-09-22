@@ -5,8 +5,15 @@ import type { NextConfig } from "next";
 
 const monorepoRoot = path.resolve(__dirname, "../..");
 
-// One .env at the monorepo root configures API, web and docker compose alike.
-loadEnvConfig(monorepoRoot);
+/**
+ * One .env at the monorepo root configures API, web and docker compose alike.
+ *
+ * forceReload matters: Next has already run @next/env against apps/web by the time this
+ * config is evaluated, and @next/env caches that result — so a second, un-forced call finds
+ * the cache and quietly does nothing, which is how the root file ended up being read by the
+ * Go API and ignored by the web app.
+ */
+loadEnvConfig(monorepoRoot, process.env.NODE_ENV !== "production", undefined, true);
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
