@@ -37,7 +37,11 @@ import (
 // allow 5 wrong attempts; a new code can be requested every 45 seconds, 5 times per hour.
 
 const (
-	PurposeSignup        = "signup"
+	PurposeSignup = "signup"
+	// Deleting your own account is confirmed the same way an account is created: with a code
+	// to the mailbox. A live session proves somebody is at the keyboard, not that it is them.
+	PurposeAccountDelete = "account_delete"
+
 	emailCodeLength      = 6
 	emailCodeTTL         = 10 * time.Minute
 	emailResendCooldown  = 45 * time.Second
@@ -135,40 +139,40 @@ func (s *Service) ensureEmailAvailable(ctx context.Context, email string) error 
 	}
 }
 
-func (s *Service) StartEmailSignup(ctx context.Context, in EmailStartInput, client ClientInfo) (EmailChallenge, error) {
+// StartEmailChallenge sends a code to an address for any purpose, and is deliberately quiet
+// about repeats: asking twice within the cooldown returns the challenge already in flight
+// rather than a second code, because a learner who went back a page has not done anything
+// wrong. Callers own the question of whether the address is allowed to receive this code at
+// all — sign-up refuses a registered address, deletion requires the opposite.
+func (s *Service) StartEmailChallenge(ctx context.Context, email, purpose string, client ClientInfo) (EmailChallenge, error) {
 	if s.emailCodes == nil {
-		return EmailChallenge{}, apperr.NotImplemented("Email sign-up")
+		return EmailChallenge{}, apperr.NotImplemented("Email codes")
 	}
-	email := normalizeEmail(in.Email)
-	if err := s.ensureEmailAvailable(ctx, email); err != nil {
-		return EmailChallenge{}, err
-	}
-	open, err := s.emailCodes.GetOpen(ctx, email, PurposeSignup)
+	email = normalizeEmail(email)
+	open, err := s.emailCodes.GetOpen(ctx, email, purpose)
 	now := s.now()
 	switch {
 	case err == nil && now.Before(open.ResendAvailableAt) && now.Before(open.ExpiresAt):
-		// A code was just sent (e.g. the learner went back and continued again): don't send another.
 		return challengeOf(open), nil
 	case err == nil:
-		return s.issueEmailCode(ctx, email, &open, client)
+		return s.issueEmailCode(ctx, email, purpose, &open, client)
 	case errors.Is(err, ErrEmailCodeNotFound):
-		return s.issueEmailCode(ctx, email, nil, client)
+		return s.issueEmailCode(ctx, email, purpose, nil, client)
 	default:
 		return EmailChallenge{}, err
 	}
 }
 
-func (s *Service) ResendEmailSignup(ctx context.Context, in EmailStartInput, client ClientInfo) (EmailChallenge, error) {
+// ResendEmailChallenge is the explicit "send it again", and does enforce the cooldown and
+// the hourly ceiling: this one was asked for on purpose.
+func (s *Service) ResendEmailChallenge(ctx context.Context, email, purpose string, client ClientInfo) (EmailChallenge, error) {
 	if s.emailCodes == nil {
-		return EmailChallenge{}, apperr.NotImplemented("Email sign-up")
+		return EmailChallenge{}, apperr.NotImplemented("Email codes")
 	}
-	email := normalizeEmail(in.Email)
-	if err := s.ensureEmailAvailable(ctx, email); err != nil {
-		return EmailChallenge{}, err
-	}
-	open, err := s.emailCodes.GetOpen(ctx, email, PurposeSignup)
+	email = normalizeEmail(email)
+	open, err := s.emailCodes.GetOpen(ctx, email, purpose)
 	if errors.Is(err, ErrEmailCodeNotFound) {
-		return s.issueEmailCode(ctx, email, nil, client)
+		return s.issueEmailCode(ctx, email, purpose, nil, client)
 	}
 	if err != nil {
 		return EmailChallenge{}, err
@@ -184,17 +188,94 @@ func (s *Service) ResendEmailSignup(ctx context.Context, in EmailStartInput, cli
 		return EmailChallenge{}, apperr.New(apperr.CodeRateLimited, "You've requested too many codes. Please try again later.").
 			WithDetails(map[string]any{"reason": "resend_limit", "retry_after_seconds": wait})
 	}
-	return s.issueEmailCode(ctx, email, &open, client)
+	return s.issueEmailCode(ctx, email, purpose, &open, client)
 }
 
-func (s *Service) issueEmailCode(ctx context.Context, email string, previous *EmailCode, client ClientInfo) (EmailChallenge, error) {
+// ConsumeEmailCode checks a code and marks it used. Single use: a code that has already been
+// spent fails the same way a wrong one does, so a replayed request never succeeds twice.
+func (s *Service) ConsumeEmailCode(ctx context.Context, email, purpose, code string) error {
+	if s.emailCodes == nil {
+		return apperr.NotImplemented("Email codes")
+	}
+	email = normalizeEmail(email)
+	open, err := s.emailCodes.GetOpen(ctx, email, purpose)
+	if errors.Is(err, ErrEmailCodeNotFound) {
+		return codeError("code_invalid", "This code is invalid. Request a new code.", nil)
+	}
+	if err != nil {
+		return err
+	}
+	if s.now().After(open.ExpiresAt) {
+		return codeError("code_expired", "This code has expired. Request a new code.", nil)
+	}
+	if open.Attempts >= emailMaxAttempts {
+		return apperr.New(apperr.CodeRateLimited, "Too many incorrect attempts. Request a new code.").
+			WithDetails(map[string]any{"reason": "attempts_exceeded"})
+	}
+	if !hmac.Equal([]byte(hashEmailCode(purpose, email, strings.TrimSpace(code))), []byte(open.CodeHash)) {
+		attempts, err := s.emailCodes.IncrementAttempts(ctx, open.ID)
+		if err != nil {
+			return err
+		}
+		remaining := max(emailMaxAttempts-attempts, 0)
+		return codeError("code_invalid", "This code is incorrect.", map[string]any{"attempts_remaining": remaining})
+	}
+	consumed, err := s.emailCodes.Consume(ctx, open.ID)
+	if err != nil {
+		return err
+	}
+	if !consumed {
+		return codeError("code_invalid", "This code has already been used.", nil)
+	}
+	return nil
+}
+
+func (s *Service) StartEmailSignup(ctx context.Context, in EmailStartInput, client ClientInfo) (EmailChallenge, error) {
+	email := normalizeEmail(in.Email)
+	if err := s.ensureEmailAvailable(ctx, email); err != nil {
+		return EmailChallenge{}, err
+	}
+	return s.StartEmailChallenge(ctx, email, PurposeSignup, client)
+}
+
+func (s *Service) ResendEmailSignup(ctx context.Context, in EmailStartInput, client ClientInfo) (EmailChallenge, error) {
+	email := normalizeEmail(in.Email)
+	if err := s.ensureEmailAvailable(ctx, email); err != nil {
+		return EmailChallenge{}, err
+	}
+	return s.ResendEmailChallenge(ctx, email, PurposeSignup, client)
+}
+
+// emailCodeMessage is what lands in the inbox. The code leads the subject line because most
+// people read it from the notification without opening the mail at all.
+func emailCodeMessage(purpose, email, code string) mail.Message {
+	minutes := int(emailCodeTTL.Minutes())
+	if purpose == PurposeAccountDelete {
+		return mail.Message{
+			To:      email,
+			Subject: fmt.Sprintf("%s is your Engora account deletion code", code),
+			Text: fmt.Sprintf("Your Engora account deletion code is %s.\n\nIt expires in %d minutes. "+
+				"Entering it permanently deletes your account, your learning history and any subscription you have.\n\n"+
+				"If you did not ask to delete your Engora account, ignore this email and change your password — "+
+				"somebody else may be able to use your session.", code, minutes),
+		}
+	}
+	return mail.Message{
+		To:      email,
+		Subject: fmt.Sprintf("%s is your Engora verification code", code),
+		Text: fmt.Sprintf("Your Engora verification code is %s.\n\nIt expires in %d minutes. "+
+			"If you didn't try to create an Engora account, you can ignore this email.", code, minutes),
+	}
+}
+
+func (s *Service) issueEmailCode(ctx context.Context, email, purpose string, previous *EmailCode, client ClientInfo) (EmailChallenge, error) {
 	code, err := newEmailCode()
 	if err != nil {
 		return EmailChallenge{}, err
 	}
 	now := s.now()
 	c := EmailCode{
-		Email: email, Purpose: PurposeSignup, CodeHash: hashEmailCode(PurposeSignup, email, code),
+		Email: email, Purpose: purpose, CodeHash: hashEmailCode(purpose, email, code),
 		SendCount: 1, CreatedAt: now, ExpiresAt: now.Add(emailCodeTTL), ResendAvailableAt: now.Add(emailResendCooldown), IP: client.IP,
 	}
 	if previous != nil && now.Sub(previous.CreatedAt) < time.Hour {
@@ -203,17 +284,14 @@ func (s *Service) issueEmailCode(ctx context.Context, email string, previous *Em
 	if err := s.emailCodes.Save(ctx, c); err != nil {
 		return EmailChallenge{}, fmt.Errorf("store email code: %w", err)
 	}
-	if err := s.mailer.Send(ctx, mail.Message{
-		To:      email,
-		Subject: fmt.Sprintf("%s is your Engora verification code", code),
-		Text: fmt.Sprintf("Your Engora verification code is %s.\n\nIt expires in %d minutes. "+
-			"If you didn't try to create an Engora account, you can ignore this email.", code, int(emailCodeTTL.Minutes())),
-	}); err != nil {
+	if err := s.mailer.Send(ctx, emailCodeMessage(purpose, email, code)); err != nil {
 		// The cause (bad credentials, network) is for operators; users get a generic message.
 		return EmailChallenge{}, apperr.Wrap(err, apperr.CodeUnavailable, "We couldn't send the email. Please try again.")
 	}
-	s.tracker.Track(ctx, analytics.Event{Name: analytics.EventEmailVerificationSent, Source: "server", Platform: client.Platform,
-		Properties: map[string]any{"send_count": c.SendCount}})
+	if purpose == PurposeSignup {
+		s.tracker.Track(ctx, analytics.Event{Name: analytics.EventEmailVerificationSent, Source: "server", Platform: client.Platform,
+			Properties: map[string]any{"send_count": c.SendCount}})
+	}
 	challenge := challengeOf(c)
 	if s.devCodes {
 		challenge.DevCode = code
@@ -231,38 +309,9 @@ func codeError(reason, message string, extra map[string]any) *apperr.Error {
 
 // VerifyEmailSignup checks the code on the server and creates the account.
 func (s *Service) VerifyEmailSignup(ctx context.Context, in EmailVerifyInput, client ClientInfo) (Session, error) {
-	if s.emailCodes == nil {
-		return Session{}, apperr.NotImplemented("Email sign-up")
-	}
 	email := normalizeEmail(in.Email)
-	open, err := s.emailCodes.GetOpen(ctx, email, PurposeSignup)
-	if errors.Is(err, ErrEmailCodeNotFound) {
-		return Session{}, codeError("code_invalid", "This code is invalid. Request a new code.", nil)
-	}
-	if err != nil {
+	if err := s.ConsumeEmailCode(ctx, email, PurposeSignup, in.Code); err != nil {
 		return Session{}, err
-	}
-	if s.now().After(open.ExpiresAt) {
-		return Session{}, codeError("code_expired", "This code has expired. Request a new code.", nil)
-	}
-	if open.Attempts >= emailMaxAttempts {
-		return Session{}, apperr.New(apperr.CodeRateLimited, "Too many incorrect attempts. Request a new code.").
-			WithDetails(map[string]any{"reason": "attempts_exceeded"})
-	}
-	if !hmac.Equal([]byte(hashEmailCode(PurposeSignup, email, strings.TrimSpace(in.Code))), []byte(open.CodeHash)) {
-		attempts, err := s.emailCodes.IncrementAttempts(ctx, open.ID)
-		if err != nil {
-			return Session{}, err
-		}
-		remaining := max(emailMaxAttempts-attempts, 0)
-		return Session{}, codeError("code_invalid", "This code is incorrect.", map[string]any{"attempts_remaining": remaining})
-	}
-	consumed, err := s.emailCodes.Consume(ctx, open.ID)
-	if err != nil {
-		return Session{}, err
-	}
-	if !consumed {
-		return Session{}, codeError("code_invalid", "This code has already been used.", nil)
 	}
 
 	tz, _ := resolveTimezone(in.Timezone)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/account"
 	"github.com/samandar-hodiev/engora/apps/api/internal/admin"
 	"github.com/samandar-hodiev/engora/apps/api/internal/analytics"
 	"github.com/samandar-hodiev/engora/apps/api/internal/assessment"
@@ -83,6 +84,8 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	authLimit := ratelimit.Middleware(ratelimit.NewRedisLimiter(c.Redis), "auth",
 		cfg.HTTP.RateLimitAuthPerMinute, time.Minute, c.Log)
 	auth.NewHandler(c.Auth).RegisterRoutes(v1, authLimit)
+	// What a learner can do to their own account: export it, or close it.
+	account.NewModule(account.Deps{Pool: c.DB, Codes: c.Auth, Audit: c.Audit, Limiter: authLimit}).RegisterRoutes(v1)
 
 	platform.NewSettingsHandler(c.DB).RegisterRoutes(r, v1)
 	users.NewHandler(c.Users).RegisterRoutes(v1)

@@ -209,6 +209,11 @@ func (h *Handler) logout(c *gin.Context) {
 	httpx.NoContent(c)
 }
 
+// ClientInfoFrom reads the caller's platform, agent and IP from a request. Exported because
+// other modules issue email codes too, and a code's audit trail is only as good as the
+// client details recorded beside it.
+func ClientInfoFrom(c *gin.Context) ClientInfo { return clientInfo(c) }
+
 func clientInfo(c *gin.Context) ClientInfo {
 	platform := strings.ToLower(c.GetHeader("X-Client-Platform"))
 	switch platform {

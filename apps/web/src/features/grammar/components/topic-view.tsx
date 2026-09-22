@@ -41,7 +41,10 @@ export function GrammarTopicView({ slug }: { slug: string }) {
   const t = topic.data;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-10">
+    // A lesson is something you read, and a line of text you have to track back across half a
+    // desk monitor is harder to read, not easier. The learning area is free to be as wide as
+    // the window; this column is not.
+    <div className="mx-auto grid w-full max-w-[84rem] gap-8 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-10">
       <article className="grid min-w-0 gap-8">
         <header className="grid gap-3">
           <Link

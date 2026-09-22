@@ -93,7 +93,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
           <WallpaperLayer />
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          {/* The gap to the sidebar and the gap to the right edge are the same gap: the area's
+              own padding, and nothing else. The cap is set high enough that it does not bind
+              on an ordinary desk monitor, and when it finally does the area centres, so the
+              two sides stay equal at every width instead of the remainder piling up on the
+              right. Anything inside that wants a narrower measure — a reading passage, a
+              lesson — sets its own. */}
+          <div className="mx-auto w-full max-w-[160rem]">{children}</div>
         </main>
       </div>
 

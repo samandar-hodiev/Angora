@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { ErrorState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OptionCard, Switch } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -23,8 +24,10 @@ import type { NotificationPreferences } from "@engora/types";
 import type { ThemePreference } from "@/lib/theme";
 import { useTheme } from "@/providers/theme-provider";
 
+import { saveAsJsonFile, useExportAccount } from "../account";
 import { useSaveAppearance } from "../appearance";
 import { useProfile } from "../hooks";
+import { DeleteAccountDialog } from "./delete-account-dialog";
 import { WallpaperPicker } from "./wallpaper-picker";
 
 const sections = [
@@ -100,6 +103,9 @@ export function SettingsView() {
   const logout = useLogout();
   const router = useRouter();
   const subscription = useCurrentSubscription();
+  const exportAccount = useExportAccount();
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { preference } = useTheme();
   const { save: saveAppearance } = useSaveAppearance();
 
@@ -128,8 +134,19 @@ export function SettingsView() {
   const focus = (profile.data?.preferences?.focus_skills ?? []) as string[];
 
   const signOut = async () => {
+    setConfirmSignOut(false);
     await logout.mutateAsync().catch(() => undefined);
     router.replace("/login");
+  };
+
+  const downloadData = () => {
+    exportAccount.mutate(undefined, {
+      onSuccess: (data) => {
+        saveAsJsonFile(data, `engora-data-${new Date().toISOString().slice(0, 10)}.json`);
+        toast({ title: "Your data has been downloaded", variant: "success" });
+      },
+      onError: (error) => toast({ title: "That export failed", description: errorMessage(error), variant: "error" }),
+    });
   };
 
   return (
@@ -246,15 +263,24 @@ export function SettingsView() {
             </div>
           </SettingsSection>
 
-          <SettingsSection flashed={flash?.id === "privacy"} id="privacy" title="Privacy" description="Self-service export and deletion are on the way. Until then, contact support.">
+          <SettingsSection
+            flashed={flash?.id === "privacy"}
+            id="privacy"
+            title="Privacy"
+            description="Your record is yours: take a copy whenever you like, or close the account for good."
+          >
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled>
+              <Button variant="outline" loading={exportAccount.isPending} onClick={downloadData}>
                 <Download aria-hidden /> Download my data
               </Button>
-              <Button variant="outline" disabled className="text-error">
+              <Button variant="outline" className="text-error" onClick={() => setDeleting(true)}>
                 <Trash2 aria-hidden /> Delete account
               </Button>
             </div>
+            <p className="mt-3 text-caption text-fg-muted">
+              The download is a JSON file of everything on your account. Deleting asks for a code sent to your email
+              first — it cannot be undone.
+            </p>
           </SettingsSection>
 
           <SettingsSection flashed={flash?.id === "security"} id="security" title="Security">
@@ -264,7 +290,7 @@ export function SettingsView() {
                   <KeyRound aria-hidden /> Change password
                 </Link>
               </Button>
-              <Button variant="outline" onClick={() => void signOut()} loading={logout.isPending}>
+              <Button variant="outline" onClick={() => setConfirmSignOut(true)} loading={logout.isPending}>
                 <LogOut aria-hidden /> Sign out
               </Button>
             </div>
@@ -282,6 +308,34 @@ export function SettingsView() {
           </SettingsSection>
         </div>
       </div>
+
+      {/* Signing out ends the session on every tab of this browser, so it is asked first. */}
+      <Dialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sign out of Engora?</DialogTitle>
+            <DialogDescription>
+              You&apos;ll need to sign in again to continue learning. Your progress is saved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSignOut(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" loading={logout.isPending} onClick={() => void signOut()}>
+              Sign out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteAccountDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        accountEmail={user?.email ?? ""}
+        planName={subscription.data?.entitlements.plan_name}
+        paidPlan={Boolean(subscription.data?.entitlements.plan_code && subscription.data.entitlements.plan_code !== "free")}
+      />
     </>
   );
 }
