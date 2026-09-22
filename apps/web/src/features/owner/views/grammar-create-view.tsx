@@ -60,8 +60,8 @@ export function GrammarCreateView() {
         description="Classify the topic first; the explanation is written in the editor afterwards."
         breadcrumbs={[
           { label: "Owner", href: "/owner/dashboard" },
-          { label: "Content", href: "/owner/cms" },
-          { label: "Grammar", href: "/owner/cms/grammar" },
+          { label: "Content CMS", href: "/owner/content" },
+          { label: "Grammar", href: "/owner/content/grammar" },
           { label: "New topic" },
         ]}
       />

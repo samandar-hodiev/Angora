@@ -177,7 +177,7 @@ export function GrammarCmsView() {
       <OwnerPageHeader
         title="Grammar"
         description="The topics behind the learner grammar library, with their explanations and practice."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Content", href: "/owner/cms" }, { label: "Grammar" }]}
+        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Content CMS", href: "/owner/content" }, { label: "Grammar" }]}
       />
 
       <SectionCard

@@ -26,6 +26,24 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  /**
+   * The Owner Console's information architecture changed: the content types moved under
+   * Content CMS, and "Settings" split into the Learner App's configuration and the
+   * console's own. Bookmarks, links in old notes and anything an operator pinned still
+   * work — temporary redirects, because these are our own URLs and not something search
+   * engines should be told is permanent.
+   */
+  async redirects() {
+    return [
+      { source: "/owner/cms", destination: "/owner/content/all", permanent: false },
+      { source: "/owner/cms/grammar", destination: "/owner/content/grammar", permanent: false },
+      { source: "/owner/cms/grammar/:path*", destination: "/owner/content/grammar/:path*", permanent: false },
+      { source: "/owner/assessments", destination: "/owner/content/placement", permanent: false },
+      { source: "/owner/questions", destination: "/owner/content/question-bank", permanent: false },
+      // Shipped briefly as /questions before the tree settled on the fuller name.
+      { source: "/owner/content/questions", destination: "/owner/content/question-bank", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -1,17 +1,19 @@
 import {
+  Bell,
+  Files,
   BookOpen,
   ClipboardList,
-  ScrollText,
-  Sparkles,
-  Bell,
   CreditCard,
   FileStack,
   Headphones,
   LayoutDashboard,
+  LayoutGrid,
   LineChart,
   Mic,
   PenLine,
-  Settings,
+  ScrollText,
+  Smartphone,
+  Sparkles,
   SpellCheck,
   Target,
   Trophy,
@@ -27,6 +29,12 @@ export interface OwnerNavItem {
   icon: LucideIcon;
   /** Matched with startsWith; exact routes opt out. */
   exact?: boolean;
+  /**
+   * Pages that live inside this one. They are rendered as a tree in the sidebar, indented
+   * under their parent, and the parent stays highlighted while any of them is open — so
+   * the console always shows where you are, not only what you clicked last.
+   */
+  children?: OwnerNavItem[];
 }
 
 export interface OwnerNavSection {
@@ -35,9 +43,21 @@ export interface OwnerNavSection {
 }
 
 /**
- * The console's navigation. Skills link into the CMS with a type filter rather than each
- * getting a route of its own — one content table, pre-filtered, is less to maintain and less
- * for the Owner to learn.
+ * The console's navigation.
+ *
+ * Three areas, and they are never mixed:
+ *
+ *   Content CMS   what the owner writes for learners to study.
+ *   Platform      who the learners are, what they pay, what the platform did — plus the
+ *                 Learner App's own configuration, which is a thing the owner sets *for*
+ *                 learners, not a setting of this console.
+ *   Owner Settings  this console: its language, its theme, its background, this
+ *                 operator's sessions. Pinned to the bottom because it is about the tool,
+ *                 not about the product.
+ *
+ * The individual content types used to sit in this list — eight rows that were really one
+ * page with a filter. They now live inside Content CMS, where they belong and where they
+ * stop pushing Platform off the bottom of a 13" screen.
  */
 export const ownerNav: OwnerNavSection[] = [
   {
@@ -50,21 +70,24 @@ export const ownerNav: OwnerNavSection[] = [
   {
     label: "Content",
     items: [
-      { href: "/owner/cms", label: "All content", icon: FileStack, exact: true },
-      { href: "/owner/cms/grammar", label: "Grammar", icon: SpellCheck },
-      { href: "/owner/cms?type=vocabulary", label: "Vocabulary", icon: Type },
-      { href: "/owner/cms?type=speaking", label: "Speaking", icon: Mic },
-      { href: "/owner/cms?type=writing", label: "Writing", icon: PenLine },
-      { href: "/owner/cms?type=reading", label: "Reading", icon: BookOpen },
-      { href: "/owner/cms?type=listening", label: "Listening", icon: Headphones },
-      { href: "/owner/cms?type=ielts", label: "IELTS", icon: Trophy },
-    ],
-  },
-  {
-    label: "Assessment",
-    items: [
-      { href: "/owner/assessments", label: "Placement & tests", icon: Target },
-      { href: "/owner/questions", label: "Question bank", icon: ClipboardList },
+      {
+        href: "/owner/content",
+        label: "Content CMS",
+        icon: FileStack,
+        children: [
+          { href: "/owner/content", label: "Overview", icon: LayoutGrid, exact: true },
+          { href: "/owner/content/all", label: "All content", icon: Files },
+          { href: "/owner/content/grammar", label: "Grammar", icon: SpellCheck },
+          { href: "/owner/content/vocabulary", label: "Vocabulary", icon: Type },
+          { href: "/owner/content/speaking", label: "Speaking", icon: Mic },
+          { href: "/owner/content/writing", label: "Writing", icon: PenLine },
+          { href: "/owner/content/reading", label: "Reading", icon: BookOpen },
+          { href: "/owner/content/listening", label: "Listening", icon: Headphones },
+          { href: "/owner/content/ielts", label: "IELTS", icon: Trophy },
+          { href: "/owner/content/placement", label: "Placement & tests", icon: Target },
+          { href: "/owner/content/question-bank", label: "Question bank", icon: ClipboardList },
+        ],
+      },
     ],
   },
   {
@@ -74,17 +97,37 @@ export const ownerNav: OwnerNavSection[] = [
       { href: "/owner/paywall", label: "Paywall", icon: CreditCard },
       { href: "/owner/payments", label: "Payments", icon: Wallet },
       { href: "/owner/notifications", label: "Notifications", icon: Bell },
-      { href: "/owner/settings", label: "Settings", icon: Settings },
       { href: "/owner/ai", label: "AI", icon: Sparkles },
       { href: "/owner/audit", label: "Audit log", icon: ScrollText },
+      // Named for what it configures. It is the Learner App's settings, not this console's.
+      { href: "/owner/learner-app", label: "Learner App", icon: Smartphone },
     ],
   },
 ];
+
+/** The content types that have a page of their own under Content CMS. */
+export const contentTypes = ["reading", "listening", "speaking", "writing", "vocabulary", "ielts"] as const;
+export type ContentTypeSlug = (typeof contentTypes)[number];
+
+export function isContentType(value: string): value is ContentTypeSlug {
+  return (contentTypes as readonly string[]).includes(value);
+}
 
 export function isNavActive(pathname: string, search: string, item: OwnerNavItem): boolean {
   const [path, query] = item.href.split("?");
   if (!path) return false;
   if (query) return pathname === path && search === query;
-  if (item.exact) return pathname === path && !search;
+  if (item.exact) return pathname === path;
   return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+/** Whether the current route is anywhere inside this item's tree. */
+export function isInsideTree(pathname: string, item: OwnerNavItem): boolean {
+  if (!item.children) return false;
+  return item.children.some((child) => isNavActive(pathname, "", child));
+}
+
+/** Every item the sidebar can show, nested ones included — used by the loading skeleton. */
+export function flatNavItems(): OwnerNavItem[] {
+  return ownerNav.flatMap((section) => section.items);
 }

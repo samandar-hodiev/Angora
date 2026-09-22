@@ -399,3 +399,64 @@ export function useRestoreContentVersion() {
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.owner.all }),
   });
 }
+
+// ---- Owner Console preferences (live API) ------------------------------------------------------
+//
+// Deliberately separate from useLiveSiteSettings, which is the Learner App's configuration.
+// The two never share a cache key, a hook or a table.
+
+export function useOwnerPreferences() {
+  return useQuery({
+    queryKey: queryKeys.owner.preferences,
+    queryFn: assessmentApi.ownerApi.preferences,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useUpdateOwnerPreferences() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Record<string, unknown>) => assessmentApi.ownerApi.updatePreferences(input),
+    onSuccess: (prefs) => client.setQueryData(queryKeys.owner.preferences, prefs),
+  });
+}
+
+export function useUploadOwnerWallpaper() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => assessmentApi.ownerApi.uploadWallpaper(file),
+    onSuccess: (prefs) => client.setQueryData(queryKeys.owner.preferences, prefs),
+  });
+}
+
+export function useRemoveOwnerWallpaper() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: assessmentApi.ownerApi.removeWallpaper,
+    onSuccess: (prefs) => client.setQueryData(queryKeys.owner.preferences, prefs),
+  });
+}
+
+export function useOwnerSessions() {
+  return useQuery({ queryKey: queryKeys.owner.sessions, queryFn: assessmentApi.ownerApi.sessions });
+}
+
+export function useRevokeOwnerSession() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => assessmentApi.ownerApi.revokeSession(id),
+    onSuccess: (sessions) => client.setQueryData(queryKeys.owner.sessions, sessions),
+  });
+}
+
+export function useRevokeOtherOwnerSessions() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: assessmentApi.ownerApi.revokeOtherSessions,
+    onSuccess: (sessions) => client.setQueryData(queryKeys.owner.sessions, sessions),
+  });
+}
+
+export function useOwnerSignIns() {
+  return useQuery({ queryKey: queryKeys.owner.signIns, queryFn: assessmentApi.ownerApi.signIns });
+}

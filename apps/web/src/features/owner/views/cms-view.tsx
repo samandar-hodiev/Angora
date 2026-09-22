@@ -2,7 +2,7 @@
 
 import { Archive, Eye, FileStack, Pencil, Plus, Send } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -65,12 +65,16 @@ const statusStyles: Record<string, string> = {
   archived: "border-transparent bg-surface-active text-fg-muted line-through",
 };
 
-export function OwnerCmsView() {
-  const router = useRouter();
+/**
+ * `initialType` comes from the route now (/owner/content/reading) rather than a query
+ * string, so the sidebar and the Content CMS nav can link straight at one skill without the
+ * page having to read search parameters.
+ */
+export function OwnerCmsView({ initialType }: { initialType?: string } = {}) {
   const params = useSearchParams();
 
   const [search, setSearch] = useState("");
-  const [skill, setSkill] = useState(params.get("type") ?? "all");
+  const [skill, setSkill] = useState(initialType ?? params.get("type") ?? "all");
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
@@ -85,11 +89,12 @@ export function OwnerCmsView() {
 
   function reset() {
     setSearch("");
-    setSkill("all");
+    // Resetting inside a skill's own page keeps that skill: the route is the filter there,
+    // and clearing it would silently move the editor somewhere they did not ask to go.
+    setSkill(initialType ?? "all");
     setLevel("all");
     setStatus("all");
     setPage(1);
-    router.replace("/owner/cms");
   }
 
   function applyStatus(row: LiveContentRow, next: string) {
@@ -159,7 +164,7 @@ export function OwnerCmsView() {
           items={[
             { label: "Edit", icon: Pencil, onSelect: () => setEditing({ id: row.id }) },
             ...(row.skill === "reading" || row.skill === "listening"
-              ? [{ label: "Questions", icon: Eye, href: `/owner/questions?search=${encodeURIComponent(row.title)}` }]
+              ? [{ label: "Questions", icon: Eye, href: `/owner/content/question-bank?search=${encodeURIComponent(row.title)}` }]
               : []),
             {
               label: "Publish",
@@ -192,7 +197,7 @@ export function OwnerCmsView() {
         actions={
           <>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/owner/cms/grammar">Grammar</Link>
+              <Link href="/owner/content/grammar">Grammar</Link>
             </Button>
             <Button size="sm" onClick={() => setEditing({ id: null })}>
               <Plus aria-hidden />

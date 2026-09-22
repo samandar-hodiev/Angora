@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, ServerCrash } from "lucide-react";
+import { KeyRound, ServerCrash, ShieldOff } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -24,19 +24,22 @@ export function LiveDataState({ error, onRetry }: { error: unknown; onRetry?: ()
         description="This page reads the platform database directly. Sign in with an account that holds the owner role."
         action={
           <Button asChild size="sm">
-            <Link href="/login?next=/owner/questions">Sign in</Link>
+            <Link href="/login?next=/owner/dashboard">Sign in</Link>
           </Button>
         }
       />
     );
   }
 
+  // The API says exactly what it refused, so show that rather than a guess. This used to
+  // read "cannot manage assessments" everywhere, which was true on one page and misleading
+  // on the other fifteen.
   if (isApiError(error) && (error.code === "FORBIDDEN" || error.status === 403)) {
     return (
       <EmptyState
-        icon={KeyRound}
-        title="Your account cannot manage assessments"
-        description="This needs the assessments permission. An owner can grant it to your account."
+        icon={ShieldOff}
+        title="Your account does not have access to this"
+        description={`${error.message} The console is open in development, but the API still checks permissions — an account needs the owner role to read platform data.`}
       />
     );
   }

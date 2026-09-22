@@ -9,7 +9,7 @@ import {
   FileStack,
   Gauge,
   Plus,
-  Settings,
+  Smartphone,
   Sparkles,
   TrendingUp,
   UserPlus,
@@ -182,7 +182,7 @@ export function OwnerDashboardView() {
               </Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="/owner/cms/grammar/new">
+              <Link href="/owner/content/grammar/new">
                 <Plus aria-hidden />
                 New grammar topic
               </Link>
@@ -401,12 +401,12 @@ export function OwnerDashboardView() {
         <SectionCard title="Quick actions" description="The things you do most">
           <ul className="grid gap-2 sm:grid-cols-2">
             {[
-              { href: "/owner/questions", label: "Question bank", icon: ClipboardList, hint: "Author and publish assessment items" },
-              { href: "/owner/cms/grammar", label: "Grammar CMS", icon: FileStack, hint: "Lessons and explanations" },
+              { href: "/owner/content/question-bank", label: "Question bank", icon: ClipboardList, hint: "Author and publish assessment items" },
+              { href: "/owner/content/grammar", label: "Grammar CMS", icon: FileStack, hint: "Lessons and explanations" },
               { href: "/owner/paywall", label: "Paywall", icon: Gauge, hint: "What each plan includes" },
               { href: "/owner/learners", label: "Learners", icon: Users, hint: "Search, inspect and support accounts" },
               { href: "/owner/audit", label: "Audit log", icon: CreditCard, hint: "Who changed what" },
-              { href: "/owner/settings", label: "Settings", icon: Settings, hint: "Defaults and appearance" },
+              { href: "/owner/learner-app", label: "Learner App", icon: Smartphone, hint: "Defaults, features and maintenance" },
             ].map((action) => (
               <li key={action.href}>
                 <Link

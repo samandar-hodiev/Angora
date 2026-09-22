@@ -69,7 +69,7 @@ export function AssessmentsView() {
         breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Assessments" }]}
         actions={
           <Button variant="outline" size="sm" asChild>
-            <Link href="/owner/questions">
+            <Link href="/owner/content/question-bank">
               <ClipboardList aria-hidden />
               Question bank
             </Link>

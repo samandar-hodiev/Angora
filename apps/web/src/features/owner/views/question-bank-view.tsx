@@ -221,7 +221,7 @@ export function QuestionBankView() {
       <OwnerPageHeader
         title="Question bank"
         description="The items placement and skill assessments are built from. Published items are live for learners."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Assessments", href: "/owner/assessments" }, { label: "Question bank" }]}
+        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Content CMS", href: "/owner/content" }, { label: "Question bank" }]}
         actions={
           <Button size="sm" onClick={() => setEditing({ id: null })}>
             <Plus aria-hidden />

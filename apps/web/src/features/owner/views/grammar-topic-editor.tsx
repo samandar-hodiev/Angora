@@ -100,7 +100,7 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
       <>
         <OwnerPageHeader
           title="Grammar topic"
-          breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Grammar", href: "/owner/cms/grammar" }]}
+          breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Grammar", href: "/owner/content/grammar" }]}
         />
         <LiveDataState error={topic.error} onRetry={() => void topic.refetch()} />
       </>
@@ -125,13 +125,13 @@ export function GrammarTopicEditorView({ slug }: { slug: string }) {
         description={detail.description}
         breadcrumbs={[
           { label: "Owner", href: "/owner/dashboard" },
-          { label: "Content", href: "/owner/cms" },
-          { label: "Grammar", href: "/owner/cms/grammar" },
+          { label: "Content CMS", href: "/owner/content" },
+          { label: "Grammar", href: "/owner/content/grammar" },
           { label: detail.name },
         ]}
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => router.push("/owner/cms/grammar")}>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/owner/content/grammar")}>
               <ArrowLeft aria-hidden />
               All topics
             </Button>

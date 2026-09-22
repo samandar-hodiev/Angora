@@ -22,7 +22,13 @@ import { formatNumber } from "../lib/format";
 import type { LiveSiteSettings } from "../types";
 
 /**
- * Platform settings.
+ * The Learner App's configuration.
+ *
+ * Every value on this page changes what learners get — never what this console looks like.
+ * That distinction is the reason the page is called "Learner App" rather than "Settings":
+ * when it was called Settings, it read as the console's own configuration, and it never was
+ * one. The console's own settings live at /owner/settings and share nothing with this,
+ * including the table they are stored in.
  *
  * Everything here is a default. A learner who has already chosen a theme, a daily goal or a
  * wallpaper keeps it — these values are what a new account starts from and what the app falls
@@ -32,27 +38,27 @@ import type { LiveSiteSettings } from "../types";
 const sections = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "learner", label: "Learner defaults", icon: Users },
-  { id: "features", label: "Features", icon: Sparkles },
+  { id: "features", label: "Feature defaults", icon: Sparkles },
   { id: "wallpapers", label: "Wallpapers", icon: ImageIcon },
   { id: "maintenance", label: "Maintenance", icon: ShieldAlert },
 ] as const;
 
 type SectionId = (typeof sections)[number]["id"];
 
-export function OwnerSettingsView() {
+export function LearnerAppSettingsView() {
   const [section, setSection] = useState<SectionId>("general");
   const settings = useLiveSiteSettings();
 
   return (
     <>
       <OwnerPageHeader
-        title="Settings"
-        description="Platform defaults. Learners keep any choice they have already made."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Settings" }]}
+        title="Learner App"
+        description="What learners get by default. Anyone who has already chosen for themselves keeps their choice."
+        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Learner App" }]}
       />
 
       <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
-        <nav aria-label="Settings sections" className="lg:sticky lg:top-20">
+        <nav aria-label="Learner App sections" className="lg:sticky lg:top-20">
           <ul className="flex gap-1 overflow-x-auto rounded-xl border bg-surface p-1.5 lg:grid lg:overflow-visible">
             {sections.map((entry) => {
               const active = entry.id === section;
@@ -226,7 +232,7 @@ function SettingsGroup({ section, settings }: { section: SectionId; settings: Li
     };
     return (
       <SectionCard
-        title="Features"
+        title="Feature defaults"
         description="Platform-wide switches. Per-plan access lives on the Paywall page."
         action={
           <Button size="sm" loading={update.isPending} onClick={() => save({ features }, "Feature switches saved")}>

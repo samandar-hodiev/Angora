@@ -17,6 +17,9 @@ import type {
   ContentVersionDetail,
   ContentVersionRow,
   NotificationTemplateRow,
+  OwnerPreferences,
+  OwnerSession,
+  OwnerSignIn,
   PaymentRow,
   RevenueReport,
   SentNotificationRow,
@@ -355,4 +358,25 @@ export const notificationsAdminApi = {
     });
     return paged(result, 25);
   },
+};
+
+// ---- Owner Console preferences -----------------------------------------------------------------
+
+export const ownerApi = {
+  preferences: () => apiClient.get<OwnerPreferences>("/admin/owner/preferences"),
+  updatePreferences: (input: Record<string, unknown>) =>
+    apiClient.patch<OwnerPreferences>("/admin/owner/preferences", input),
+  // Multipart: the file goes to object storage and the row keeps a key. The API validates
+  // the declared type, the real first bytes and the length, so a client cannot talk its way
+  // past the limits by relabelling a file.
+  uploadWallpaper: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.postForm<OwnerPreferences>("/admin/owner/wallpaper", form);
+  },
+  removeWallpaper: () => apiClient.delete<OwnerPreferences>("/admin/owner/wallpaper"),
+  sessions: () => apiClient.get<OwnerSession[]>("/admin/owner/sessions"),
+  revokeSession: (id: string) => apiClient.delete<OwnerSession[]>(`/admin/owner/sessions/${id}`),
+  revokeOtherSessions: () => apiClient.post<OwnerSession[]>("/admin/owner/sessions/revoke-others", {}),
+  signIns: () => apiClient.get<OwnerSignIn[]>("/admin/owner/sign-ins"),
 };

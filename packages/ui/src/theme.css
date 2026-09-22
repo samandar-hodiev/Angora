@@ -19,7 +19,13 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
+/*
+ * The light palette is bound to `.light` as well as `:root` so a subtree can opt out of the
+ * theme above it. The Owner Console needs that: its theme belongs to the operator looking
+ * at the screen and must not follow — or change — the learner app's.
+ */
+:root,
+.light {
   color-scheme: light;
 
   /* Light grey, not white: white cards need something to sit on, or the page and the cards

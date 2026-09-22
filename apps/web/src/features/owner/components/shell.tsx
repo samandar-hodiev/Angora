@@ -1,18 +1,20 @@
 "use client";
 
 import {
-  ArrowLeft,
   Bell,
+  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
+  ExternalLink,
   LogOut,
   Menu,
   ShieldCheck,
+  SlidersHorizontal,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useSyncExternalStore, type ReactNode } from "react";
+import { Suspense, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
@@ -33,12 +35,14 @@ import {
   initials,
 } from "@/components/ui/overlay";
 import { useSession } from "@/features/auth/hooks";
+import { apiAssetUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 import { ownerPreviewMode } from "../guard";
 import { useAuditLogs } from "../hooks";
 import { formatRelative } from "../lib/format";
-import { isNavActive, ownerNav } from "./nav";
+import { OwnerPreferencesProvider, useOwnerConsole } from "../preferences";
+import { isInsideTree, isNavActive, ownerNav, type OwnerNavItem } from "./nav";
 
 /**
  * The Owner console shell.
@@ -89,20 +93,65 @@ function subscribeCollapsed(listener: () => void) {
 const collapsedOnServer = () => false;
 
 export function OwnerShell({ children }: { children: ReactNode }) {
-  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, collapsedOnServer);
+  return (
+    <OwnerPreferencesProvider>
+      <OwnerShellBody>{children}</OwnerShellBody>
+    </OwnerPreferencesProvider>
+  );
+}
+
+function OwnerShellBody({ children }: { children: ReactNode }) {
+  const { prefs, resolvedTheme, t } = useOwnerConsole();
+  const remembered = useSyncExternalStore(subscribeCollapsed, readCollapsed, collapsedOnServer);
+  // "Always expanded" and "always collapsed" win over whatever was left last time; that is
+  // what the operator asked for by choosing them.
+  const collapsed =
+    prefs.sidebar_mode === "collapsed" ? true : prefs.sidebar_mode === "expanded" ? false : remembered;
 
   function toggleCollapsed() {
     writeCollapsed(!collapsed);
   }
 
+  const accessibility = prefs.accessibility as Record<string, unknown>;
+  const wallpaper = prefs.wallpaper;
+
   return (
     <div
+      // The theme class sits here, not on <html>: it is this operator's console theme, and
+      // it must not touch the learner app's — theme.css binds the light palette to `.light`
+      // for exactly this reason.
       className={cn(
-        "min-h-dvh bg-background md:grid",
+        resolvedTheme,
+        "relative isolate min-h-dvh bg-background md:grid",
+        accessibility.larger_text === true && "text-[1.0625rem]",
+        accessibility.reduced_motion === true && "[&_*]:!animate-none [&_*]:!transition-none",
+        accessibility.high_contrast === true && "contrast-more",
+        accessibility.density === "compact" && "[--owner-density:compact]",
         collapsed ? "md:grid-cols-[4rem_minmax(0,1fr)]" : "md:grid-cols-[15rem_minmax(0,1fr)]",
       )}
+      lang={prefs.locale}
+      data-owner-density={typeof accessibility.density === "string" ? accessibility.density : "comfortable"}
     >
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-surface md:flex">
+      {/* The console background. Fixed and behind everything, dimmed by the amount the
+          operator chose, and never over the content: a table you cannot read is not a
+          nicer table. */}
+      {wallpaper.enabled && wallpaper.url && (
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+          {/* A background image, like the learner wallpaper: a CSS background rather than
+              an <img>, because it is decoration with no content to describe. */}
+          <span
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${apiAssetUrl(wallpaper.url) ?? ""})` }}
+          />
+          <span className="absolute inset-0 bg-background" style={{ opacity: wallpaper.overlay / 100 }} />
+        </div>
+      )}
+      <aside
+        className={cn(
+          "sticky top-0 hidden h-dvh flex-col border-r md:flex",
+          wallpaper.enabled && wallpaper.url ? "bg-surface/85 backdrop-blur-sm" : "bg-surface",
+        )}
+      >
         <div className={cn("flex h-14 items-center gap-2 border-b px-3", collapsed && "justify-center px-0")}>
           <Link href="/owner/dashboard" className="flex min-w-0 items-center gap-2">
             <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
@@ -111,7 +160,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
             {!collapsed && (
               <span className="grid min-w-0">
                 <span className="truncate text-label leading-tight">Engora</span>
-                <span className="truncate text-caption leading-tight text-fg-muted">Owner console</span>
+                <span className="truncate text-caption leading-tight text-fg-muted">{t.shell.console}</span>
               </span>
             )}
           </Link>
@@ -123,17 +172,12 @@ export function OwnerShell({ children }: { children: ReactNode }) {
           <OwnerNav collapsed={collapsed} />
         </Suspense>
 
+        {/* Pinned below the scrolling navigation, so the console's own settings and the
+            collapse control stay reachable however long the list above gets. "Back to the
+            learner app" used to sit here; it is not a place in this console, so it moved to
+            the account menu where the other cross-app actions live. */}
         <div className="mt-auto grid gap-1 border-t p-2">
-          <Link
-            href="/app/dashboard"
-            className={cn(
-              "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm text-fg-muted transition-colors duration-micro hover:bg-surface-hover hover:text-foreground",
-              collapsed && "justify-center px-0",
-            )}
-          >
-            <ArrowLeft className="size-4 shrink-0" aria-hidden />
-            {!collapsed && "Back to learner app"}
-          </Link>
+          <OwnerSettingsLink collapsed={collapsed} />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -171,13 +215,7 @@ export function OwnerShell({ children }: { children: ReactNode }) {
               </div>
               <div className="mt-auto border-t p-2">
                 <SheetClose asChild>
-                  <Link
-                    href="/app/dashboard"
-                    className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm text-fg-muted hover:bg-surface-hover hover:text-foreground"
-                  >
-                    <ArrowLeft className="size-4" aria-hidden />
-                    Back to learner app
-                  </Link>
+                  <OwnerSettingsLink />
                 </SheetClose>
               </div>
             </SheetContent>
@@ -207,9 +245,12 @@ export function OwnerShell({ children }: { children: ReactNode }) {
   );
 }
 
+// The skeleton shown while the navigation resolves. It scrolls for the same reason the
+// real navigation does: without it, a list taller than the sidebar is simply cut off, with
+// no way to reach the end of it.
 function NavFallback({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <div aria-hidden className="flex-1 p-2">
+    <div aria-hidden className="min-h-0 flex-1 overflow-y-auto p-2">
       {ownerNav.flatMap((section) => section.items).map((item) => (
         <div key={item.href} className={cn("flex items-center gap-2.5 px-2.5 py-2", collapsed && "justify-center px-0")}>
           <item.icon className="size-4 shrink-0 text-fg-muted" />
@@ -225,7 +266,7 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
   const search = useSearchParams().toString();
 
   return (
-    <nav aria-label="Owner" className="flex-1 overflow-y-auto p-2">
+    <nav aria-label="Owner" className="min-h-0 flex-1 overflow-y-auto p-2">
       {ownerNav.map((section) => (
         <div key={section.label} className="mb-3 last:mb-0">
           {!collapsed && (
@@ -235,31 +276,184 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
           )}
           {collapsed && <div className="mx-2 my-2 h-px bg-border-subtle" aria-hidden />}
           <ul className="grid gap-0.5">
-            {section.items.map((item) => {
-              const active = isNavActive(pathname, search, item);
-              const link = (
-                <Link
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm transition-colors duration-micro",
-                    collapsed && "justify-center px-0",
-                    active
-                      ? "bg-primary-subtle font-medium text-primary-subtle-foreground"
-                      : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
-                  )}
-                >
-                  <item.icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-fg-muted")} aria-hidden />
-                  {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
-                </Link>
-              );
-              return <li key={item.href}>{inSheet ? <SheetClose asChild>{link}</SheetClose> : link}</li>;
-            })}
+            {section.items.map((item) =>
+              item.children ? (
+                <NavTree
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                  inSheet={inSheet}
+                />
+              ) : (
+                <li key={item.href}>
+                  <NavLink
+                    item={item}
+                    active={isNavActive(pathname, search, item)}
+                    collapsed={collapsed}
+                    inSheet={inSheet}
+                  />
+                </li>
+              ),
+            )}
           </ul>
         </div>
       ))}
     </nav>
+  );
+}
+
+function navLinkClass(active: boolean, collapsed: boolean, depth: 0 | 1) {
+  return cn(
+    "flex items-center gap-2.5 rounded-md text-body-sm transition-colors duration-micro",
+    // Children are a step quieter than their parent: smaller row, indented, so the tree
+    // reads as one thing rather than eleven more top-level destinations.
+    depth === 0 ? "px-2.5 py-2" : "py-1.5 pr-2.5 pl-8",
+    collapsed && "justify-center px-0",
+    active
+      ? "bg-primary-subtle font-medium text-primary-subtle-foreground"
+      : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+  );
+}
+
+function NavLink({
+  item,
+  active,
+  collapsed = false,
+  inSheet = false,
+  depth = 0,
+  /**
+   * False for a parent that is merely containing the current page. It is highlighted, but
+   * it is not the page you are on, and only one thing can be — announcing two would make
+   * the sidebar lie to a screen reader.
+   */
+  current = active,
+}: {
+  item: OwnerNavItem;
+  active: boolean;
+  collapsed?: boolean;
+  inSheet?: boolean;
+  depth?: 0 | 1;
+  current?: boolean;
+}) {
+  const link = (
+    <Link
+      href={item.href}
+      aria-current={current ? "page" : undefined}
+      title={collapsed ? item.label : undefined}
+      className={navLinkClass(active, collapsed, depth)}
+    >
+      <item.icon
+        className={cn(depth === 0 ? "size-4" : "size-3.5", "shrink-0", active ? "text-primary" : "text-fg-muted")}
+        aria-hidden
+      />
+      {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
+    </Link>
+  );
+  return inSheet ? <SheetClose asChild>{link}</SheetClose> : link;
+}
+
+/**
+ * A navigation item with pages inside it.
+ *
+ * The parent is a link and the chevron is a separate button, because those are two
+ * different intentions: "take me to Content CMS" and "show me what is in it". Arriving
+ * anywhere inside the tree opens it, so a bookmark straight to Grammar does not land on a
+ * sidebar that hides where you are.
+ *
+ * Collapsed, the tree becomes a flyout instead: eleven indented rows in a 4rem column would
+ * be unreadable, and hiding them entirely would make the collapsed sidebar a dead end.
+ */
+function NavTree({
+  item,
+  pathname,
+  collapsed,
+  inSheet,
+}: {
+  item: OwnerNavItem;
+  pathname: string;
+  collapsed: boolean;
+  inSheet: boolean;
+}) {
+  const inside = isInsideTree(pathname, item) || isNavActive(pathname, "", item);
+  const [expanded, setExpanded] = useState(inside);
+  const [wasInside, setWasInside] = useState(inside);
+
+  // Adjust during render rather than in an effect: navigating into the tree must open it
+  // in the same paint, not a frame later.
+  if (inside !== wasInside) {
+    setWasInside(inside);
+    if (inside) setExpanded(true);
+  }
+
+  const children = item.children ?? [];
+  const panelId = `nav-tree-${item.href.replace(/\W+/g, "-")}`;
+
+  if (collapsed) {
+    return (
+      <li>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              title={item.label}
+              aria-label={item.label}
+              className={cn(navLinkClass(inside, true, 0), "w-full")}
+            >
+              <item.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="w-56">
+            <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
+            {children.map((child) => (
+              <DropdownMenuItem key={child.href} asChild>
+                <Link href={child.href} aria-current={isNavActive(pathname, "", child) ? "page" : undefined}>
+                  <child.icon aria-hidden />
+                  {child.label}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      {/* The whole row is the disclosure, not just the chevron. A parent that opens on the
+          first click and then ignores the second one is the most annoying kind of broken:
+          it looks like nothing happened. Overview is the child that opens the page, so the
+          parent does not have to be a link as well as a toggle. */}
+      <button
+        type="button"
+        onClick={() => setExpanded((open) => !open)}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className={cn(navLinkClass(inside, false, 0), "w-full text-left")}
+      >
+        <item.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+        <span className="truncate">{item.label}</span>
+        <ChevronDown
+          className={cn("ml-auto size-3.5 shrink-0 transition-transform duration-micro", !expanded && "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {expanded && (
+        <ul id={panelId} className="mt-0.5 grid gap-0.5">
+          {children.map((child) => (
+            <li key={child.href}>
+              <NavLink
+                item={child}
+                active={isNavActive(pathname, "", child)}
+                inSheet={inSheet}
+                depth={1}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
@@ -326,14 +520,21 @@ function OwnerMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/owner/settings">
-            <UserRound aria-hidden />
-            Site settings
+            <SlidersHorizontal aria-hidden />
+            Owner Settings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/app/profile">
-            <ArrowLeft aria-hidden />
-            Learner profile
+            <UserRound aria-hidden />
+            Owner profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          {/* Leaving the console is an action, not a destination inside it. */}
+          <Link href="/app/dashboard">
+            <ExternalLink aria-hidden />
+            Open Learner App
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -360,5 +561,36 @@ export function OwnerQuickActions({ actions }: { actions: { label: string; href:
         </Button>
       ))}
     </div>
+  );
+}
+
+/**
+ * The console's own settings, pinned to the bottom of the sidebar.
+ *
+ * Bottom-left rather than in the Platform list because it is about the tool, not about the
+ * product: everything in Platform changes something a learner will meet, and this changes
+ * nothing but the screen the operator is looking at.
+ */
+function OwnerSettingsLink({ collapsed = false }: { collapsed?: boolean }) {
+  const pathname = usePathname();
+  // Exact, so standing in the Learner App's settings never lights this up and vice versa.
+  const active = pathname === "/owner/settings" || pathname.startsWith("/owner/settings/");
+
+  return (
+    <Link
+      href="/owner/settings"
+      aria-current={active ? "page" : undefined}
+      title={collapsed ? "Owner Settings" : undefined}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm transition-colors duration-micro",
+        collapsed && "justify-center px-0",
+        active
+          ? "bg-primary-subtle font-medium text-primary-subtle-foreground"
+          : "text-fg-muted hover:bg-surface-hover hover:text-foreground",
+      )}
+    >
+      <SlidersHorizontal className={cn("size-4 shrink-0", active && "text-primary")} aria-hidden />
+      {collapsed ? <span className="sr-only">Owner Settings</span> : "Owner Settings"}
+    </Link>
   );
 }

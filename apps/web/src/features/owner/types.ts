@@ -1087,3 +1087,53 @@ export interface ContentVersionRow {
 export interface ContentVersionDetail extends ContentVersionRow {
   body: Record<string, unknown>;
 }
+
+// ---- Owner Console preferences ---------------------------------------------------------------
+//
+// These belong to the operator looking at the screen, never to the platform. They are
+// stored in owner_preferences and share nothing with LiveSiteSettings, which is the Learner
+// App's configuration.
+
+export type OwnerLocale = "uz" | "ru" | "en";
+export type OwnerTheme = "system" | "dark" | "light";
+export type OwnerDateFormat = "dmy" | "mdy" | "iso";
+export type OwnerTimeFormat = "12h" | "24h";
+export type OwnerSidebarMode = "expanded" | "collapsed" | "remember";
+
+export interface OwnerWallpaper {
+  url: string | null;
+  enabled: boolean;
+  /** How much the image is dimmed, 0–100. A console is tables before it is a picture. */
+  overlay: number;
+}
+
+export interface OwnerPreferences {
+  locale: OwnerLocale;
+  theme: OwnerTheme;
+  timezone: string;
+  date_format: OwnerDateFormat;
+  time_format: OwnerTimeFormat;
+  sidebar_mode: OwnerSidebarMode;
+  wallpaper: OwnerWallpaper;
+  notifications: Record<string, boolean>;
+  accessibility: Record<string, unknown>;
+  updated_at: ISODate | null;
+}
+
+export interface OwnerSession {
+  id: UUID;
+  platform: string;
+  user_agent: string;
+  ip_address: string;
+  /** The one making this request. It cannot be revoked from here. */
+  current: boolean;
+  expires_at: ISODate;
+  created_at: ISODate;
+}
+
+export interface OwnerSignIn {
+  action: string;
+  ip_address: string;
+  user_agent: string;
+  created_at: ISODate;
+}

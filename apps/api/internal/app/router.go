@@ -21,6 +21,7 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/mistakes"
 	"github.com/samandar-hodiev/engora/apps/api/internal/notifications"
 	"github.com/samandar-hodiev/engora/apps/api/internal/onboarding"
+	"github.com/samandar-hodiev/engora/apps/api/internal/owner"
 	"github.com/samandar-hodiev/engora/apps/api/internal/payments"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/middleware"
@@ -67,6 +68,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 			practice.SpeakingRoute:    cfg.Storage.MaxUploadBytes + 1<<20,
 			profiles.AvatarRoute:      6 << 20,
 			profiles.WallpaperRoute:   9 << 20,
+			owner.WallpaperRoute:      owner.MaxWallpaperBytes + 1<<20,
 		}),
 		middleware.Errors(c.Reporter),
 	)
@@ -114,6 +116,8 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	analytics.RegisterRoutes(v1, c.Analytics, ratelimit.Middleware(ratelimit.NewRedisLimiter(c.Redis), "analytics",
 		120, time.Minute, c.Log))
 	admin.NewModule(c.DB, c.Audit).RegisterRoutes(v1)
+	// The console's own configuration, kept apart from the Learner App's (see internal/owner).
+	owner.NewModule(owner.Deps{Pool: c.DB, Storage: c.Storage, Log: c.Log}).RegisterRoutes(v1)
 	jobs.RegisterRoutes(v1, c.Jobs)
 
 	v1.GET("/admin/system/metrics", authz.RequirePermission(authz.PermSystemRead), func(ctx *gin.Context) {

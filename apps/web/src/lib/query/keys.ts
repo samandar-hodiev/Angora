@@ -141,6 +141,9 @@ export const queryKeys = {
     notificationTemplates: ["owner", "notification-templates"] as const,
     sentNotifications: (filters: Record<string, string | number | undefined>) => ["owner", "sent-notifications", filters] as const,
     contentVersions: (id: string) => ["owner", "content-versions", id] as const,
+    preferences: ["owner", "preferences"] as const,
+    sessions: ["owner", "sessions"] as const,
+    signIns: ["owner", "sign-ins"] as const,
   },
   admin: {
     overview: ["admin", "overview"] as const,
