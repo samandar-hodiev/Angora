@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Eye, Minus, Pencil, Send, SpellCheck } from "lucide-react";
+import { Check, Eye, Minus, Pencil, Send, SpellCheck, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -29,6 +29,7 @@ import { formatDate, formatNumber } from "../lib/format";
 import type { LiveGrammarTopicRow } from "../types";
 import { cefrLevels } from "../types";
 import { GrammarMapView } from "./grammar-map-view";
+import { GrammarSchemaDialog } from "./grammar-schema-dialog";
 
 /**
  * Grammar authoring, on the topics the learner app serves.
@@ -356,6 +357,7 @@ function GrammarAllContentView() {
  */
 export function GrammarCmsView() {
   const [view, setView] = useState<"map" | "all">("map");
+  const [schemaOpen, setSchemaOpen] = useState(false);
 
   return (
     <>
@@ -368,18 +370,27 @@ export function GrammarCmsView() {
           { label: "Grammar" },
         ]}
         actions={
-          <SegmentedControl
-            label="View"
-            value={view}
-            onChange={(value) => setView(value as "map" | "all")}
-            options={[
-              { value: "map", label: "Grammar Map" },
-              { value: "all", label: "All content" },
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* "What should I write next?" is a question about shape, not about rows, so it
+                opens the schema rather than scrolling the list. */}
+            <Button onClick={() => setSchemaOpen(true)}>
+              <Waypoints aria-hidden />
+              Create content
+            </Button>
+            <SegmentedControl
+              label="View"
+              value={view}
+              onChange={(value) => setView(value as "map" | "all")}
+              options={[
+                { value: "map", label: "Grammar Map" },
+                { value: "all", label: "All content" },
+              ]}
+            />
+          </div>
         }
       />
       {view === "map" ? <GrammarMapView /> : <GrammarAllContentView />}
+      <GrammarSchemaDialog open={schemaOpen} onOpenChange={setSchemaOpen} language="en" />
     </>
   );
 }

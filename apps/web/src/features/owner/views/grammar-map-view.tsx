@@ -45,6 +45,25 @@ const statusLabels: Record<ContentStatusState, string> = {
   not_applicable: "Not applicable",
 };
 
+/**
+ * A row's colour answers one question: can a learner read this today?
+ *
+ * Green means yes. Everything else is grey — never written, half written, waiting for review
+ * are three different jobs for an owner but the same nothing for a learner, and the row
+ * should not claim otherwise. The badge is where the difference is spelled out.
+ */
+const rowTone: Record<ContentStatusState, string> = {
+  published: "border-l-success bg-success/[0.08] hover:bg-success/[0.14]",
+  partially_published: "border-l-success/50 bg-success/[0.04] hover:bg-success/[0.1]",
+  draft: "border-l-border bg-surface-active/45 hover:bg-surface-active/75",
+  in_review: "border-l-border bg-surface-active/45 hover:bg-surface-active/75",
+  not_created: "border-l-border bg-surface-active/25 hover:bg-surface-active/55",
+  not_applicable: "border-l-border bg-surface-active/25 hover:bg-surface-active/55",
+};
+
+/** Grey, and readable on both themes: a badge that has to look inert still has to be legible. */
+const mutedBadge = "border-transparent bg-fg-muted/15 text-fg-muted";
+
 /** Published is the only state that means a learner can read it, so it is the only green one. */
 function StatusPill({ topic }: { topic: MapTopic }) {
   const { status, published_levels: published, total_levels: total } = topic.content;
@@ -60,9 +79,9 @@ function StatusPill({ topic }: { topic: MapTopic }) {
     );
   }
   if (status === "not_created") {
-    return <span className="text-caption text-fg-muted">Not created</span>;
+    return <Badge className={mutedBadge}>Not created</Badge>;
   }
-  return <Badge variant="secondary">{statusLabels[status]}</Badge>;
+  return <Badge className={mutedBadge}>{statusLabels[status]}</Badge>;
 }
 
 const levelIcon: Record<LevelStatus, typeof Circle> = {
@@ -206,7 +225,11 @@ function CategoryGroup({ name, topics, language }: { name: string; topics: MapTo
             <li key={topic.id}>
               <Link
                 href={`/owner/content/grammar/${topic.slug}?lang=${language}`}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b px-4 py-3 transition-colors duration-micro last:border-b-0 hover:bg-surface-hover"
+                className={cn(
+                  "flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-l-2 px-4 py-3",
+                  "transition-colors duration-micro last:border-b-0",
+                  rowTone[topic.content.status],
+                )}
               >
                 <span className="grid min-w-0 flex-1 basis-64 gap-0.5">
                   <span className="truncate text-body-sm">{topic.name}</span>

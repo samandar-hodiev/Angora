@@ -463,11 +463,17 @@ export function useOwnerSignIns() {
 
 // ---- Grammar Map and the content builder (live API) --------------------------------------------
 
-export function useGrammarMap(query: { lang?: string; search?: string; status?: string; level?: string; category?: string }) {
+export function useGrammarMap(
+  query: { lang?: string; search?: string; status?: string; level?: string; category?: string },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: queryKeys.owner.grammarMap(query as Record<string, string | number | undefined>),
     queryFn: () => assessmentApi.grammarMapApi.map(query),
     placeholderData: keepPreviousData,
+    // The whole curriculum is a big read. Callers that only need it once something is open —
+    // the schema dialog — say so, rather than fetching it behind a closed door.
+    enabled: options?.enabled ?? true,
   });
 }
 
