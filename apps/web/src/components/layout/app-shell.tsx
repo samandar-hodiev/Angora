@@ -155,7 +155,7 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
   };
 
   return (
-    <nav aria-label="Main" className="relative flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
+    <nav aria-label="Main" className="scrollbar-slim relative flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
       <ul className="grid gap-0.5">
         <li>{link(homeNav)}</li>
         <li>{link(grammarNav)}</li>

@@ -208,7 +208,7 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
                 </span>
                 <span className="text-label">Owner console</span>
               </div>
-              <div className="overflow-y-auto">
+              <div className="scrollbar-slim overflow-y-auto">
                 <Suspense fallback={<NavFallback />}>
                   <OwnerNav inSheet />
                 </Suspense>
@@ -237,8 +237,13 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        {/* Left-aligned, not centred. The console sits next to a fixed sidebar, and a
+            centred column pushes the first card a couple of hundred pixels away from the
+            navigation it belongs to on any screen wider than the cap — which is most desks.
+            The cap is still there, because a table stretched across an ultrawide monitor is
+            its own kind of unreadable. */}
         <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-[86rem]">{children}</div>
+          <div className="w-full max-w-[120rem]">{children}</div>
         </main>
       </div>
     </div>
@@ -250,7 +255,7 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
 // no way to reach the end of it.
 function NavFallback({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <div aria-hidden className="min-h-0 flex-1 overflow-y-auto p-2">
+    <div aria-hidden className="scrollbar-slim min-h-0 flex-1 overflow-y-auto p-2">
       {ownerNav.flatMap((section) => section.items).map((item) => (
         <div key={item.href} className={cn("flex items-center gap-2.5 px-2.5 py-2", collapsed && "justify-center px-0")}>
           <item.icon className="size-4 shrink-0 text-fg-muted" />
@@ -266,7 +271,7 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
   const search = useSearchParams().toString();
 
   return (
-    <nav aria-label="Owner" className="min-h-0 flex-1 overflow-y-auto p-2">
+    <nav aria-label="Owner" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto p-2">
       {ownerNav.map((section) => (
         <div key={section.label} className="mb-3 last:mb-0">
           {!collapsed && (

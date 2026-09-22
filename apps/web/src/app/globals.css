@@ -7,6 +7,43 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /*
+   * A slim scrollbar for panels that scroll inside the page — the Owner Console's
+   * navigation, mainly. The browser's default is sized for a whole window and reads as a
+   * structural element next to a 15rem sidebar, which is exactly what it is not.
+   *
+   * The two rules are deliberately not used together. Chromium honours `scrollbar-width`
+   * over `::-webkit-scrollbar` the moment both are present, and its "thin" is 11px — so
+   * setting both gives the pseudo-elements no effect at all. WebKit gets the 6px bar;
+   * Firefox, which has no pseudo-elements, gets the standard properties instead.
+   *
+   * macOS overlay scrollbars are untouched either way: nothing is drawn until you scroll.
+   */
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 999px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-muted);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollbar-slim {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     html {
       scroll-behavior: smooth;
