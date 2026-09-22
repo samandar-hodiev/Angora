@@ -202,7 +202,10 @@ func (m *Module) storeGenerated(
 				if err != nil {
 					return err
 				}
-				answer, err := json.Marshal(map[string]any{"index": q.AnswerIndex})
+				// correct_index, not index: this is the marking key, and internal/grammar's
+				// scorer reads correct_index. Writing the other name produced questions that
+				// looked fine in the console and could not be marked right by a learner.
+				answer, err := json.Marshal(map[string]any{"correct_index": q.AnswerIndex})
 				if err != nil {
 					return err
 				}
@@ -264,6 +267,22 @@ type levelInput struct {
 	Body     *json.RawMessage `json:"body"`
 	/** draft | review | not_applicable. Publishing goes through its own endpoint. */
 	Status *string `json:"status" binding:"omitempty,oneof=draft review not_applicable"`
+	/**
+	 * The level's practice, in full. Present means "these are the questions now": the ones
+	 * not yet published are replaced by this list. Absent means the owner did not touch
+	 * practice on this save, and it is left alone — a builder that quietly deleted the
+	 * questions every time somebody fixed a typo in the intro would be worse than one that
+	 * could not edit them at all.
+	 */
+	Questions *[]levelQuestionInput `json:"questions" binding:"omitempty,max=50,dive"`
+}
+
+type levelQuestionInput struct {
+	Prompt      string   `json:"prompt" binding:"required,min=3,max=600"`
+	Options     []string `json:"options" binding:"required,min=2,max=6,dive,required,max=300"`
+	AnswerIndex int      `json:"answer_index" binding:"min=0,max=5"`
+	Explanation string   `json:"explanation" binding:"omitempty,max=800"`
+	TargetRule  string   `json:"target_rule" binding:"omitempty,max=200"`
 }
 
 // saveGrammarLevel stores an owner's edit as a new draft version.
@@ -331,12 +350,62 @@ func (m *Module) saveGrammarLevel(c *gin.Context) {
 		return
 	}
 
+	if in.Questions != nil {
+		if err := m.replaceLevelQuestions(ctx, topicID, level, *in.Questions); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+	}
+
 	out, err := m.loadTopicContent(ctx, slug, language)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	httpx.OK(c, out)
+}
+
+// replaceLevelQuestions swaps the level's unpublished practice for the list the owner saved.
+//
+// Published questions are left where they are: learners may be mid-attempt on them, and a
+// draft edit is not a publication. They are replaced when the topic is published, by the
+// same rule that replaces the text.
+func (m *Module) replaceLevelQuestions(ctx context.Context, topicID uuid.UUID, level cefr.Level, questions []levelQuestionInput) error {
+	return database.WithTx(ctx, m.pool, func(tx pgx.Tx) error {
+		// Scoped to multiple choice: the builder shows that type and only that type, and a
+		// save must not delete a gap-fill or a rewrite task it never put on the screen.
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM grammar_questions
+			WHERE grammar_topic_id = $1 AND status <> 'published' AND type = 'multiple_choice'
+			  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, level.BaseCode()); err != nil {
+			return err
+		}
+		for _, q := range questions {
+			if q.AnswerIndex < 0 || q.AnswerIndex >= len(q.Options) {
+				return apperr.Validation(map[string]any{
+					"reason": "answer_out_of_range",
+					"fields": map[string]any{"answer_index": "the correct answer must be one of the options"},
+				})
+			}
+			payload, err := json.Marshal(map[string]any{"options": q.Options})
+			if err != nil {
+				return err
+			}
+			answer, err := json.Marshal(map[string]any{"correct_index": q.AnswerIndex})
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO grammar_questions (grammar_topic_id, type, level_id, prompt, payload, answer,
+				                               explanation, target_rule, source, status)
+				VALUES ($1, 'multiple_choice', (SELECT id FROM levels WHERE code = $2), $3, $4, $5, $6, $7,
+				        'curated', 'draft')`,
+				topicID, level.BaseCode(), q.Prompt, payload, answer, q.Explanation, q.TargetRule); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func nullRaw(in *json.RawMessage, fallback json.RawMessage) any {
@@ -431,13 +500,19 @@ func (m *Module) checkTopic(ctx context.Context, slug, language string, only []c
 
 	// Practice questions are checked against what actually marks them: an answer index that
 	// points outside its own options marks a correct learner wrong.
+	//
+	// Two things this used to get wrong, both of which reported problems that were not there.
+	// It read answer->>'index', while internal/grammar marks on answer->>'correct_index'. And
+	// it checked every question type for options, so a gap-fill — which correctly has none —
+	// was reported as broken on every topic that had one.
 	rows, err := m.pool.Query(ctx, `
 		SELECT COALESCE(l.code, ''), q.prompt,
 		       COALESCE(jsonb_array_length(q.payload -> 'options'), 0),
-		       COALESCE((q.answer ->> 'index')::int, -1)
+		       COALESCE((q.answer ->> 'correct_index')::int, (q.answer ->> 'index')::int, -1)
 		FROM grammar_questions q
 		LEFT JOIN levels l ON l.id = q.level_id
-		WHERE q.grammar_topic_id = $1 AND q.status <> 'archived'`, content.Topic.ID)
+		WHERE q.grammar_topic_id = $1 AND q.status <> 'archived'
+		  AND q.type IN ('multiple_choice', 'contextual')`, content.Topic.ID)
 	if err != nil {
 		return out, content, err
 	}

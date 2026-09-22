@@ -56,6 +56,8 @@ import type {
   QuestionRow,
   QuestionStats,
   QuestionStatus,
+  ProposedLevel,
+  RefineInput,
 } from "../types";
 
 /**
@@ -407,4 +409,9 @@ export const grammarMapApi = {
     apiClient.put<TopicContent>(`/admin/grammar/topics/${slug}/levels/${level}`, input),
   publish: (slug: string, input: { language: string; levels?: string[] }) =>
     apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/publish`, input),
+  // Neither of these saves anything: they answer with a proposal the editor keeps or drops.
+  refine: (slug: string, level: string, input: RefineInput) =>
+    apiClient.post<ProposedLevel>(`/admin/grammar/topics/${slug}/levels/${level}/refine`, input),
+  translate: (slug: string, level: string, input: { from?: string; to: string }) =>
+    apiClient.post<ProposedLevel>(`/admin/grammar/topics/${slug}/levels/${level}/translate`, input),
 };

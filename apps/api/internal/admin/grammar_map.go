@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/cefr"
@@ -278,9 +279,11 @@ type LevelContent struct {
 	Body   json.RawMessage `json:"body"`
 	Source string          `json:"source"`
 	/** Practice questions authored against this level. */
-	QuestionCount int        `json:"question_count"`
-	PublishedAt   *time.Time `json:"published_at"`
-	UpdatedAt     *time.Time `json:"updated_at"`
+	QuestionCount int `json:"question_count"`
+	/** The questions themselves, so the builder can edit them beside the text they test. */
+	Questions   []ai.GeneratedPractice `json:"questions"`
+	PublishedAt *time.Time             `json:"published_at"`
+	UpdatedAt   *time.Time             `json:"updated_at"`
 	/** The live version a learner is reading, when this draft is not it. */
 	PublishedVersion *int `json:"published_version"`
 }
@@ -385,17 +388,79 @@ func (m *Module) loadTopicContent(ctx context.Context, slug, language string) (T
 		return out, err
 	}
 
+	// The practice, in one query rather than one per level: six round trips to draw six
+	// tabs is six chances for the editor to wait.
+	questions, err := m.questionsByLevel(ctx, topicID)
+	if err != nil {
+		return out, err
+	}
+
 	// Every level is offered, written or not: the editor's job is to see the gaps.
 	for _, code := range allLevels {
-		if level, ok := byLevel[code]; ok {
-			out.Levels = append(out.Levels, level)
-			continue
+		level, ok := byLevel[code]
+		if !ok {
+			level = LevelContent{Level: code, Status: ContentNotCreated, Body: json.RawMessage(`{}`)}
 		}
-		out.Levels = append(out.Levels, LevelContent{
-			Level: code, Status: ContentNotCreated, Body: json.RawMessage(`{}`),
-		})
+		level.Questions = questions[code]
+		if level.Questions == nil {
+			level.Questions = []ai.GeneratedPractice{}
+		}
+		out.Levels = append(out.Levels, level)
 	}
 	return out, nil
+}
+
+// questionsByLevel reads the topic's live practice, grouped by CEFR level.
+func (m *Module) questionsByLevel(ctx context.Context, topicID uuid.UUID) (map[string][]ai.GeneratedPractice, error) {
+	rows, err := m.pool.Query(ctx, `
+		SELECT l.code, q.prompt, q.payload, q.answer, q.explanation, q.target_rule
+		FROM grammar_questions q
+		JOIN levels l ON l.id = q.level_id
+		WHERE q.grammar_topic_id = $1 AND q.status <> 'archived'
+		  AND q.type = 'multiple_choice'
+		ORDER BY l.code, q.created_at`, topicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[string][]ai.GeneratedPractice{}
+	for rows.Next() {
+		var (
+			code            string
+			q               ai.GeneratedPractice
+			payload, answer []byte
+		)
+		if err := rows.Scan(&code, &q.Prompt, &payload, &answer, &q.Explanation, &q.TargetRule); err != nil {
+			return nil, err
+		}
+		var options struct {
+			Options []string `json:"options"`
+		}
+		_ = json.Unmarshal(payload, &options)
+		var index struct {
+			CorrectIndex *int `json:"correct_index"`
+			// Rows written before the key was corrected. Read, never written.
+			Legacy *int `json:"index"`
+		}
+		_ = json.Unmarshal(answer, &index)
+		// A list is a list even when it is empty. Sending null here put a crash in the
+		// editor for any question whose payload lost its options.
+		q.Options = options.Options
+		switch {
+		case index.CorrectIndex != nil:
+			q.AnswerIndex = *index.CorrectIndex
+		case index.Legacy != nil:
+			q.AnswerIndex = *index.Legacy
+		default:
+			q.AnswerIndex = -1
+		}
+		if q.Options == nil {
+			q.Options = []string{}
+		}
+		out[code] = append(out[code], q)
+	}
+	return out, rows.Err()
 }
 
 func parseLevels(codes []string) ([]cefr.Level, error) {

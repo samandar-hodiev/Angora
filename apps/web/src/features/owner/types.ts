@@ -1191,6 +1191,37 @@ export interface MapCategory {
 }
 
 /** The structured sections the learner page renders. Same shape as internal/grammar.Content. */
+/** One multiple-choice practice question, as the builder edits it. */
+export interface PracticeQuestion {
+  prompt: string;
+  options: string[];
+  answer_index: number;
+  explanation?: string;
+  target_rule?: string;
+}
+
+/** What an AI action on an existing draft proposes. Nothing is saved until the owner saves. */
+export interface ProposedLevel {
+  level: string;
+  applicable: boolean;
+  reason?: string;
+  title: string;
+  summary: string;
+  body: GrammarBody;
+  practice: PracticeQuestion[];
+  /** The section that was asked for; empty when the whole level was rewritten. */
+  section?: string;
+}
+
+export type RefineAction = "improve" | "regenerate" | "expand" | "adapt";
+
+export interface RefineInput {
+  language?: string;
+  action: RefineAction;
+  section?: string;
+  adapt_from?: string;
+}
+
 export interface GrammarBody {
   intro?: string;
   explanation?: string;
@@ -1210,6 +1241,8 @@ export interface LevelContent {
   body: GrammarBody;
   source: string;
   question_count: number;
+  /** The questions themselves, so the builder can edit them beside the text they test. */
+  questions: PracticeQuestion[];
   published_at: ISODate | null;
   updated_at: ISODate | null;
   /** The live version a learner is reading, when this draft is not it. */

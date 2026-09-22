@@ -99,6 +99,9 @@ type Module struct {
 	// author writes grammar content. Nil leaves the Generate action reporting that AI is
 	// not configured, rather than pretending to have written something.
 	author Author
+	// refiner edits drafts that already exist: one section at a time, and translation.
+	// Nil leaves those actions reporting that AI is not configured, like Generate.
+	refiner Refiner
 }
 
 func NewModule(pool *pgxpool.Pool, recorder audit.Recorder) *Module {
@@ -108,9 +111,13 @@ func NewModule(pool *pgxpool.Pool, recorder audit.Recorder) *Module {
 	return &Module{pool: pool, audit: recorder}
 }
 
-// WithAuthor attaches the AI content writer.
+// WithAuthor attaches the AI content writer. The same service edits drafts, so a value that
+// also implements Refiner is wired to both — one integration, not two.
 func (m *Module) WithAuthor(author Author) *Module {
 	m.author = author
+	if refiner, ok := author.(Refiner); ok {
+		m.refiner = refiner
+	}
 	return m
 }
 
@@ -147,6 +154,9 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.POST("/grammar/topics/:slug/generate", content, m.generateGrammarContent)
 	g.PUT("/grammar/topics/:slug/levels/:level", content, m.saveGrammarLevel)
 	g.POST("/grammar/topics/:slug/publish", content, m.publishGrammarContent)
+	// Editing a draft that exists. Neither writes: both return a suggestion for review.
+	g.POST("/grammar/topics/:slug/levels/:level/refine", content, m.refineGrammarLevel)
+	g.POST("/grammar/topics/:slug/levels/:level/translate", content, m.translateGrammarLevel)
 
 	// Question bank and assessment configuration. Reads and writes are separate
 	// permissions so an analyst role can inspect the bank without being able to change

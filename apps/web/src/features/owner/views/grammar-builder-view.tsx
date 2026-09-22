@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, Check, Eye, Pencil, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Eye, Languages, Pencil, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,28 @@ import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import { LiveDataState } from "../components/live-state";
-import { ConfirmDialog, KeyValue, OwnerPageHeader, SectionCard } from "../components/primitives";
+import { ActionMenu, ConfirmDialog, KeyValue, OwnerPageHeader, SectionCard } from "../components/primitives";
 import {
   useGenerateGrammarContent,
   useGrammarContent,
   useGrammarValidation,
   usePublishGrammarContent,
+  useRefineGrammarLevel,
   useSaveGrammarLevel,
+  useTranslateGrammarLevel,
 } from "../hooks";
 import { formatDate } from "../lib/format";
 import { cefrLevels, contentLanguageLabels, contentLanguages } from "../types";
-import type { CEFRLevel, ContentLanguage, GrammarBody, LevelContent, LevelStatus } from "../types";
+import type {
+  CEFRLevel,
+  ContentLanguage,
+  GrammarBody,
+  LevelContent,
+  LevelStatus,
+  PracticeQuestion,
+  ProposedLevel,
+  RefineAction,
+} from "../types";
 
 /**
  * The Grammar Content Builder.
@@ -323,6 +334,8 @@ function LanguageSwitch({ value, onChange }: { value: ContentLanguage; onChange:
  */
 function LevelEditor({ slug, language, content }: { slug: string; language: ContentLanguage; content: LevelContent }) {
   const save = useSaveGrammarLevel(slug);
+  const refine = useRefineGrammarLevel(slug);
+  const translate = useTranslateGrammarLevel(slug);
   const body = content.body ?? {};
 
   const [title, setTitle] = useState(content.title);
@@ -334,8 +347,113 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
   const [formulas, setFormulas] = useState(body.formulas ?? []);
   const [examples, setExamples] = useState(body.examples ?? []);
   const [mistakes, setMistakes] = useState(body.common_mistakes ?? []);
+  const [questions, setQuestions] = useState<PracticeQuestion[]>(content.questions ?? []);
+  /** Which section is waiting on the model, so only that card shows it is busy. */
+  const [pending, setPending] = useState<string | null>(null);
 
   const notApplicable = content.status === "not_applicable";
+
+  /**
+   * Applies what the model proposed to the section that was asked for, and nothing else.
+   *
+   * The API sends the whole level back, because that is the shape the model answers in. If
+   * it ignored the instruction and rewrote the rest as well, this is where that stops
+   * mattering: an editor who asked for better examples keeps their explanation.
+   */
+  function applyProposal(section: string, proposed: ProposedLevel) {
+    const next = proposed.body ?? {};
+    switch (section) {
+      case "intro":
+        setIntro(next.intro ?? "");
+        break;
+      case "explanation":
+        setExplanation(next.explanation ?? "");
+        break;
+      case "usage":
+        setUsage(next.usage ?? []);
+        break;
+      case "signal_words":
+        setSignalWords(next.signal_words ?? []);
+        break;
+      case "formulas":
+        setFormulas(next.formulas ?? []);
+        break;
+      case "examples":
+        setExamples(next.examples ?? []);
+        break;
+      case "common_mistakes":
+        setMistakes(next.common_mistakes ?? []);
+        break;
+      case "practice":
+        setQuestions(proposed.practice ?? []);
+        break;
+      default:
+        // No section named: the whole level was rewritten (Improve, Adapt, Translate).
+        setTitle(proposed.title);
+        setSummary(proposed.summary);
+        setIntro(next.intro ?? "");
+        setExplanation(next.explanation ?? "");
+        setUsage(next.usage ?? []);
+        setSignalWords(next.signal_words ?? []);
+        setFormulas(next.formulas ?? []);
+        setExamples(next.examples ?? []);
+        setMistakes(next.common_mistakes ?? []);
+        setQuestions(proposed.practice ?? []);
+    }
+  }
+
+  function runRefine(section: string, action: RefineAction, adaptFrom?: string) {
+    setPending(section || "level");
+    refine.mutate(
+      { level: content.level, input: { language, action, section: section || undefined, adapt_from: adaptFrom } },
+      {
+        onSuccess: (proposed) => {
+          applyProposal(section, proposed);
+          toast({
+            title: section ? "Proposed — review it and save" : "Rewritten — review it and save",
+            description: "Nothing is saved until you press Save draft.",
+          });
+        },
+        onError: (error) =>
+          toast({
+            title: "The model could not do that",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
+        onSettled: () => setPending(null),
+      },
+    );
+  }
+
+  /**
+   * Translating the approved English into the language being edited.
+   *
+   * Not the same as generating in that language, which is what Generate does: a translation
+   * says what the English says. When an editor has decided what a topic teaches, the other
+   * languages should agree with that decision rather than make their own.
+   */
+  function runTranslate() {
+    setPending("translate");
+    translate.mutate(
+      { level: content.level, input: { from: "en", to: language } },
+      {
+        onSuccess: (proposed) => {
+          applyProposal("", proposed);
+          toast({
+            title: "Translated — review it and save",
+            description: "Nothing is saved until you press Save draft.",
+          });
+        },
+        onError: (error) =>
+          toast({
+            title: "It could not be translated",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
+        onSettled: () => setPending(null),
+      },
+    );
+  }
 
   function persist(status?: string) {
     const next: GrammarBody = {
@@ -348,7 +466,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
       common_mistakes: mistakes,
     };
     save.mutate(
-      { level: content.level, input: { language, title, summary, body: next, status } },
+      { level: content.level, input: { language, title, summary, body: next, status, questions } },
       {
         onSuccess: () => toast({ title: "Saved as a draft", variant: "success" }),
         onError: (error) =>
@@ -395,9 +513,23 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         title={`${content.level} content`}
         description={`${contentLanguageLabels[language]} · version ${content.version || 1} · ${content.source === "ai" ? "written by AI, unreviewed" : "edited by hand"}`}
         action={
-          <Button size="sm" loading={save.isPending} onClick={() => persist()}>
-            Save draft
-          </Button>
+          <span className="flex flex-wrap items-center gap-1">
+            <SectionAI
+              section=""
+              busy={pending}
+              onRun={(_, action) => runRefine("", action)}
+              actions={[{ action: "improve", label: "Improve with AI" }]}
+            />
+            <AdaptMenu level={content.level} busy={pending} onAdapt={(from) => runRefine("", "adapt", from)} />
+            {language !== "en" && (
+              <Button variant="ghost" size="sm" disabled={pending !== null} loading={pending === "translate"} onClick={runTranslate}>
+                <Languages aria-hidden /> Translate from English
+              </Button>
+            )}
+            <Button size="sm" loading={save.isPending} onClick={() => persist()}>
+              Save draft
+            </Button>
+          </span>
         }
       >
         <div className="grid gap-4">
@@ -413,21 +545,74 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="level-intro">What is it?</Label>
+            <span className="flex items-center justify-between gap-2">
+              <Label htmlFor="level-intro">What is it?</Label>
+              <SectionAI
+                section="intro"
+                busy={pending}
+                onRun={runRefine}
+                actions={[{ action: "regenerate", label: "Rewrite" }]}
+              />
+            </span>
             <Textarea id="level-intro" rows={3} value={intro} onChange={(e) => setIntro(e.target.value)} />
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="level-explanation">When do we use it?</Label>
+            <span className="flex items-center justify-between gap-2">
+              <Label htmlFor="level-explanation">When do we use it?</Label>
+              <SectionAI
+                section="explanation"
+                busy={pending}
+                onRun={runRefine}
+                actions={[{ action: "regenerate", label: "Rewrite" }]}
+              />
+            </span>
             <Textarea id="level-explanation" rows={5} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
           </div>
 
-          <StringList label="Usage rules" value={usage} onChange={setUsage} placeholder="Talking about experience" />
-          <StringList label="Signal words" value={signalWords} onChange={setSignalWords} placeholder="already, yet, since" />
+          <StringList
+            label="Usage rules"
+            value={usage}
+            onChange={setUsage}
+            placeholder="Talking about experience"
+            action={
+              <SectionAI
+                section="usage"
+                busy={pending}
+                onRun={runRefine}
+                actions={[{ action: "expand", label: "Add more" }]}
+              />
+            }
+          />
+          <StringList
+            label="Signal words"
+            value={signalWords}
+            onChange={setSignalWords}
+            placeholder="already, yet, since"
+            action={
+              <SectionAI
+                section="signal_words"
+                busy={pending}
+                onRun={runRefine}
+                actions={[{ action: "expand", label: "Add more" }]}
+              />
+            }
+          />
         </div>
       </SectionCard>
 
-      <SectionCard title="Formulas" description="Affirmative, negative, question">
+      <SectionCard
+        title="Formulas"
+        description="Affirmative, negative, question"
+        action={
+          <SectionAI
+            section="formulas"
+            busy={pending}
+            onRun={runRefine}
+            actions={[{ action: "regenerate", label: "Regenerate" }, { action: "expand", label: "Add more" }]}
+          />
+        }
+      >
         <RowList
           rows={formulas}
           onChange={setFormulas}
@@ -453,7 +638,18 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         />
       </SectionCard>
 
-      <SectionCard title="Examples" description="Sentences somebody would actually say">
+      <SectionCard
+        title="Examples"
+        description="Sentences somebody would actually say"
+        action={
+          <SectionAI
+            section="examples"
+            busy={pending}
+            onRun={runRefine}
+            actions={[{ action: "regenerate", label: "Regenerate examples" }, { action: "expand", label: "Add more" }]}
+          />
+        }
+      >
         <RowList
           rows={examples}
           onChange={setExamples}
@@ -479,7 +675,18 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         />
       </SectionCard>
 
-      <SectionCard title="Common mistakes" description="The wrong form, the right form, and why">
+      <SectionCard
+        title="Common mistakes"
+        description="The wrong form, the right form, and why"
+        action={
+          <SectionAI
+            section="common_mistakes"
+            busy={pending}
+            onRun={runRefine}
+            actions={[{ action: "regenerate", label: "Regenerate" }, { action: "expand", label: "Add more" }]}
+          />
+        }
+      >
         <RowList
           rows={mistakes}
           onChange={setMistakes}
@@ -509,7 +716,225 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
           )}
         />
       </SectionCard>
+
+      <SectionCard
+        title="Practice"
+        description={`${questions.length} ${questions.length === 1 ? "question" : "questions"} · multiple choice`}
+        action={
+          <SectionAI
+            section="practice"
+            busy={pending}
+            onRun={runRefine}
+            actions={[
+              { action: "expand", label: "Generate more" },
+              { action: "regenerate", label: "Regenerate all" },
+            ]}
+          />
+        }
+      >
+        <PracticeEditor questions={questions} onChange={setQuestions} />
+      </SectionCard>
     </div>
+  );
+}
+
+/**
+ * The questions, edited next to the text they test.
+ *
+ * They used to be reachable only from the Question Bank, which meant writing a lesson and
+ * writing its practice were two visits to two pages — and the second one was easy to forget.
+ * Published questions are not shown here: learners may be part-way through them, and a draft
+ * edit is not a publication. They are replaced when the topic is published.
+ */
+function PracticeEditor({
+  questions,
+  onChange,
+}: {
+  questions: PracticeQuestion[];
+  onChange: (next: PracticeQuestion[]) => void;
+}) {
+  const update = (index: number, next: PracticeQuestion) =>
+    onChange(questions.map((q, i) => (i === index ? next : q)));
+
+  return (
+    <div className="grid gap-4">
+      {questions.length === 0 && (
+        <p className="rounded-lg border border-dashed py-6 text-center text-body-sm text-fg-muted">
+          No practice yet. Ask the model for some, or write one.
+        </p>
+      )}
+
+      {questions.map((raw, index) => {
+        // Defended rather than assumed: this list arrives from the API, and a question that
+        // lost its options should be fixable here, not a blank page.
+        const question: PracticeQuestion = { ...raw, options: raw.options ?? [] };
+        const answerOutOfRange = question.answer_index < 0 || question.answer_index >= question.options.length;
+        return (
+          <div key={index} className="grid gap-3 rounded-lg border bg-surface p-3">
+            <div className="flex items-start gap-2">
+              <span className="mt-2 text-caption text-fg-muted tabular-nums">{index + 1}</span>
+              <Textarea
+                aria-label={`Question ${index + 1}`}
+                rows={2}
+                value={question.prompt}
+                placeholder="She ___ in London since 2019."
+                onChange={(event) => update(index, { ...question, prompt: event.target.value })}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove question ${index + 1}`}
+                onClick={() => onChange(questions.filter((_, i) => i !== index))}
+              >
+                <Trash2 aria-hidden />
+              </Button>
+            </div>
+
+            <fieldset className="grid gap-1.5">
+              <legend className="mb-1 text-caption text-fg-muted">Options — select the correct one</legend>
+              {question.options.map((option, optionIndex) => (
+                <div key={optionIndex} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`answer-${index}`}
+                    aria-label={`Option ${optionIndex + 1} is correct`}
+                    checked={question.answer_index === optionIndex}
+                    onChange={() => update(index, { ...question, answer_index: optionIndex })}
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  <Input
+                    aria-label={`Option ${optionIndex + 1}`}
+                    value={option}
+                    onChange={(event) =>
+                      update(index, {
+                        ...question,
+                        options: question.options.map((o, i) => (i === optionIndex ? event.target.value : o)),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove option ${optionIndex + 1}`}
+                    disabled={question.options.length <= 2}
+                    onClick={() => {
+                      const options = question.options.filter((_, i) => i !== optionIndex);
+                      // The correct answer follows its option rather than staying on an index
+                      // that now points at a different one.
+                      let answer = question.answer_index;
+                      if (optionIndex < answer) answer -= 1;
+                      else if (optionIndex === answer) answer = 0;
+                      update(index, { ...question, options, answer_index: answer });
+                    }}
+                  >
+                    <X aria-hidden />
+                  </Button>
+                </div>
+              ))}
+              {question.options.length < 6 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="justify-self-start"
+                  onClick={() => update(index, { ...question, options: [...question.options, ""] })}
+                >
+                  <Plus aria-hidden /> Add an option
+                </Button>
+              )}
+              {answerOutOfRange && (
+                <p className="text-caption text-error">Pick which option is correct — none is selected.</p>
+              )}
+            </fieldset>
+
+            <Input
+              aria-label={`Why option is correct, question ${index + 1}`}
+              placeholder="Why the answer is right"
+              value={question.explanation ?? ""}
+              onChange={(event) => update(index, { ...question, explanation: event.target.value })}
+            />
+          </div>
+        );
+      })}
+
+      <Button
+        variant="outline"
+        className="justify-self-start"
+        onClick={() =>
+          onChange([...questions, { prompt: "", options: ["", ""], answer_index: 0, explanation: "", target_rule: "" }])
+        }
+      >
+        <Plus aria-hidden /> Add a question
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Rewriting this level from another one.
+ *
+ * "Adapt to B2" only makes sense when there is a B2 to adapt from, so the menu offers the
+ * levels rather than a free-text box, and the direction is stated in full: you are on B1,
+ * and you are taking the B2 draft down to it.
+ */
+function AdaptMenu({
+  level,
+  busy,
+  onAdapt,
+}: {
+  level: string;
+  busy: string | null;
+  onAdapt: (from: string) => void;
+}) {
+  const others = cefrLevels.filter((code) => code !== level);
+  return (
+    <ActionMenu
+      label={`Adapt ${level} from another level`}
+      items={others.map((code) => ({
+        label: `Adapt from ${code}`,
+        icon: Sparkles,
+        disabled: busy !== null,
+        onSelect: () => onAdapt(code),
+      }))}
+    />
+  );
+}
+
+
+/**
+ * The AI actions for one section.
+ *
+ * Deliberately small and deliberately next to the thing they change: "Regenerate examples"
+ * means the examples under it, and an editor should never have to work out which part of the
+ * page a button at the top applies to. Nothing here saves — every action is a proposal.
+ */
+function SectionAI({
+  section,
+  actions,
+  busy,
+  onRun,
+}: {
+  section: string;
+  actions: { action: RefineAction; label: string }[];
+  busy: string | null;
+  onRun: (section: string, action: RefineAction) => void;
+}) {
+  const pending = busy === section;
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {actions.map(({ action, label }) => (
+        <Button
+          key={action}
+          variant="ghost"
+          size="sm"
+          disabled={busy !== null}
+          loading={pending}
+          onClick={() => onRun(section, action)}
+        >
+          <Sparkles aria-hidden />
+          {label}
+        </Button>
+      ))}
+    </span>
   );
 }
 
@@ -519,15 +944,20 @@ function StringList({
   value,
   onChange,
   placeholder,
+  action,
 }: {
   label: string;
   value: string[];
   onChange: (next: string[]) => void;
   placeholder: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <span className="flex items-center justify-between gap-2">
+        <Label>{label}</Label>
+        {action}
+      </span>
       <div className="grid gap-1.5">
         {value.map((entry, index) => (
           <div key={index} className="flex gap-1.5">

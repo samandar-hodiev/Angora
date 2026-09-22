@@ -13,7 +13,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { queryKeys } from "@/lib/query/keys";
 
 import * as assessmentApi from "./services/assessments";
-import type { ContentLanguage, QuestionInput, QuestionQuery, QuestionStatus } from "./types";
+import type { ContentLanguage, QuestionInput, QuestionQuery, QuestionStatus, RefineInput } from "./types";
 
 // ---- Assessment & question bank (live API) --------------------------------------------------
 
@@ -503,6 +503,26 @@ export function useGenerateGrammarContent(slug: string) {
       client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
       client.invalidateQueries({ queryKey: queryKeys.owner.grammarValidation(slug, content.language) });
     },
+  });
+}
+
+/**
+ * The AI actions that work on a draft: one section at a time, and translation.
+ *
+ * They do not touch the cache, because they do not change anything on the server. The
+ * proposal goes into the editor's own state and lives or dies there.
+ */
+export function useRefineGrammarLevel(slug: string) {
+  return useMutation({
+    mutationFn: ({ level, input }: { level: string; input: RefineInput }) =>
+      assessmentApi.grammarMapApi.refine(slug, level, input),
+  });
+}
+
+export function useTranslateGrammarLevel(slug: string) {
+  return useMutation({
+    mutationFn: ({ level, input }: { level: string; input: { from?: string; to: string } }) =>
+      assessmentApi.grammarMapApi.translate(slug, level, input),
   });
 }
 
