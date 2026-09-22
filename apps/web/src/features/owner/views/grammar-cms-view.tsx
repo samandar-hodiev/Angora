@@ -184,6 +184,11 @@ export function GrammarCmsView() {
         title="Categories"
         description="Select one to filter the table"
         className="mb-5"
+        // Closed to begin with: twenty tiles are a useful shortcut when you want one and a
+        // wall to scroll past when you do not, and the topics table below is what the page
+        // is actually for.
+        collapsible
+        defaultOpen={false}
         action={
           category !== "all" && (
             <Button variant="ghost" size="sm" onClick={() => setCategory("all")}>

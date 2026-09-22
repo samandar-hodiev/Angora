@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, Check, Eye, Minus, MoreHorizontal, Search, X, type LucideIcon } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Check, ChevronDown, Eye, Minus, MoreHorizontal, Search, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
@@ -58,6 +58,8 @@ export function SectionCard({
   children,
   className,
   bodyClassName,
+  collapsible = false,
+  defaultOpen = true,
 }: {
   title: string;
   description?: string;
@@ -65,17 +67,57 @@ export function SectionCard({
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+  /**
+   * Turns the header into a disclosure. For cards that are reference rather than reading:
+   * a twenty-tile category grid is useful when you want it and a wall to scroll past when
+   * you do not, and the table underneath is what people actually came for.
+   */
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyId = useId();
+  const expanded = !collapsible || open;
+
+  const heading = (
+    <div className="grid min-w-0 gap-0.5 text-left">
+      <h2 className="truncate text-h4">{title}</h2>
+      {description && <p className="truncate text-caption text-fg-muted">{description}</p>}
+    </div>
+  );
+
   return (
     <section className={cn("flex min-w-0 flex-col rounded-xl border bg-surface", className)}>
-      <header className="flex items-start justify-between gap-3 border-b px-4 py-3">
-        <div className="grid min-w-0 gap-0.5">
-          <h2 className="truncate text-h4">{title}</h2>
-          {description && <p className="truncate text-caption text-fg-muted">{description}</p>}
-        </div>
+      <header className={cn("flex items-start justify-between gap-3 px-4 py-3", expanded && "border-b")}>
+        {collapsible ? (
+          // The whole header is the control, not a small chevron: a header that opens on
+          // click should be the thing you click.
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-controls={bodyId}
+            className="flex min-w-0 flex-1 items-start gap-3 rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          >
+            {heading}
+            <ChevronDown
+              className={cn(
+                "ml-auto mt-0.5 size-4 shrink-0 text-fg-muted transition-transform duration-micro",
+                !open && "-rotate-90",
+              )}
+              aria-hidden
+            />
+          </button>
+        ) : (
+          heading
+        )}
         {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
       </header>
-      <div className={cn("min-w-0 flex-1 p-4", bodyClassName)}>{children}</div>
+      {expanded && (
+        <div id={bodyId} className={cn("min-w-0 flex-1 p-4", bodyClassName)}>
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -322,7 +364,7 @@ export function SearchInput({
   }, [draft, delay, value]);
 
   return (
-    <div className={cn("relative min-w-0 flex-1 basis-56 sm:max-w-xs", className)}>
+    <div className={cn("relative min-w-0 flex-1 basis-72 sm:max-w-sm", className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
       <Input
         type="search"
@@ -336,7 +378,9 @@ export function SearchInput({
             onChangeRef.current("");
           }
         }}
-        className="h-9 pr-9 pl-9"
+        // A shade darker than the bar around it. A field that matches its container
+        // reads as a label until you click it, and a search box has to look typeable.
+        className="h-9 border-(--glass-border) bg-background/60 pr-9 pl-9 focus-visible:bg-background/80"
       />
       {draft && (
         <button
@@ -375,7 +419,7 @@ export function FilterSelect<T extends string>({
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="h-9 min-w-32 text-body-sm"
+        className="h-9 min-w-32 border-(--glass-border) bg-background/60 text-body-sm"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -397,9 +441,16 @@ export function FilterBar({
   resultLabel?: string;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-surface p-3">
-      {children}
-      <div className="ml-auto flex items-center gap-2">
+    // The one floating surface in a console made of flat cards, so the controls that change
+    // what the table shows sit visibly above it rather than inside it. Same liquid glass the
+    // learner app uses for its header and sidebar — no new visual language, just the one
+    // that already exists applied where it earns its keep.
+    <div className="glass-card relative isolate mb-4 flex flex-wrap items-center gap-2 overflow-hidden rounded-xl p-3">
+      <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <span className="absolute -top-8 left-1/4 h-20 w-1/2 animate-liquid rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-70 blur-2xl motion-reduce:animate-none" />
+      </span>
+      <span className="relative flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</span>
+      <div className="relative ml-auto flex items-center gap-2">
         {resultLabel && <span className="text-caption text-fg-muted tabular-nums">{resultLabel}</span>}
         {onReset && (
           <Button variant="ghost" size="sm" onClick={onReset}>
