@@ -171,10 +171,16 @@ func seedGrammar(ctx context.Context, pool *pgxpool.Pool) error {
 
 	withContent, questions := 0, 0
 	for slug, entry := range content.Topics {
+		// Seeded explanations are English, written at the topic's own CEFR level — content
+		// is keyed by (topic, language, level) since 000026, and the seed file carries one
+		// explanation per topic.
 		if _, err := pool.Exec(ctx, `
-			INSERT INTO grammar_content (grammar_topic_id, body, schema_version, version, status, source, published_at)
-			SELECT id, $2, 1, 1, 'published', 'curated', now() FROM grammar_topics WHERE slug = $1
-			ON CONFLICT (grammar_topic_id) WHERE status = 'published'
+			INSERT INTO grammar_content (grammar_topic_id, language, level_code, body, schema_version,
+			                             version, status, source, published_at)
+			SELECT t.id, 'en', COALESCE(l.code, 'B1'), $2, 1, 1, 'published', 'curated', now()
+			FROM grammar_topics t LEFT JOIN levels l ON l.id = t.level_id
+			WHERE t.slug = $1
+			ON CONFLICT (grammar_topic_id, language, level_code) WHERE status = 'published'
 			DO UPDATE SET body = EXCLUDED.body, version = grammar_content.version + 1, published_at = now()`,
 			slug, entry.Content); err != nil {
 			return fmt.Errorf("grammar content %s: %w", slug, err)

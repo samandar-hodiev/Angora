@@ -460,3 +460,66 @@ export function useRevokeOtherOwnerSessions() {
 export function useOwnerSignIns() {
   return useQuery({ queryKey: queryKeys.owner.signIns, queryFn: assessmentApi.ownerApi.signIns });
 }
+
+// ---- Grammar Map and the content builder (live API) --------------------------------------------
+
+export function useGrammarMap(query: { lang?: string; search?: string; status?: string; level?: string; category?: string }) {
+  return useQuery({
+    queryKey: queryKeys.owner.grammarMap(query as Record<string, string | number | undefined>),
+    queryFn: () => assessmentApi.grammarMapApi.map(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useGrammarContent(slug: string | null, lang: string) {
+  return useQuery({
+    queryKey: queryKeys.owner.grammarContent(slug ?? "", lang),
+    queryFn: () => assessmentApi.grammarMapApi.content(slug!, lang),
+    enabled: Boolean(slug),
+  });
+}
+
+export function useGrammarValidation(slug: string | null, lang: string) {
+  return useQuery({
+    queryKey: queryKeys.owner.grammarValidation(slug ?? "", lang),
+    queryFn: () => assessmentApi.grammarMapApi.validate(slug!, lang),
+    enabled: Boolean(slug),
+  });
+}
+
+/** Writes the whole topic in one request; the result replaces the cached content. */
+export function useGenerateGrammarContent(slug: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { language: string; levels: string[]; overwrite?: boolean }) =>
+      assessmentApi.grammarMapApi.generate(slug, input),
+    onSuccess: (content) => {
+      client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
+      client.invalidateQueries({ queryKey: queryKeys.owner.grammarValidation(slug, content.language) });
+    },
+  });
+}
+
+export function useSaveGrammarLevel(slug: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ level, input }: { level: string; input: Record<string, unknown> }) =>
+      assessmentApi.grammarMapApi.saveLevel(slug, level, input),
+    onSuccess: (content) => {
+      client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
+      client.invalidateQueries({ queryKey: queryKeys.owner.grammarValidation(slug, content.language) });
+    },
+  });
+}
+
+export function usePublishGrammarContent(slug: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { language: string; levels?: string[] }) => assessmentApi.grammarMapApi.publish(slug, input),
+    onSuccess: (content) => {
+      client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
+      // The map's status for this topic has just changed.
+      client.invalidateQueries({ queryKey: queryKeys.owner.all });
+    },
+  });
+}

@@ -1138,3 +1138,101 @@ export interface OwnerSignIn {
   user_agent: string;
   created_at: ISODate;
 }
+
+// ---- Grammar Map and the content builder -------------------------------------------------
+//
+// Two things, kept apart. The map is the curriculum: what English grammar consists of,
+// whether or not anybody has written a word about it. The content is the lesson, per
+// language and per CEFR level, versioned, and only its published rows reach a learner.
+
+/** How much of a topic has been written, derived by the API from the rows that exist. */
+export type ContentStatusState =
+  | "not_created"
+  | "draft"
+  | "in_review"
+  | "partially_published"
+  | "published"
+  | "not_applicable";
+
+/** One level's own state. "archived" is a superseded version, kept as history. */
+export type LevelStatus = "not_created" | "draft" | "review" | "published" | "archived" | "not_applicable";
+
+export interface MapLevel {
+  level: CEFRLevel;
+  status: LevelStatus;
+  version: number;
+  /** Why the level was ruled out, when it was. */
+  reason?: string;
+  updated_at: ISODate | null;
+}
+
+export interface MapTopic {
+  id: UUID;
+  slug: string;
+  name: string;
+  description: string;
+  level: CEFRLevel | null;
+  cefr_levels: string[];
+  topic_status: string;
+  content: {
+    status: ContentStatusState;
+    published_levels: number;
+    total_levels: number;
+  };
+  levels: MapLevel[];
+  languages: ContentLanguage[];
+  question_count: number;
+}
+
+export interface MapCategory {
+  slug: string;
+  name: string;
+  topics: MapTopic[];
+}
+
+/** The structured sections the learner page renders. Same shape as internal/grammar.Content. */
+export interface GrammarBody {
+  intro?: string;
+  explanation?: string;
+  usage?: string[];
+  formulas?: { label: string; pattern: string; examples: string[] }[];
+  signal_words?: string[];
+  examples?: { text: string; note?: string }[];
+  common_mistakes?: { wrong: string; right: string; why: string; rule?: string }[];
+}
+
+export interface LevelContent {
+  level: CEFRLevel;
+  status: LevelStatus;
+  version: number;
+  title: string;
+  summary: string;
+  body: GrammarBody;
+  source: string;
+  question_count: number;
+  published_at: ISODate | null;
+  updated_at: ISODate | null;
+  /** The live version a learner is reading, when this draft is not it. */
+  published_version: number | null;
+}
+
+export interface TopicContent {
+  topic: LiveGrammarTopicDetail;
+  language: ContentLanguage;
+  /** Topics learners confuse this with; the model is told about them. */
+  related: string[];
+  levels: LevelContent[];
+}
+
+export interface ValidationIssue {
+  level: string;
+  field: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  language: ContentLanguage;
+  levels: string[];
+  issues: ValidationIssue[];
+  can_publish: boolean;
+}

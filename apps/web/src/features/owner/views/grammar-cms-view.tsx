@@ -22,11 +22,13 @@ import {
   OwnerPageHeader,
   SearchInput,
   SectionCard,
+  SegmentedControl,
 } from "../components/primitives";
 import { useGrammarAdminCategories, useGrammarAdminTopics, useSetGrammarTopicStatus } from "../hooks";
 import { formatDate, formatNumber } from "../lib/format";
 import type { LiveGrammarTopicRow } from "../types";
 import { cefrLevels } from "../types";
+import { GrammarMapView } from "./grammar-map-view";
 
 /**
  * Grammar authoring, on the topics the learner app serves.
@@ -45,7 +47,7 @@ const statusStyles: Record<string, string> = {
   archived: "border-transparent bg-surface-active text-fg-muted line-through",
 };
 
-export function GrammarCmsView() {
+function GrammarAllContentView() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [level, setLevel] = useState("all");
@@ -174,12 +176,6 @@ export function GrammarCmsView() {
 
   return (
     <>
-      <OwnerPageHeader
-        title="Grammar"
-        description="The topics behind the learner grammar library, with their explanations and practice."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "Content CMS", href: "/owner/content" }, { label: "Grammar" }]}
-      />
-
       <SectionCard
         title="Categories"
         description="Select one to filter the table"
@@ -346,6 +342,44 @@ export function GrammarCmsView() {
           setPending(null);
         }}
       />
+    </>
+  );
+}
+
+/**
+ * Grammar, as two views of the same thing.
+ *
+ * The map is the curriculum — every topic, written or not — and it opens first, because the
+ * question an owner arrives with is "what still needs writing?", not "what rows exist?".
+ * The table is the answer to the second question, and it is still here for the times that
+ * is what you actually want.
+ */
+export function GrammarCmsView() {
+  const [view, setView] = useState<"map" | "all">("map");
+
+  return (
+    <>
+      <OwnerPageHeader
+        title="Grammar"
+        description="The grammar curriculum, and how much of it learners can study today."
+        breadcrumbs={[
+          { label: "Owner", href: "/owner/dashboard" },
+          { label: "Content CMS", href: "/owner/content" },
+          { label: "Grammar" },
+        ]}
+        actions={
+          <SegmentedControl
+            label="View"
+            value={view}
+            onChange={(value) => setView(value as "map" | "all")}
+            options={[
+              { value: "map", label: "Grammar Map" },
+              { value: "all", label: "All content" },
+            ]}
+          />
+        }
+      />
+      {view === "map" ? <GrammarMapView /> : <GrammarAllContentView />}
     </>
   );
 }

@@ -115,7 +115,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	assessment.NewHandler(c.Assessment).RegisterRoutes(v1)
 	analytics.RegisterRoutes(v1, c.Analytics, ratelimit.Middleware(ratelimit.NewRedisLimiter(c.Redis), "analytics",
 		120, time.Minute, c.Log))
-	admin.NewModule(c.DB, c.Audit).RegisterRoutes(v1)
+	admin.NewModule(c.DB, c.Audit).WithAuthor(c.GrammarAuthor).RegisterRoutes(v1)
 	// The console's own configuration, kept apart from the Learner App's (see internal/owner).
 	owner.NewModule(owner.Deps{Pool: c.DB, Storage: c.Storage, Log: c.Log}).RegisterRoutes(v1)
 	jobs.RegisterRoutes(v1, c.Jobs)

@@ -16,10 +16,13 @@ import type {
   ContentTaxonomy,
   ContentVersionDetail,
   ContentVersionRow,
+  MapCategory,
   NotificationTemplateRow,
   OwnerPreferences,
   OwnerSession,
   OwnerSignIn,
+  TopicContent,
+  ValidationResult,
   PaymentRow,
   RevenueReport,
   SentNotificationRow,
@@ -379,4 +382,29 @@ export const ownerApi = {
   revokeSession: (id: string) => apiClient.delete<OwnerSession[]>(`/admin/owner/sessions/${id}`),
   revokeOtherSessions: () => apiClient.post<OwnerSession[]>("/admin/owner/sessions/revoke-others", {}),
   signIns: () => apiClient.get<OwnerSignIn[]>("/admin/owner/sign-ins"),
+};
+
+// ---- Grammar Map and the content builder ---------------------------------------------------
+
+export const grammarMapApi = {
+  map: (query: { lang?: string; search?: string; status?: string; level?: string; category?: string }) =>
+    apiClient.get<MapCategory[]>("/admin/grammar/map", {
+      query: {
+        lang: query.lang,
+        search: query.search || undefined,
+        status: query.status === "all" ? undefined : query.status,
+        level: query.level === "all" ? undefined : query.level,
+        category: query.category === "all" ? undefined : query.category,
+      },
+    }),
+  content: (slug: string, lang: string) =>
+    apiClient.get<TopicContent>(`/admin/grammar/topics/${slug}/content`, { query: { lang } }),
+  validate: (slug: string, lang: string) =>
+    apiClient.get<ValidationResult>(`/admin/grammar/topics/${slug}/validate`, { query: { lang } }),
+  generate: (slug: string, input: { language: string; levels: string[]; overwrite?: boolean }) =>
+    apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/generate`, input),
+  saveLevel: (slug: string, level: string, input: Record<string, unknown>) =>
+    apiClient.put<TopicContent>(`/admin/grammar/topics/${slug}/levels/${level}`, input),
+  publish: (slug: string, input: { language: string; levels?: string[] }) =>
+    apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/publish`, input),
 };

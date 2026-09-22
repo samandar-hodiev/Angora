@@ -62,6 +62,9 @@ type Container struct {
 	Onboarding        *onboarding.Service
 	Assessment        *assessment.Service
 	GrammarTutor      grammar.Tutor
+	// GrammarAuthor writes curriculum content for the owner console. It is the same
+	// service as GrammarTutor; the console needs the wider interface.
+	GrammarAuthor *ai.GrammarTutorService
 }
 
 func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container, error) {
@@ -168,7 +171,8 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	if fastModel == "" {
 		fastModel = cfg.AI.Model
 	}
-	c.GrammarTutor = ai.NewGrammarTutor(c.AI, fastModel, cfg.AI.Model)
+	c.GrammarAuthor = ai.NewGrammarTutor(c.AI, fastModel, cfg.AI.Model)
+	c.GrammarTutor = c.GrammarAuthor
 
 	log.Info("container ready",
 		slog.String("env", string(cfg.App.Env)),

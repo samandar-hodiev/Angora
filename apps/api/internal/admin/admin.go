@@ -96,6 +96,9 @@ type ContentFilter struct {
 type Module struct {
 	pool  *pgxpool.Pool
 	audit audit.Recorder
+	// author writes grammar content. Nil leaves the Generate action reporting that AI is
+	// not configured, rather than pretending to have written something.
+	author Author
 }
 
 func NewModule(pool *pgxpool.Pool, recorder audit.Recorder) *Module {
@@ -103,6 +106,12 @@ func NewModule(pool *pgxpool.Pool, recorder audit.Recorder) *Module {
 		recorder = audit.Nop{}
 	}
 	return &Module{pool: pool, audit: recorder}
+}
+
+// WithAuthor attaches the AI content writer.
+func (m *Module) WithAuthor(author Author) *Module {
+	m.author = author
+	return m
 }
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
@@ -128,6 +137,16 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/grammar/topics/:slug", content, m.grammarTopic)
 	g.PATCH("/grammar/topics/:slug", content, m.updateGrammarTopic)
 	g.POST("/grammar/topics/:slug/status", content, m.setGrammarStatus)
+
+	// The Grammar Map and the content builder. Reading the curriculum needs only the
+	// content read permission; writing to it — including asking a model to write — needs
+	// the manage permission, because generated text is still text learners will be taught.
+	g.GET("/grammar/map", content, m.grammarMap)
+	g.GET("/grammar/topics/:slug/content", content, m.grammarTopicContent)
+	g.GET("/grammar/topics/:slug/validate", content, m.validateGrammarContent)
+	g.POST("/grammar/topics/:slug/generate", content, m.generateGrammarContent)
+	g.PUT("/grammar/topics/:slug/levels/:level", content, m.saveGrammarLevel)
+	g.POST("/grammar/topics/:slug/publish", content, m.publishGrammarContent)
 
 	// Question bank and assessment configuration. Reads and writes are separate
 	// permissions so an analyst role can inspect the bank without being able to change

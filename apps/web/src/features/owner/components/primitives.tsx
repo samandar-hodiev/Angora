@@ -575,6 +575,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   destructive = false,
   loading = false,
+  disabled = false,
   onConfirm,
   children,
 }: {
@@ -586,6 +587,8 @@ export function ConfirmDialog({
   cancelLabel?: string;
   destructive?: boolean;
   loading?: boolean;
+  /** Blocks confirming while the dialog's own content is incomplete. */
+  disabled?: boolean;
   onConfirm: () => void;
   children?: ReactNode;
 }) {
@@ -601,7 +604,12 @@ export function ConfirmDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
-          <Button variant={destructive ? "destructive" : "default"} loading={loading} onClick={onConfirm}>
+          <Button
+            variant={destructive ? "destructive" : "default"}
+            loading={loading}
+            disabled={disabled}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </DialogFooter>

@@ -205,34 +205,43 @@ func (m *Module) topic(c *gin.Context) {
 	slug := c.Param("slug")
 
 	language := m.readingLanguage(ctx, p.UserID, c.Query("lang"))
+	levelRank := m.readingLevel(ctx, p.UserID)
 
 	var (
-		topic    Topic
-		topicID  uuid.UUID
-		body     []byte
-		bodyLang *string
-		progress Progress
+		topic     Topic
+		topicID   uuid.UUID
+		body      []byte
+		bodyLang  *string
+		bodyLevel *string
+		progress  Progress
 	)
 	err := m.pool.QueryRow(ctx, `
 		SELECT t.id, `+topicColumns+`,
-		       COALESCE(gc.body, 'null'::jsonb), gc.language,
+		       COALESCE(gc.body, 'null'::jsonb), gc.language, gc.level_code,
 		       COALESCE(p.mastery, 0)::float8, COALESCE(p.understanding, 0)::float8,
 		       COALESCE(p.practice, 0)::float8, COALESCE(p.application, 0)::float8,
 		       COALESCE(p.correct, 0),
 		       (SELECT count(*) FROM grammar_questions q
 		         WHERE q.grammar_topic_id = t.id AND q.status = 'published')::int`+
 		topicJoins+`
+		-- The explanation written for this learner: their language first, then the level
+		-- closest to their own. A topic explained at C1 to an A2 learner is worse than the
+		-- same topic explained at A2 in the wrong language, so level breaks the tie only
+		-- after language does.
 		LEFT JOIN LATERAL (
-			SELECT gcx.body, gcx.language FROM grammar_content gcx
+			SELECT gcx.body, gcx.language, gcx.level_code
+			FROM grammar_content gcx
+			JOIN levels gl ON gl.code = gcx.level_code
 			WHERE gcx.grammar_topic_id = t.id AND gcx.status = 'published'
 			  AND gcx.language IN ($3, 'en')
-			ORDER BY (gcx.language = $3) DESC LIMIT 1
+			ORDER BY (gcx.language = $3) DESC, abs(gl.rank - $4), gl.rank DESC
+			LIMIT 1
 		) gc ON true
-		WHERE t.slug = $2 AND t.status = 'published'`, p.UserID, slug, language).
+		WHERE t.slug = $2 AND t.status = 'published'`, p.UserID, slug, language, levelRank).
 		Scan(&topicID, &topic.Slug, &topic.Name, &topic.Description, &topic.Category, &topic.CategoryName,
 			&topic.Group, &topic.Level, &topic.CEFRLevels, &topic.Difficulty, &topic.IELTSRelevant,
 			&topic.EstimatedMinutes, &topic.HasPractice, &topic.Mastery, &topic.State, &topic.Attempts,
-			&topic.LastPracticedAt, &body, &bodyLang, &progress.Mastery, &progress.Understanding,
+			&topic.LastPracticedAt, &body, &bodyLang, &bodyLevel, &progress.Mastery, &progress.Understanding,
 			&progress.Practice, &progress.Application, &progress.Correct, &topic.QuestionCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, apperr.NotFound("Grammar topic"))
@@ -253,6 +262,9 @@ func (m *Module) topic(c *gin.Context) {
 			topic.Content = &content
 			if bodyLang != nil {
 				topic.ContentLanguage = *bodyLang
+			}
+			if bodyLevel != nil {
+				topic.ContentLevel = *bodyLevel
 			}
 		}
 	}
@@ -514,4 +526,22 @@ func (m *Module) readingLanguage(ctx context.Context, userID uuid.UUID, requeste
 		}
 	}
 	return "en"
+}
+
+// readingLevel is the CEFR rank the explanation is chosen around: the learner's own level,
+// or B1 when they have none yet. A rank rather than a code because the choice is "nearest",
+// and nearest is arithmetic.
+func (m *Module) readingLevel(ctx context.Context, userID uuid.UUID) int {
+	const defaultRank = 2 // B1
+	if userID == uuid.Nil {
+		return defaultRank
+	}
+	var rank *int
+	_ = m.pool.QueryRow(ctx, `
+		SELECT l.rank FROM profiles p JOIN levels l ON l.id = p.current_level_id
+		WHERE p.user_id = $1`, userID).Scan(&rank)
+	if rank == nil {
+		return defaultRank
+	}
+	return *rank
 }
