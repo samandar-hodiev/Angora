@@ -4,8 +4,24 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "-w", "@engora/web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "@engora/web"
+      ],
       "port": 3001
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "go",
+      "runtimeArgs": [
+        "run",
+        "-C",
+        "apps/api",
+        "./cmd/server"
+      ],
+      "port": 8000
     }
   ]
 }

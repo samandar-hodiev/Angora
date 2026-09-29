@@ -39,7 +39,14 @@ function VerifyEmailFields({ email }: { email: string }) {
     const challenge = loadChallenge(email);
     return challenge ? Date.parse(challenge.resend_available_at) : 0;
   });
+  const [expiresAt, setExpiresAt] = useState<number>(() => {
+    const challenge = loadChallenge(email);
+    return challenge ? Date.parse(challenge.expires_at) : 0;
+  });
   const wait = Math.max(0, Math.ceil((resendAt - now) / 1000));
+  // Zero when this tab never saw the challenge (a pasted link): the server still decides.
+  const left = expiresAt ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : null;
+  const expired = left === 0;
 
   const submit = async (value: string) => {
     if (value.length !== 6 || verify.isPending) return;
@@ -81,6 +88,7 @@ function VerifyEmailFields({ email }: { email: string }) {
       const challenge = await resend.mutateAsync(email);
       saveChallenge(challenge);
       setResendAt(Date.parse(challenge.resend_available_at));
+      setExpiresAt(Date.parse(challenge.expires_at));
       setDevCode(challenge.dev_code ?? null);
       setCode("");
       setNotice("We sent a new code to your email.");
@@ -94,8 +102,13 @@ function VerifyEmailFields({ email }: { email: string }) {
   return (
     <div className="grid gap-5">
       <p className="text-center text-body-sm text-fg-secondary">
-        Enter the 6-digit code we sent to <span className="font-medium break-all text-foreground">{email}</span>
+        Enter the 6-digit code we sent to<span className="block font-medium break-all text-foreground">{email}</span>
       </p>
+      {left !== null && (
+        <p aria-live={expired ? "polite" : "off"} className={`-mt-2 text-center text-caption tabular-nums ${expired ? "text-error" : "text-fg-muted"}`}>
+          {expired ? "This code has expired. Request a new code." : `Code expires in ${formatDuration(left * 1000)}`}
+        </p>
+      )}
 
       {devCode && (
         <div role="note" className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-center text-caption text-fg-secondary">
@@ -131,13 +144,13 @@ function VerifyEmailFields({ email }: { email: string }) {
           autoFocus
           describedBy={error ? "otp-error" : undefined}
         />
-        <Button type="submit" variant="liquid" size="lg" className="w-full" loading={verify.isPending} disabled={code.length !== 6}>
+        <Button type="submit" variant="liquid" size="lg" className="w-full" loading={verify.isPending} disabled={code.length !== 6 || expired}>
           Verify
         </Button>
       </form>
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-body-sm">
-        {wait > 0 ? (
+        {wait > 0 && !expired ? (
           <span className="text-fg-muted tabular-nums">Resend code in {formatDuration(wait * 1000)}</span>
         ) : (
           <Button variant="link" className="h-auto" onClick={() => void onResend()} loading={resend.isPending}>

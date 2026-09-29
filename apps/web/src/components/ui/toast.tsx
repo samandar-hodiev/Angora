@@ -39,7 +39,9 @@ const subscribe = (l: () => void) => {
   };
 };
 const snapshot = () => items;
-const emptySnapshot = (): ToastItem[] => [];
+// One shared array: a new [] per call reads to React as a store that never settles.
+const EMPTY: ToastItem[] = [];
+const emptySnapshot = (): ToastItem[] => EMPTY;
 
 const icons = { default: Info, success: CircleCheck, error: CircleAlert };
 

@@ -33,7 +33,7 @@ import (
 //
 // No password is required to create an account. A password can be added later
 // (POST /auth/password/set) and the same codes can later power passwordless sign-in.
-// Codes are 6 digits, stored only as a hash bound to the email, expire after 10 minutes and
+// Codes are 6 digits, stored only as a hash bound to the email, expire after 2 minutes and
 // allow 5 wrong attempts; a new code can be requested every 45 seconds, 5 times per hour.
 
 const (
@@ -43,7 +43,7 @@ const (
 	PurposeAccountDelete = "account_delete"
 
 	emailCodeLength      = 6
-	emailCodeTTL         = 10 * time.Minute
+	emailCodeTTL         = 2 * time.Minute
 	emailResendCooldown  = 45 * time.Second
 	emailMaxSendsPerHour = 5
 	emailMaxAttempts     = 5

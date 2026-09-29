@@ -146,6 +146,8 @@ export function GoogleAuthButton({
           text: mode === "signup" ? "signup_with" : "continue_with",
           shape: "rectangular",
           logo_alignment: "center",
+          // Match the page, not the browser: otherwise one button speaks Uzbek on an English card.
+          locale: "en",
           // GIS accepts 200–400px; follow the card width (the container itself is hidden until ready).
           width: Math.max(200, Math.min(400, Math.floor(container.parentElement?.getBoundingClientRect().width ?? 320))),
         });

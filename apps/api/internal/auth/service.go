@@ -320,6 +320,12 @@ func (s *Service) ForgotPassword(ctx context.Context, in ForgotPasswordInput, cl
 	if creds.Status != users.StatusActive {
 		return nil
 	}
+	// The owner signs in with an emailed code and has no password on purpose (see console.go).
+	// A reset would give that account a second, weaker door, so it is refused as quietly as
+	// an unknown address.
+	if creds.Role == authz.RoleOwner {
+		return nil
+	}
 
 	raw, hash, err := newOpaqueToken()
 	if err != nil {
@@ -332,6 +338,10 @@ func (s *Service) ForgotPassword(ctx context.Context, in ForgotPasswordInput, cl
 	}
 
 	link := s.webURL + "/reset-password?token=" + url.QueryEscape(raw)
+	if creds.Role != authz.RoleUser {
+		// Staff sign in at the Owner Console, so the page they land on should send them back there.
+		link += "&for=console"
+	}
 	delivery := "sent"
 	if err := s.mailer.Send(ctx, mail.Message{
 		To:      creds.Email,

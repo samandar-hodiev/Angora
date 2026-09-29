@@ -29,7 +29,14 @@ function Done({ icon: Icon, title, text, action }: { icon: typeof MailCheck; tit
   );
 }
 
-export function ForgotPasswordForm() {
+function forgotHref(signInHref: string) {
+  return signInHref === CONSOLE_SIGN_IN ? "/forgot-password?for=console" : "/forgot-password";
+}
+
+export const CONSOLE_SIGN_IN = "/owner/login";
+
+/** `signInHref` is where "back to sign in" goes: the learner login, or the Owner Console for staff. */
+export function ForgotPasswordForm({ signInHref = "/login" }: { signInHref?: string }) {
   const forgot = useForgotPassword();
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -54,7 +61,7 @@ export function ForgotPasswordForm() {
         text="If an account exists for this email, we'll send reset instructions. The link expires in one hour."
         action={
           <Button variant="outline" asChild>
-            <Link href="/login">Back to sign in</Link>
+            <Link href={signInHref}>Back to sign in</Link>
           </Button>
         }
       />
@@ -79,7 +86,7 @@ export function ForgotPasswordForm() {
   );
 }
 
-export function ResetPasswordForm({ token }: { token: string }) {
+export function ResetPasswordForm({ token, signInHref = "/login" }: { token: string; signInHref?: string }) {
   const reset = useResetPassword();
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -96,7 +103,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         text="Open the link from your email again, or request a new one."
         action={
           <Button variant="outline" asChild>
-            <Link href="/forgot-password">Request a new link</Link>
+            <Link href={forgotHref(signInHref)}>Request a new link</Link>
           </Button>
         }
       />
@@ -111,7 +118,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         text="Your password has been changed. Sign in with your new password."
         action={
           <Button variant="liquid" asChild>
-            <Link href="/login">Continue to sign in</Link>
+            <Link href={signInHref}>Continue to sign in</Link>
           </Button>
         }
       />
@@ -137,7 +144,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <CircleAlert />
           <AlertDescription>
             {formError}{" "}
-            <Link href="/forgot-password" className="underline underline-offset-4">
+            <Link href={forgotHref(signInHref)} className="underline underline-offset-4">
               Get a new link
             </Link>
           </AlertDescription>

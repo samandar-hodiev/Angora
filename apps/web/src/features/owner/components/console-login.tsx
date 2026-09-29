@@ -1,6 +1,7 @@
 "use client";
 
 import { KeyRound, Mail, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -12,6 +13,8 @@ import { toast } from "@/components/ui/toast";
 import { OtpInput } from "@/features/auth/components/otp-input";
 import { login, OWNER_LANDING_PATH, verifyOwnerCode } from "@/features/auth/session";
 import { apiClient } from "@/lib/api";
+import { formatDuration } from "@/lib/audio";
+import { useNow } from "@/lib/clock";
 import { errorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +90,11 @@ function OwnerCodeForm() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<EmailChallenge | null>(null);
+  const now = useNow();
+  const expiresIn = challenge ? Math.max(0, Math.ceil((Date.parse(challenge.expires_at) - now) / 1000)) : null;
+  const resendIn = challenge ? Math.max(0, Math.ceil((Date.parse(challenge.resend_available_at) - now) / 1000)) : 0;
+  const expired = expiresIn === 0;
 
   const sendCode = async () => {
     setBusy(true);
@@ -94,6 +102,8 @@ function OwnerCodeForm() {
     try {
       const challenge = await apiClient.post<EmailChallenge>("/auth/owner/start", { email: email.trim() }, { auth: false });
       setSent(true);
+      setChallenge(challenge);
+      setCode("");
       // Only ever present when no mail provider is configured, which is a development build.
       if (challenge.dev_code) {
         toast({ title: `Development code: ${challenge.dev_code}`, description: "Email is not configured on this build." });
@@ -160,8 +170,13 @@ function OwnerCodeForm() {
     <div className="grid gap-4">
       <div className="grid gap-1 text-center">
         <p className="text-body-sm text-fg-secondary">
-          We sent a six-digit code to <span className="font-medium text-foreground">{email.trim()}</span>.
+          We sent a six-digit code to <span className="font-medium break-all text-foreground">{email.trim()}</span>.
         </p>
+        {expiresIn !== null && (
+          <p aria-live={expired ? "polite" : "off"} className={cn("text-caption tabular-nums", expired ? "text-error" : "text-fg-muted")}>
+            {expired ? "This code has expired. Send another code." : `Code expires in ${formatDuration(expiresIn * 1000)}`}
+          </p>
+        )}
       </div>
       <div className="grid justify-items-center gap-3">
         <OtpInput
@@ -171,7 +186,7 @@ function OwnerCodeForm() {
             setError(null);
           }}
           onComplete={(value) => void verify(value)}
-          disabled={busy}
+          disabled={busy || expired}
           invalid={Boolean(error)}
           autoFocus
           label="Owner sign-in code"
@@ -188,9 +203,13 @@ function OwnerCodeForm() {
         <Button variant="ghost" size="sm" onClick={() => { setSent(false); setCode(""); setError(null); }}>
           Change email
         </Button>
-        <Button variant="ghost" size="sm" loading={busy} onClick={() => void sendCode()}>
-          Send another code
-        </Button>
+        {resendIn > 0 && !expired ? (
+          <span className="px-3 text-caption text-fg-muted tabular-nums">Send another in {formatDuration(resendIn * 1000)}</span>
+        ) : (
+          <Button variant="ghost" size="sm" loading={busy} onClick={() => void sendCode()}>
+            Send another code
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -240,7 +259,12 @@ function StaffPasswordForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <p className="text-caption text-fg-muted">The owner sets this for you. Change it once you are in.</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-caption text-fg-muted">The owner sets this for you. Change it once you are in.</p>
+          <Link href="/forgot-password?for=console" className="text-caption text-fg-secondary underline-offset-4 hover:text-primary hover:underline">
+            Forgot password?
+          </Link>
+        </div>
       </div>
 
       {error && (

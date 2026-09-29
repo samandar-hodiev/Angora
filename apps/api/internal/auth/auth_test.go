@@ -478,6 +478,38 @@ func TestForgotPasswordDoesNotRevealAccounts(t *testing.T) {
 	}
 }
 
+func TestForgotPasswordByRole(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("owner gets no reset", func(t *testing.T) {
+		svc, us, _, mailer := newTestServiceWithMailer(t)
+		session := register(t, svc)
+		if err := us.SetRole(ctx, session.User.ID, authz.RoleOwner); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.ForgotPassword(ctx, ForgotPasswordInput{Email: "learner@example.com"}, client); err != nil {
+			t.Fatalf("owner must be refused silently, got %v", err)
+		}
+		if len(mailer.sent) != 0 {
+			t.Errorf("the owner signs in with a code and must never get a password link, sent %d", len(mailer.sent))
+		}
+	})
+
+	t.Run("staff link returns to the console", func(t *testing.T) {
+		svc, us, _, mailer := newTestServiceWithMailer(t)
+		session := register(t, svc)
+		if err := us.SetRole(ctx, session.User.ID, authz.RoleContentManager); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.ForgotPassword(ctx, ForgotPasswordInput{Email: "learner@example.com"}, client); err != nil {
+			t.Fatal(err)
+		}
+		if len(mailer.sent) != 1 || !strings.Contains(mailer.sent[0].Text, "&for=console") {
+			t.Fatalf("staff reset link must point back to the console, got %+v", mailer.sent)
+		}
+	})
+}
+
 func TestPasswordResetFlow(t *testing.T) {
 	svc, _, _, mailer := newTestServiceWithMailer(t)
 	session := register(t, svc)
