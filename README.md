@@ -30,6 +30,41 @@ infrastructure    Dockerfiles, scripts
 docs              Architecture, database, AI, API, roadmap
 ```
 
+## Quick start (daily)
+
+Once the project is set up (see *Option B* below for the first time), this is all it takes:
+
+```bash
+make dev
+```
+
+It checks that PostgreSQL and Redis are reachable, applies pending migrations and starts the
+**API**, the **worker** and the **web app** in one terminal, with each line prefixed by
+`[api]`, `[worker]` or `[web]`. On macOS it also keeps the machine awake (`caffeinate`) while it
+runs, so the servers do not stop when the laptop would otherwise sleep. **Ctrl+C** stops all three.
+
+| Page | URL |
+| --- | --- |
+| Landing page | http://localhost:3001 |
+| Learner sign-in / sign-up | http://localhost:3001/login · http://localhost:3001/register |
+| Owner Console sign-in | http://localhost:3001/owner/login |
+| API health | http://localhost:8000/health |
+
+`NO_WORKER=1 make dev` skips the worker. If a port is taken, `make dev` says which one; free it
+with `lsof -iTCP:8000 -sTCP:LISTEN` (or `3001`) and stop that process.
+
+**Signing in locally**
+
+- **Email codes** are sent for real when `MAIL_PROVIDER=smtp` (Gmail: `SMTP_*` in `.env`, with an
+  App Password). With `MAIL_PROVIDER=log` nothing is sent and the code is shown on the page
+  instead. Codes expire after **2 minutes**; a new one can be requested after 45 seconds.
+- **Owner Console**: enter the address in `OWNER_EMAIL`; a code is emailed to it. The owner account
+  is created on the first sign-in. The owner has no password and cannot reset one.
+- **Staff** sign in with email + password on the same page, and can use *Forgot password?*.
+- **Google** sign-in needs `GOOGLE_CLIENT_IDS` / `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, and
+  `http://localhost:3001` listed under *Authorized JavaScript origins* for that client in the
+  Google Cloud Console.
+
 ## Prerequisites
 
 - **Docker** with Docker Compose v2 — for the one-command setup, or
@@ -61,10 +96,11 @@ Compose starts `postgres` and `redis`, runs the `migrate` job, then starts `api`
 make setup            # creates .env with a random JWT secret, installs npm + Go deps
 make infra            # postgres + redis in docker (or use your own, see below)
 make migrate-up       # apply database migrations
-make api              # terminal 1 → http://localhost:8000
-make web              # terminal 2 → http://localhost:3001
-make worker           # terminal 3 (optional) → background jobs
+make dev              # API + worker + web in one terminal (Ctrl+C stops all)
 ```
+
+Or run them separately, one per terminal: `make api` (http://localhost:8000), `make web`
+(http://localhost:3001) and, optionally, `make worker`.
 
 Using an existing local PostgreSQL/Redis instead of docker: create a database and point `.env` at it.
 

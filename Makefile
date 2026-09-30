@@ -5,7 +5,7 @@ TEST_DATABASE_URL ?= postgres://localhost:5432/engora_test?sslmode=disable
 TEST_REDIS_URL ?= redis://localhost:6379/15
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down infra logs api worker web migrate-up migrate-down migrate-version migrate-create \
+.PHONY: help setup up down infra logs dev api worker web migrate-up migrate-down migrate-version migrate-create \
         test test-api test-api-integration test-web lint typecheck build gitpulse-hook
 
 ## help: list available commands
@@ -36,6 +36,10 @@ infra:
 ## logs: follow docker logs
 logs:
 	docker compose logs -f
+
+## dev: run API + worker + web together in one terminal, keeping the Mac awake (Ctrl+C stops all)
+dev:
+	@infrastructure/scripts/dev.sh
 
 ## api: run the API locally (http://localhost:8000)
 api:
