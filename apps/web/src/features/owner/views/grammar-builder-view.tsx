@@ -334,21 +334,34 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         description={
           issues.length > 0
             ? `${issues.length} ${issues.length === 1 ? "issue has" : "issues have"} to be fixed first. Publishing is refused until they are.`
-            : `${written.length} level${written.length === 1 ? "" : "s"} in ${contentLanguageLabels[language]} go live. Learners on other levels keep whatever is published for them.`
+            : `${written.length} level${written.length === 1 ? "" : "s"} go live in ${contentLanguages.map((code) => contentLanguageLabels[code]).join(", ")} together — every language that has a draft. Learners on other levels keep whatever is published for them.`
         }
         confirmLabel="Publish"
         loading={publish.isPending}
         onConfirm={() => {
           publish.mutate(
-            { language },
+            // All three at once: the topic was written in all three, and publishing only the
+            // tab that happens to be open left the other languages as drafts nobody noticed.
+            { languages: [...contentLanguages] },
             {
               onSuccess: () => toast({ title: "Published", description: "Learners can read it now.", variant: "success" }),
-              onError: (error) =>
+              onError: (error) => {
+                // The refusal names the language of each issue ("Русский: B1 has no title"),
+                // which this page cannot show for the tabs that are not open.
+                const issues = isApiError(error)
+                  ? ((error.details?.issues as { message: string }[] | undefined) ?? []).map((issue) => issue.message)
+                  : [];
                 toast({
                   title: "Publishing was refused",
-                  description: isApiError(error) ? error.message : undefined,
+                  description:
+                    issues.length > 0
+                      ? issues.slice(0, 3).join(" · ") + (issues.length > 3 ? ` · and ${issues.length - 3} more` : "")
+                      : isApiError(error)
+                        ? error.message
+                        : undefined,
                   variant: "error",
-                }),
+                });
+              },
             },
           );
           setPublishOpen(false);

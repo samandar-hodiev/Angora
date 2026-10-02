@@ -288,6 +288,19 @@ func (m *Module) topic(c *gin.Context) {
 	topic.Compare = orEmpty(append(relations[RelCompare], relations[RelCommonlyConfused]...))
 	topic.Next = orEmpty(relations[RelNext])
 
+	// The languages the switch offers: whatever is published in the same level band the
+	// explanation was chosen from, so switching never lands on text written for another level.
+	topic.ContentLanguages = []string{}
+	if err := m.pool.QueryRow(ctx, `
+		SELECT COALESCE(array_agg(DISTINCT gcx.language ORDER BY gcx.language), '{}')
+		FROM grammar_content gcx
+		JOIN levels gl ON gl.code = gcx.level_code
+		WHERE gcx.grammar_topic_id = $1 AND gcx.status = 'published' AND gl.rank >= $2 - 1`,
+		topicID, levelRank).Scan(&topic.ContentLanguages); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
 	topic.Visuals, err = m.visualsOf(ctx, topicID)
 	if err != nil {
 		httpx.Fail(c, err)
@@ -510,24 +523,23 @@ var contentLanguages = map[string]bool{"en": true, "uz": true, "ru": true}
 // readingLanguage decides which explanation a learner is shown.
 //
 // An explicit ?lang wins, because a learner who switches the language on the page means it.
-// Otherwise it is the language they said they speak — the same field the AI tutor already
-// writes in, so the curated text and the generated text never disagree about the reader.
-// Anything unrecognised becomes English, which every topic has.
+// Otherwise Russian for a learner who said Russian is their language, and Uzbek for everyone
+// else — the platform's learners are Uzbek speakers first, and an explanation of English in
+// English is the harder read for exactly the learners who need it most. Every topic is written
+// in all three, and English stays one click away on the page.
 func (m *Module) readingLanguage(ctx context.Context, userID uuid.UUID, requested string) string {
 	if lang := strings.ToLower(strings.TrimSpace(requested)); contentLanguages[lang] {
 		return lang
 	}
 	if userID == uuid.Nil {
-		return "en"
+		return "uz"
 	}
 	var native *string
 	_ = m.pool.QueryRow(ctx, `SELECT native_language FROM profiles WHERE user_id = $1`, userID).Scan(&native)
-	if native != nil {
-		if lang := strings.ToLower(strings.TrimSpace(*native)); contentLanguages[lang] {
-			return lang
-		}
+	if native != nil && strings.EqualFold(strings.TrimSpace(*native), "ru") {
+		return "ru"
 	}
-	return "en"
+	return "uz"
 }
 
 // readingLevel is the CEFR rank the explanation is chosen around: the learner's own level,

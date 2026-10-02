@@ -411,7 +411,7 @@ export const grammarMapApi = {
   job: (id: string) => apiClient.get<JobState>(`/jobs/${id}`),
   saveLevel: (slug: string, level: string, input: Record<string, unknown>) =>
     apiClient.put<TopicContent>(`/admin/grammar/topics/${slug}/levels/${level}`, input),
-  publish: (slug: string, input: { language: string; levels?: string[] }) =>
+  publish: (slug: string, input: { language?: string; languages?: string[]; levels?: string[] }) =>
     apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/publish`, input),
   // Neither of these saves anything: they answer with a proposal the editor keeps or drops.
   refine: (slug: string, level: string, input: RefineInput) =>

@@ -623,10 +623,10 @@ export function useSaveGrammarLevel(slug: string) {
 export function usePublishGrammarContent(slug: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: { language: string; levels?: string[] }) => assessmentApi.grammarMapApi.publish(slug, input),
-    onSuccess: (content) => {
-      client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
-      // The map's status for this topic has just changed.
+    mutationFn: (input: { language?: string; languages?: string[]; levels?: string[] }) =>
+      assessmentApi.grammarMapApi.publish(slug, input),
+    onSuccess: () => {
+      // Every language may have gone live, and the map's status for this topic has changed.
       client.invalidateQueries({ queryKey: queryKeys.owner.all });
     },
   });

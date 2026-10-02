@@ -567,15 +567,22 @@ func (m *Module) checkTopic(ctx context.Context, slug, language string, only []c
 }
 
 type publishInput struct {
+	/** Legacy: publish one language. Ignored when Languages is given. */
 	Language string `json:"language" binding:"omitempty,oneof=en uz ru"`
+	/**
+	 * The languages to publish together. A topic is generated in all three, so it goes live
+	 * in all three: publishing one would leave the others as drafts nobody notices.
+	 */
+	Languages []string `json:"languages" binding:"omitempty,max=3,dive,oneof=en uz ru"`
 	/** Empty publishes every level that has a draft. */
 	Levels []string `json:"levels" binding:"omitempty,max=6,dive,max=4"`
 }
 
-// publishGrammarContent puts the current drafts in front of learners.
+// publishGrammarContent puts the current drafts in front of learners, in every language asked for.
 //
-// Validation runs first and a failure stops everything: publishing four good levels and
-// refusing the fifth would leave the topic half-live with no clear way back.
+// Validation runs first, for every language, and any failure stops everything: publishing
+// four good levels and refusing the fifth — or Uzbek but not Russian — would leave the topic
+// half-live with no clear way back. A language with nothing drafted is simply not part of it.
 func (m *Module) publishGrammarContent(c *gin.Context) {
 	p, err := authz.CurrentPrincipal(c)
 	if err != nil {
@@ -587,93 +594,183 @@ func (m *Module) publishGrammarContent(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	language := editorLanguage(in.Language)
 	levels, err := parseLevels(in.Levels)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
+	languages := []string{editorLanguage(in.Language)}
+	if len(in.Languages) > 0 {
+		languages = uniqueLanguages(in.Languages)
+	}
 
 	slug := c.Param("slug")
 	ctx := c.Request.Context()
-	result, content, err := m.checkTopic(ctx, slug, language, levels)
-	if err != nil {
-		httpx.Fail(c, err)
+
+	type plan struct {
+		language string
+		levels   []string
+	}
+	var plans []plan
+	var topicID uuid.UUID
+	var issues []Issue
+	for _, language := range languages {
+		result, content, err := m.checkTopic(ctx, slug, language, levels)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		topicID = content.Topic.ID
+		if len(result.Levels) == 0 {
+			continue // nothing drafted in this language: not an error, just not in this publish
+		}
+		if !result.CanPublish {
+			for _, issue := range result.Issues {
+				issue.Message = languageLabel(language) + ": " + issue.Message
+				issues = append(issues, issue)
+			}
+			continue
+		}
+		plans = append(plans, plan{language: language, levels: result.Levels})
+	}
+	if len(issues) > 0 {
+		httpx.Fail(c, apperr.New(apperr.CodeConflict, "Content cannot be published yet").
+			WithDetails(map[string]any{"issues": issues}))
 		return
 	}
-	if !result.CanPublish {
-		message := "Content cannot be published yet"
-		if len(result.Levels) == 0 {
-			message = "There is nothing to publish yet"
-		}
-		httpx.Fail(c, apperr.New(apperr.CodeConflict, message).
-			WithDetails(map[string]any{"issues": result.Issues}))
+	if len(plans) == 0 {
+		httpx.Fail(c, apperr.New(apperr.CodeConflict, "There is nothing to publish yet").
+			WithDetails(map[string]any{"issues": []Issue{}}))
 		return
 	}
 
-	publishing := result.Levels
+	published := map[string][]string{}
 	err = database.WithTx(ctx, m.pool, func(tx pgx.Tx) error {
-		for _, code := range publishing {
-			// Retire the live version before promoting the new one: the unique index allows
-			// exactly one published row per topic, language and level, and that constraint
-			// is what stops two versions being live at once.
-			if _, err := tx.Exec(ctx, `
-				UPDATE grammar_content SET status = 'archived'
-				WHERE grammar_topic_id = $1 AND language = $2 AND level_code = $3::cefr_code
-				  AND status = 'published'`,
-				content.Topic.ID, language, code); err != nil {
+		for _, pl := range plans {
+			levels, err := publishLanguage(ctx, tx, topicID, pl.language, pl.levels, p.UserID)
+			if err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `
-				UPDATE grammar_content SET status = 'published', published_at = now(), reviewed_by = $4
-				WHERE id = (SELECT id FROM grammar_content
-				             WHERE grammar_topic_id = $1 AND language = $2 AND level_code = $3::cefr_code
-				               AND status IN ('draft', 'review')
-				             ORDER BY version DESC LIMIT 1)`,
-				content.Topic.ID, language, code, p.UserID); err != nil {
-				return err
+			if len(levels) > 0 {
+				published[pl.language] = levels
 			}
-			// Anything older than what just went live is history, not pending work. Left
-			// as drafts they would sit on the map for ever as "still to do", which is the
-			// opposite of what they are.
-			if _, err := tx.Exec(ctx, `
-				UPDATE grammar_content SET status = 'archived'
-				WHERE grammar_topic_id = $1 AND language = $2 AND level_code = $3::cefr_code
-				  AND status IN ('draft', 'review')
-				  AND version < (SELECT version FROM grammar_content
-				                  WHERE grammar_topic_id = $1 AND language = $2
-				                    AND level_code = $3::cefr_code AND status = 'published')`,
-				content.Topic.ID, language, code); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `
-				UPDATE grammar_questions SET status = 'published'
-				WHERE grammar_topic_id = $1 AND status = 'draft'
-				  AND level_id = (SELECT id FROM levels WHERE code = $2)`, content.Topic.ID, code); err != nil {
-				return err
-			}
+		}
+		if len(published) == 0 {
+			return errNothingToPublish
 		}
 		// A topic with published content belongs in the library; leaving it a draft would
 		// publish text nobody can reach.
 		_, err := tx.Exec(ctx, `
 			UPDATE grammar_topics
 			SET status = 'published', published_at = COALESCE(published_at, now())
-			WHERE id = $1 AND status <> 'published'`, content.Topic.ID)
+			WHERE id = $1 AND status <> 'published'`, topicID)
 		return err
 	})
+	if errors.Is(err, errNothingToPublish) {
+		httpx.Fail(c, apperr.New(apperr.CodeConflict, "Nothing new to publish: every level is already live").
+			WithDetails(map[string]any{"issues": []Issue{}}))
+		return
+	}
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 
-	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarPublished, slug, map[string]any{
-		"language": language, "levels": publishing,
-	})
+	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarPublished, slug, map[string]any{"published": published})
 
-	out, err := m.loadTopicContent(ctx, slug, language)
+	out, err := m.loadTopicContent(ctx, slug, plans[0].language)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	httpx.OK(c, out)
+}
+
+// publishLanguage promotes the newest draft of each level in one language, and returns the
+// levels it actually put live.
+//
+// A level with no draft is left exactly as it is. The check that lists levels counts the
+// ones already published too, and retiring the live version before finding there was nothing
+// to replace it with took a whole language offline — Uzbek went dark on a topic when it was
+// published again alongside English and Russian.
+func publishLanguage(ctx context.Context, tx pgx.Tx, topicID uuid.UUID, language string, levels []string, actor uuid.UUID) ([]string, error) {
+	var published []string
+	for _, code := range levels {
+		var draftID uuid.UUID
+		err := tx.QueryRow(ctx, `
+			SELECT id FROM grammar_content
+			WHERE grammar_topic_id = $1 AND language = $2 AND level_code = $3::cefr_code
+			  AND status IN ('draft', 'review')
+			ORDER BY version DESC LIMIT 1`, topicID, language, code).Scan(&draftID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		// Retire the live version before promoting the new one: the unique index allows
+		// exactly one published row per topic, language and level, and that constraint
+		// is what stops two versions being live at once.
+		if _, err := tx.Exec(ctx, `
+			UPDATE grammar_content SET status = 'archived'
+			WHERE grammar_topic_id = $1 AND language = $2 AND level_code = $3::cefr_code
+			  AND status = 'published'`,
+			topicID, language, code); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE grammar_content SET status = 'published', published_at = now(), reviewed_by = $2
+			WHERE id = $1`, draftID, actor); err != nil {
+			return nil, err
+		}
+		published = append(published, code)
+		// Anything older than what just went live is history, not pending work. Left
+		// as drafts they would sit on the map for ever as "still to do", which is the
+		// opposite of what they are.
+		if _, err := tx.Exec(ctx, `
+			UPDATE grammar_content SET status = 'archived'
+			WHERE grammar_topic_id = $1 AND language = $2 AND level_code = $3::cefr_code
+			  AND status IN ('draft', 'review')
+			  AND version < (SELECT version FROM grammar_content
+			                  WHERE grammar_topic_id = $1 AND language = $2
+			                    AND level_code = $3::cefr_code AND status = 'published')`,
+			topicID, language, code); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE grammar_questions SET status = 'published'
+			WHERE grammar_topic_id = $1 AND status = 'draft'
+			  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, code); err != nil {
+			return nil, err
+		}
+	}
+	return published, nil
+}
+
+// errNothingToPublish is returned from inside the publish transaction when no language had a
+// draft to put live, so the handler can say so instead of reporting success for nothing.
+var errNothingToPublish = errors.New("nothing to publish")
+
+func uniqueLanguages(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, language := range in {
+		language = editorLanguage(language)
+		if !seen[language] {
+			seen[language] = true
+			out = append(out, language)
+		}
+	}
+	return out
+}
+
+func languageLabel(code string) string {
+	switch code {
+	case "uz":
+		return "O'zbekcha"
+	case "ru":
+		return "Русский"
+	default:
+		return "English"
+	}
 }

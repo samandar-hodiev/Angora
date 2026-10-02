@@ -146,6 +146,61 @@ func TestGrammarGenerateEveryLanguagePostgres(t *testing.T) {
 		}
 	})
 
+	t.Run("publishing puts every language live together", func(t *testing.T) {
+		var buf bytes.Buffer
+		_ = json.NewEncoder(&buf).Encode(map[string]any{"languages": []string{"en", "uz", "ru"}})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/grammar/topics/"+slug+"/publish", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("publish status = %d body = %s", w.Code, w.Body.String())
+		}
+		var live map[string]int
+		rows, err := pool.Query(ctx, `
+			SELECT language, count(*) FROM grammar_content
+			WHERE grammar_topic_id = $1 AND status = 'published' GROUP BY language`, topicID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		live = map[string]int{}
+		for rows.Next() {
+			var language string
+			var n int
+			if err := rows.Scan(&language, &n); err != nil {
+				t.Fatal(err)
+			}
+			live[language] = n
+		}
+		for _, language := range []string{"en", "uz", "ru"} {
+			if live[language] != 2 {
+				t.Errorf("%s: %d levels live, want 2 (A2 and B2) — one publish is every language", language, live[language])
+			}
+		}
+	})
+
+	t.Run("publishing again with nothing new takes nothing offline", func(t *testing.T) {
+		var buf bytes.Buffer
+		_ = json.NewEncoder(&buf).Encode(map[string]any{"languages": []string{"en", "uz", "ru"}})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/grammar/topics/"+slug+"/publish", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusConflict {
+			t.Errorf("status = %d, want 409 — there was nothing new to publish", w.Code)
+		}
+		var live int
+		if err := pool.QueryRow(ctx, `
+			SELECT count(*) FROM grammar_content WHERE grammar_topic_id = $1 AND status = 'published'`,
+			topicID).Scan(&live); err != nil {
+			t.Fatal(err)
+		}
+		if live != 6 {
+			t.Errorf("%d levels live after a second publish, want all 6 still live", live)
+		}
+	})
+
 	t.Run("practice is written once per level, not once per language", func(t *testing.T) {
 		var n int
 		if err := pool.QueryRow(ctx, `SELECT count(*) FROM grammar_questions WHERE grammar_topic_id = $1`, topicID).Scan(&n); err != nil {

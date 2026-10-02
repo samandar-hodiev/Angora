@@ -12,7 +12,7 @@ import { LiveDataState } from "../components/live-state";
 import { FilterBar, FilterSelect, SearchInput } from "../components/primitives";
 import { useGrammarMap } from "../hooks";
 import { formatNumber } from "../lib/format";
-import { cefrLevels, contentLanguages, contentLanguageLabels } from "../types";
+import { cefrLevels } from "../types";
 import type { ContentStatusState, LevelStatus, MapTopic } from "../types";
 
 /**
@@ -122,17 +122,12 @@ function LevelDots({ topic }: { topic: MapTopic }) {
 }
 
 /**
- * The language lives above this component because the schema dialog reads it too: "written"
- * means written in the language you are looking at, and two controls disagreeing about that
- * would make the same topic green in one place and grey in the other.
+ * There is no language filter. A topic is generated in English and translated into Uzbek
+ * and Russian in the same step, so its status is the status of the English source — the
+ * language every translation is made from. The builder still has a tab per language for
+ * reading and fixing the translations themselves.
  */
-export function GrammarMapView({
-  language,
-  onLanguageChange,
-}: {
-  language: string;
-  onLanguageChange: (language: string) => void;
-}) {
+export function GrammarMapView({ language }: { language: string }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [level, setLevel] = useState("all");
@@ -175,12 +170,6 @@ export function GrammarMapView({
           value={level}
           options={[{ value: "all", label: "All levels" }, ...cefrLevels.map((code) => ({ value: code, label: code }))]}
           onChange={setLevel}
-        />
-        <FilterSelect
-          label="Language"
-          value={language}
-          options={contentLanguages.map((code) => ({ value: code, label: contentLanguageLabels[code] }))}
-          onChange={onLanguageChange}
         />
       </FilterBar>
 

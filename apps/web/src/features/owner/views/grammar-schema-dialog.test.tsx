@@ -99,7 +99,7 @@ describe("GrammarMapView rows", () => {
     map.state = { ...map.state, data: fixture };
     const { GrammarMapView } = await import("./grammar-map-view");
 
-    render(<GrammarMapView language="en" onLanguageChange={() => {}} />);
+    render(<GrammarMapView language="en" />);
 
     expect(row("^The").className).toContain("bg-success/[0.08]");
     expect(row("Zero Article").className).toContain("bg-surface-active/25");
@@ -111,7 +111,7 @@ describe("GrammarMapView rows", () => {
     map.state = { ...map.state, data: fixture };
     const { GrammarMapView } = await import("./grammar-map-view");
 
-    render(<GrammarMapView language="en" onLanguageChange={() => {}} />);
+    render(<GrammarMapView language="en" />);
 
     expect(within(row("Zero Article")).getByText("Not created")).toBeInTheDocument();
     expect(within(row("^The")).getByText("Published")).toBeInTheDocument();

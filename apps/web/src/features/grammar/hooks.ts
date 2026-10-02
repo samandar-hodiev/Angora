@@ -66,6 +66,11 @@ export function useGrammarTopic(slug: string | undefined, lang?: string) {
     queryKey: [...queryKeys.grammar.topic(slug ?? ""), lang ?? "auto"],
     queryFn: () => grammarApi.topic(slug!, lang),
     enabled: useAuthed() && Boolean(slug),
+    // Switching the explanation's language keeps the page on screen until the new text
+    // arrives, rather than dropping the learner back to a skeleton mid-read. Only for the
+    // same topic: opening another one must never show the last one's page in the meantime.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === (slug ?? "") ? previous : undefined,
   });
 }
 

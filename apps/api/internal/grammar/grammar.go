@@ -166,13 +166,15 @@ type Topic struct {
 	 * than pretending. */
 	ContentLanguage string `json:"content_language,omitempty"`
 	/** The CEFR level the explanation was written for; not always the learner's own. */
-	ContentLevel  string         `json:"content_level,omitempty"`
-	Prerequisites []RelatedTopic `json:"prerequisites"`
-	Related       []RelatedTopic `json:"related"`
-	Compare       []RelatedTopic `json:"compare"`
-	Next          []RelatedTopic `json:"next"`
-	Progress      Progress       `json:"progress"`
-	QuestionCount int            `json:"question_count"`
+	ContentLevel string `json:"content_level,omitempty"`
+	/** Every language this topic can be read in at the learner's level, for the language switch. */
+	ContentLanguages []string       `json:"content_languages"`
+	Prerequisites    []RelatedTopic `json:"prerequisites"`
+	Related          []RelatedTopic `json:"related"`
+	Compare          []RelatedTopic `json:"compare"`
+	Next             []RelatedTopic `json:"next"`
+	Progress         Progress       `json:"progress"`
+	QuestionCount    int            `json:"question_count"`
 	// Visuals already generated for this topic, so the page can show one without a request.
 	Visuals []Visual `json:"visuals"`
 }

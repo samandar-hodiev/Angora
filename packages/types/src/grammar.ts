@@ -129,6 +129,8 @@ export interface GrammarTopic extends GrammarTopicSummary {
   content_language?: "en" | "uz" | "ru";
   /** The CEFR level the canonical explanation was written for — the learner's, or the nearest one to it. */
   content_level?: string;
+  /** Every language this topic can be read in at the learner's level; what the language switch offers. */
+  content_languages?: ("en" | "uz" | "ru")[];
   prerequisites: GrammarRelatedTopic[];
   related: GrammarRelatedTopic[];
   compare: GrammarRelatedTopic[];

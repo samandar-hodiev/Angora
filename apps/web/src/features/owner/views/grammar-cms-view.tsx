@@ -358,7 +358,8 @@ function GrammarAllContentView() {
 export function GrammarCmsView() {
   const [view, setView] = useState<"map" | "all">("map");
   const [schemaOpen, setSchemaOpen] = useState(false);
-  const [language, setLanguage] = useState("en");
+  // The English source: what the map and the schema report, and what translations come from.
+  const language = "en";
 
   return (
     <>
@@ -391,7 +392,7 @@ export function GrammarCmsView() {
         }
       />
       {view === "map" ? (
-        <GrammarMapView language={language} onLanguageChange={setLanguage} />
+        <GrammarMapView language={language} />
       ) : (
         <GrammarAllContentView />
       )}

@@ -13,8 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { GrammarRelatedTopic, GrammarTopic } from "@engora/types";
 
-import { useProfile } from "@/features/profile/hooks";
-
 import { useGrammarComparison, useGrammarTopic } from "../hooks";
 import { ExplainPanel, TutorPanel, VisualPanel } from "./ai-panels";
 import { MasteryBar, StateBadge } from "./shared";
@@ -71,13 +69,18 @@ export function GrammarTopicView({ slug }: { slug: string }) {
 
         {t.content ? (
           <>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               {t.content_level && (
                 <span className="text-caption text-fg-muted">
                   Written for <Badge variant="outline">{t.content_level}</Badge>
                 </span>
               )}
-              <LanguageNotice current={t.content_language} onChange={setLanguage} />
+              <ContentLanguageSwitch
+                current={t.content_language}
+                available={t.content_languages ?? []}
+                pending={topic.isFetching}
+                onChange={setLanguage}
+              />
             </div>
             <CanonicalContent topic={t} />
             {/* A second pass over the same rule, written for this learner's level. */}
@@ -481,54 +484,65 @@ function TopicSkeleton() {
   );
 }
 
-const languageNames: Record<string, string> = { en: "English", uz: "O'zbekcha", ru: "Русский" };
+const languageNames: Record<string, string> = { uz: "O'zbekcha", en: "English", ru: "Русский" };
+/** The order the switch lists them in: the platform's default first. */
+const languageOrder = ["uz", "en", "ru"] as const;
 
 /**
- * Which language this explanation is in.
+ * Which language the explanation is read in.
  *
- * It says nothing at all to a learner reading the language they asked for — which is most
- * of them, most of the time, and a banner on every page would be noise. It speaks up in
- * exactly two cases: the text is in their language and they might want the English, or the
- * topic has no translation yet and they are reading English instead. The second is the one
- * worth saying out loud: without it, a learner wonders why one topic is in Uzbek and the
- * next is not.
+ * Uzbek by default; the switch offers only the languages this topic is actually written in,
+ * so every choice shows the owner's text for that language — never a machine translation
+ * made on the spot, and never an option that quietly falls back to another. It changes the
+ * explanation and nothing else: the examples are English in every language anyway.
  */
-function LanguageNotice({ current, onChange }: { current?: string; onChange: (lang: string | undefined) => void }) {
-  const profile = useProfile();
-  const [dismissed, setDismissed] = useState(false);
-
-  const preferred = (profile.data?.native_language ?? "en").toLowerCase();
-  if (!current || dismissed || !(preferred in languageNames)) return null;
-
-  if (current === preferred) {
-    if (current === "en") return null;
-    return (
-      <p className="flex flex-wrap items-center gap-2 text-caption text-fg-muted">
+function ContentLanguageSwitch({
+  current,
+  available,
+  pending,
+  onChange,
+}: {
+  current?: string;
+  available: string[];
+  pending: boolean;
+  onChange: (lang: string) => void;
+}) {
+  const options = languageOrder.filter((code) => available.includes(code));
+  if (options.length <= 1) {
+    return options.length === 1 && current ? (
+      <span className="flex items-center gap-1.5 text-caption text-fg-muted">
         <Languages className="size-3.5" aria-hidden />
-        Shown in {languageNames[current]}.
-        <button
-          type="button"
-          onClick={() => onChange("en")}
-          className="underline underline-offset-2 transition-colors duration-micro hover:text-foreground"
-        >
-          Read it in English
-        </button>
-      </p>
-    );
+        Only in {languageNames[current] ?? current} for now
+      </span>
+    ) : null;
   }
-
   return (
-    <p className="flex flex-wrap items-center gap-2 text-caption text-fg-muted">
-      <Languages className="size-3.5" aria-hidden />
-      This topic has no {languageNames[preferred]} explanation yet, so it is in{" "}
-      {languageNames[current] ?? current}.
-      <button
-        type="button"
-        onClick={() => setDismissed(true)}
-        className="underline underline-offset-2 transition-colors duration-micro hover:text-foreground"
-      >
-        Got it
-      </button>
-    </p>
+    <div
+      role="radiogroup"
+      aria-label="Explanation language"
+      aria-busy={pending}
+      className="inline-flex items-center gap-0.5 rounded-lg border bg-surface p-0.5"
+    >
+      <Languages className="mx-1.5 size-3.5 text-fg-muted" aria-hidden />
+      {options.map((code) => {
+        const selected = code === current;
+        return (
+          <button
+            key={code}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => !selected && onChange(code)}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-caption font-medium transition-colors duration-micro outline-none",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+              selected ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+            )}
+          >
+            {languageNames[code]}
+          </button>
+        );
+      })}
+    </div>
   );
 }
