@@ -481,29 +481,91 @@ function NavTree({
   );
 }
 
+/** When this operator last opened the activity menu, per account, in this browser. */
+const seenKey = (userId: string) => `engora-owner-activity-seen:${userId}`;
+const seenListeners = new Set<() => void>();
+
+function subscribeSeen(listener: () => void) {
+  seenListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    seenListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+function readSeen(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function markSeen(key: string, at: string) {
+  try {
+    localStorage.setItem(key, at);
+  } catch {
+    // storage unavailable: the badge simply stays until the next visit
+  }
+  seenListeners.forEach((listener) => listener());
+}
+
+/** Above this many unread entries the badge says "3+" instead of showing a dot. */
+const BADGE_DOT_MAX = 3;
+
 function NotificationsMenu() {
   // The audit log is the platform's own record of what changed; a separate notification
   // feed would be a second version of the same truth.
   const { data } = useAuditLogs({ days: 7, page: 1 });
-  const entries = data?.items.slice(0, 6) ?? [];
-  const count = entries.length;
+  const userId = useSession().user?.id ?? "owner";
+  const key = seenKey(userId);
+  // Null on the server and before anything was opened: everything in the last week is new.
+  const seen = useSyncExternalStore(subscribeSeen, () => readSeen(key), () => null);
+
+  const all = data?.items ?? [];
+  const entries = all.slice(0, 6);
+  // Unread is what arrived since the menu was last opened, not everything in the week: a
+  // badge that never goes away stops meaning anything.
+  const isNew = (createdAt: string) => !seen || Date.parse(createdAt) > Date.parse(seen);
+  const unread = all.filter((entry) => isNew(entry.created_at)).length;
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open && all[0]) markSeen(key, all[0].created_at);
+      }}
+    >
       <DropdownMenuTrigger asChild>
-        <IconButton label={`Notifications${count ? `, ${count} recent` : ""}`} className="relative">
+        <IconButton label={`Notifications${unread ? `, ${unread} unread` : ""}`} className="relative">
           <Bell />
-          {count > 0 && (
-            <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-background" />
+          {unread > BADGE_DOT_MAX ? (
+            <span
+              aria-hidden
+              className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.625rem] leading-none font-semibold text-primary-foreground tabular-nums ring-2 ring-background"
+            >
+              {BADGE_DOT_MAX}+
+            </span>
+          ) : (
+            unread > 0 && (
+              <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-background" />
+            )
           )}
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel>Recent activity</DropdownMenuLabel>
-        {count === 0 && <p className="px-2.5 py-6 text-center text-body-sm text-fg-muted">Nothing new right now.</p>}
+        {entries.length === 0 && (
+          <p className="px-2.5 py-6 text-center text-body-sm text-fg-muted">Nothing new right now.</p>
+        )}
         {entries.map((entry) => (
           <DropdownMenuItem key={entry.id} className="grid gap-0.5 whitespace-normal">
-            <span className="text-body-sm">{entry.action.replace(/[._]/g, " ")}</span>
+            <span className="flex items-center gap-1.5 text-body-sm">
+              {isNew(entry.created_at) && (
+                <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />
+              )}
+              {entry.action.replace(/[._]/g, " ")}
+            </span>
             <span className="text-caption text-fg-muted">
               {entry.actor_email ?? "System"} · {formatRelative(entry.created_at, new Date().toISOString())}
             </span>
