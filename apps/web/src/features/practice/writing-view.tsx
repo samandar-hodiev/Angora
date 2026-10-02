@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, FileText } from "lucide-react";
+import { Clock, FileText, Sparkles, Target } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/common/page-header";
@@ -15,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-import { useSubmitWriting, useWritingSubmissions, useWritingTasks } from "./hooks";
+import { useSubmitWriting, useTopicWritingTask, useWritingSubmissions, useWritingTasks } from "./hooks";
 import type { WritingFeedback } from "./api";
 
 const MIN_WORDS = 20;
@@ -25,141 +26,246 @@ export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+/** What the learner is answering: a library task, or one written for a grammar topic. */
+interface ActiveTask {
+  key: string;
+  title: string;
+  level: string | null;
+  prompt?: string;
+  instructions: string[];
+  minWords?: number;
+  minutes?: number;
+  /** Library tasks are submitted by id; topic tasks carry their prompt and topic instead. */
+  taskId?: string;
+  topic?: { slug: string; name: string };
+  focus?: string;
+}
+
+const TOPIC_KEY = "topic";
+
 /**
  * Writing practice.
  *
  * The learner writes, submits, and gets back rubric scores and specific corrections. There is
  * no answer key here, so the feedback is the AI's judgement — labelled as an estimate, never
  * as an exam result, and every correction points at the sentence it came from.
+ *
+ * Arriving from a grammar topic ("Use it in real English → Writing"), the first task is one
+ * written for that topic, and the check is told to judge that grammar first. The editor takes
+ * the full width — this is a page for writing, and a narrow column is a worse place to write —
+ * and it does not accept pasted text: the feedback is about the learner's English, and text
+ * from somewhere else would make it about somebody else's.
  */
-export function WritingView({ initialContentId }: { initialContentId?: string }) {
+export function WritingView({ initialContentId, grammarTopic }: { initialContentId?: string; grammarTopic?: string }) {
   const tasks = useWritingTasks();
+  const topicTask = useTopicWritingTask(grammarTopic);
   const history = useWritingSubmissions();
   const submit = useSubmitWriting();
 
-  const [taskId, setTaskId] = useState(initialContentId);
+  const [selected, setSelected] = useState<string | undefined>(
+    initialContentId ?? (grammarTopic ? TOPIC_KEY : undefined),
+  );
   const [text, setText] = useState("");
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   const items = tasks.data?.items ?? [];
-  const task = items.find((item) => item.id === taskId) ?? items[0];
+  const options: ActiveTask[] = [
+    ...(topicTask.data
+      ? [
+          {
+            key: TOPIC_KEY,
+            title: topicTask.data.title,
+            level: topicTask.data.level,
+            prompt: topicTask.data.prompt,
+            instructions: topicTask.data.instructions,
+            minWords: topicTask.data.min_words,
+            minutes: topicTask.data.recommended_minutes,
+            topic: topicTask.data.topic,
+            focus: topicTask.data.focus,
+          },
+        ]
+      : []),
+    ...items.map((item) => ({
+      key: item.id,
+      title: item.title,
+      level: item.level,
+      prompt: item.body.prompt,
+      instructions: item.body.instructions ?? [],
+      minWords: item.body.min_words,
+      minutes: item.body.recommended_minutes,
+      taskId: item.id,
+    })),
+  ];
+  const task = options.find((option) => option.key === selected) ?? options[0];
   const words = useMemo(() => countWords(text), [text]);
-  const target = task?.body.min_words ?? MIN_WORDS;
+  const target = task?.minWords ?? MIN_WORDS;
   const feedback = submit.data?.feedback;
 
-  if (tasks.isPending) {
+  const header = (
+    <PageHeader title="Writing practice" description="Write, submit, and get rubric scores and corrections back." />
+  );
+
+  // The topic task is what the learner came for: wait for it rather than flashing the library.
+  if (tasks.isPending || (grammarTopic && topicTask.isPending)) {
     return (
       <>
-        <PageHeader title="Writing practice" description="Write, submit, and get specific corrections back." />
+        {header}
         <div className="grid gap-4">
-          <Skeleton className="h-10 w-72" />
-          <Skeleton className="h-64 w-full" />
+          {grammarTopic && (
+            <p className="flex items-center gap-2 text-body-sm text-fg-secondary">
+              <Sparkles className="size-4 animate-pulse text-primary" aria-hidden />
+              Writing a task for the grammar you just studied…
+            </p>
+          )}
+          <Skeleton className="h-40 w-full rounded-xl" />
+          <Skeleton className="h-72 w-full rounded-xl" />
         </div>
       </>
     );
   }
 
-  if (tasks.isError) {
+  if (tasks.isError && options.length === 0) {
     return (
       <>
-        <PageHeader title="Writing practice" description="Write, submit, and get specific corrections back." />
+        {header}
         <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} />
       </>
     );
   }
 
-  if (items.length === 0) {
+  if (!task) {
     return (
       <>
-        <PageHeader title="Writing practice" description="Write, submit, and get specific corrections back." />
+        {header}
         <EmptyState title="No writing tasks yet" description="Tasks appear here as soon as they are published." />
       </>
     );
   }
 
+  /** Copying, cutting, pasting and dropping text are refused, and the learner is told why. */
+  const refuse = (what: string) => (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    setBlocked(what);
+  };
+
   return (
     <>
-      <PageHeader
-        title="Writing practice"
-        description="Write, submit, and get rubric scores and corrections back."
-      />
+      {header}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">
-        <div className="grid gap-4">
-          {items.length > 1 && (
-            <div className="grid max-w-md gap-2">
-              <Label htmlFor="task-picker">Task</Label>
-              <NativeSelect
-                id="task-picker"
-                value={task?.id}
-                onChange={(event) => {
-                  setTaskId(event.target.value);
-                  submit.reset();
-                }}
-              >
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.level ? `${item.level} · ` : ""}
-                    {item.title}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+      <div className="grid gap-6">
+        {options.length > 1 && (
+          <div className="grid max-w-xl gap-2">
+            <Label htmlFor="task-picker">Task</Label>
+            <NativeSelect
+              id="task-picker"
+              value={task.key}
+              onChange={(event) => {
+                setSelected(event.target.value);
+                submit.reset();
+              }}
+            >
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.topic ? `For ${option.topic.name} · ` : option.level ? `${option.level} · ` : ""}
+                  {option.title}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        )}
+
+        <article className="grid gap-4 rounded-xl border bg-surface p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {task.topic && (
+              <Badge variant="success">
+                <Target aria-hidden /> Practising {task.topic.name}
+              </Badge>
+            )}
+            {task.level && <Badge variant="secondary">{task.level}</Badge>}
+            {task.minWords && <Badge variant="outline">{task.minWords}+ words</Badge>}
+            {task.minutes && (
+              <Badge variant="outline">
+                <Clock aria-hidden /> {task.minutes} min
+              </Badge>
+            )}
+          </div>
+          <h2 className="text-h3">{task.title}</h2>
+          {task.prompt && <p className="text-body">{task.prompt}</p>}
+          {task.instructions.length > 0 && (
+            <ul className="grid gap-1.5">
+              {task.instructions.map((instruction) => (
+                <li key={instruction} className="flex items-start gap-2 text-body-sm text-fg-secondary">
+                  <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
+                  {instruction}
+                </li>
+              ))}
+            </ul>
           )}
-
-          <article className="grid gap-4 rounded-xl border bg-surface p-6">
-            <div className="flex flex-wrap gap-2">
-              {task?.level && <Badge variant="secondary">{task.level}</Badge>}
-              {task?.body.min_words && <Badge variant="outline">{task.body.min_words}+ words</Badge>}
-              {task?.body.recommended_minutes && (
-                <Badge variant="outline">
-                  <Clock aria-hidden /> {task.body.recommended_minutes} min
-                </Badge>
-              )}
-            </div>
-            <h2 className="text-h3">{task?.title}</h2>
-            {task?.body.prompt && <p className="text-body">{task.body.prompt}</p>}
-            {task?.body.instructions && task.body.instructions.length > 0 && (
-              <ul className="grid gap-1.5">
-                {task.body.instructions.map((instruction) => (
-                  <li key={instruction} className="flex items-start gap-2 text-body-sm text-fg-secondary">
-                    <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                    {instruction}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
-          <div className="grid gap-2">
-            <div className="flex items-baseline justify-between gap-3">
-              <Label htmlFor="writing-text">Your answer</Label>
-              <span
-                className={cn(
-                  "text-caption tabular-nums",
-                  words >= target ? "text-success" : "text-fg-muted",
-                )}
-              >
-                {words} / {target} words
+          {task.topic && (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-primary/25 bg-primary-subtle/60 px-3 py-2 text-body-sm">
+              <Target className="size-4 shrink-0 text-primary" aria-hidden />
+              <span className="min-w-0 flex-1">
+                {task.focus || `This task practises ${task.topic.name}.`} The check looks at it first.
               </span>
-            </div>
-            <Textarea
-              id="writing-text"
-              rows={14}
-              value={text}
-              disabled={submit.isPending}
-              placeholder="Write your answer here."
-              onChange={(event) => setText(event.target.value)}
-            />
-            {submit.isError && (
-              <p role="alert" className="text-body-sm text-error">
-                {isApiError(submit.error) ? submit.error.message : "Your answer could not be checked."}
-              </p>
-            )}
+              <Link href={`/app/grammar/${task.topic.slug}`} className="text-caption font-medium text-primary hover:underline">
+                Review the rule
+              </Link>
+            </p>
+          )}
+        </article>
+
+        <div className="grid gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <Label htmlFor="writing-text">Your answer</Label>
+            <span className={cn("text-caption tabular-nums", words >= target ? "text-success" : "text-fg-muted")}>
+              {words} / {target} words
+            </span>
+          </div>
+          <Textarea
+            id="writing-text"
+            rows={16}
+            value={text}
+            disabled={submit.isPending}
+            placeholder="Write your answer here, in your own words."
+            className="min-h-[24rem] w-full text-body leading-relaxed"
+            spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="sentences"
+            aria-describedby="writing-rules"
+            onChange={(event) => {
+              setText(event.target.value);
+              if (blocked) setBlocked(null);
+            }}
+            onPaste={refuse("Pasting")}
+            onCopy={refuse("Copying")}
+            onCut={refuse("Cutting")}
+            onDrop={refuse("Dropping text")}
+            onDragOver={(event) => event.preventDefault()}
+          />
+          <p id="writing-rules" aria-live="polite" className={cn("text-caption", blocked ? "text-warning-text" : "text-fg-muted")}>
+            {blocked
+              ? `${blocked} is turned off here — type it yourself, so the feedback is about your English.`
+              : "Copy and paste are turned off: write it yourself, so the feedback is about your English."}
+          </p>
+          {submit.isError && (
+            <p role="alert" className="text-body-sm text-error">
+              {isApiError(submit.error) ? submit.error.message : "Your answer could not be checked."}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               className="w-fit"
               loading={submit.isPending}
               disabled={words < MIN_WORDS}
-              onClick={() => submit.mutate({ task_id: task?.id, prompt: task?.body.prompt, text })}
+              onClick={() =>
+                submit.mutate({
+                  task_id: task.taskId,
+                  prompt: task.prompt,
+                  text,
+                  grammar_topic: task.topic?.slug,
+                })
+              }
             >
               Check my writing
             </Button>
@@ -171,43 +277,42 @@ export function WritingView({ initialContentId }: { initialContentId?: string })
           </div>
         </div>
 
-        <aside className="grid gap-4 lg:sticky lg:top-20 lg:self-start">
-          {feedback ? (
-            <FeedbackCard feedback={feedback} score={submit.data?.overall_score ?? null} />
-          ) : (
-            <div className="grid gap-2 rounded-xl border border-dashed bg-surface p-6">
-              <p className="flex items-center gap-2 text-label">
-                <FileText className="size-4 text-fg-muted" aria-hidden />
-                Feedback appears here
-              </p>
-              <p className="text-body-sm text-fg-secondary">
-                You get four rubric scores, an estimated level and the specific corrections your text needs.
-              </p>
-            </div>
-          )}
+        {feedback ? (
+          <FeedbackCard feedback={feedback} score={submit.data?.overall_score ?? null} focus={task.topic?.name} />
+        ) : (
+          <div className="grid gap-2 rounded-xl border border-dashed bg-surface p-6">
+            <p className="flex items-center gap-2 text-label">
+              <FileText className="size-4 text-fg-muted" aria-hidden />
+              Feedback appears here
+            </p>
+            <p className="text-body-sm text-fg-secondary">
+              You get four rubric scores, an estimated level and the specific corrections your text needs
+              {task.topic ? ` — starting with how you used ${task.topic.name}.` : "."}
+            </p>
+          </div>
+        )}
 
-          {(history.data?.items.length ?? 0) > 0 && (
-            <div className="grid gap-3 rounded-xl border bg-surface p-5">
-              <h2 className="text-h4">Previous submissions</h2>
-              <ul className="grid gap-2">
-                {history.data!.items.slice(0, 5).map((submission) => (
-                  <li key={submission.id} className="flex items-baseline justify-between gap-3 text-body-sm">
-                    <span className="truncate text-fg-secondary">{submission.prompt || "Free writing"}</span>
-                    <span className="shrink-0 tabular-nums">
-                      {submission.overall_score !== null ? `${Math.round(submission.overall_score)}%` : submission.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </aside>
+        {(history.data?.items.length ?? 0) > 0 && (
+          <div className="grid gap-3 rounded-xl border bg-surface p-5">
+            <h2 className="text-h4">Previous submissions</h2>
+            <ul className="grid gap-2">
+              {history.data!.items.slice(0, 5).map((submission) => (
+                <li key={submission.id} className="flex items-baseline justify-between gap-3 text-body-sm">
+                  <span className="truncate text-fg-secondary">{submission.prompt || "Free writing"}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {submission.overall_score !== null ? `${Math.round(submission.overall_score)}%` : submission.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-function FeedbackCard({ feedback, score }: { feedback: WritingFeedback; score: number | null }) {
+function FeedbackCard({ feedback, score, focus }: { feedback: WritingFeedback; score: number | null; focus?: string }) {
   const criteria = [
     { label: "Task response", value: feedback.task_response },
     { label: "Grammar", value: feedback.grammar },
@@ -242,6 +347,7 @@ function FeedbackCard({ feedback, score }: { feedback: WritingFeedback; score: n
       {feedback.mistakes.length > 0 && (
         <div className="grid gap-2 border-t pt-3">
           <h3 className="text-label">Corrections</h3>
+          {focus && <p className="text-caption text-fg-muted">Mistakes with {focus} come first.</p>}
           <ul className="grid gap-2.5">
             {feedback.mistakes.map((mistake, index) => (
               <li key={index} className="grid gap-1 rounded-lg border bg-surface-hover p-3">

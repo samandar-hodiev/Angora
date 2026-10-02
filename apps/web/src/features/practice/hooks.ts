@@ -40,6 +40,18 @@ export function useWritingTasks() {
   return useQuery({ queryKey: queryKeys.practice.writingTasks, queryFn: writingApi.tasks });
 }
 
+/** The writing task for a grammar topic; idle when there is no topic. */
+export function useTopicWritingTask(topic: string | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.practice.writingTasks, "topic", topic ?? ""],
+    queryFn: () => writingApi.topicTask(topic!),
+    enabled: Boolean(topic),
+    // A written task is the same task for the session; refetching would replace what the
+    // learner is part-way through answering.
+    staleTime: Infinity,
+  });
+}
+
 export function useWritingSubmissions() {
   return useQuery({ queryKey: queryKeys.practice.writingSubmissions, queryFn: writingApi.submissions });
 }

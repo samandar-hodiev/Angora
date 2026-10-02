@@ -111,6 +111,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		Evaluator: c.Evaluator, Speaker: c.Evaluator, Storage: c.Storage,
 		MaxUploadBytes: cfg.Storage.MaxUploadBytes, Tracker: c.Analytics,
 		Conversation: c.AI, AllowedOrigins: cfg.HTTP.CORSAllowedOrigins,
+		TopicTasks: c.GrammarAuthor,
 	}).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
 	levels.NewModule(c.DB).RegisterRoutes(v1)

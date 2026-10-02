@@ -68,6 +68,9 @@ type Module struct {
 	conversation Conversationalist
 	// origins are the browser origins allowed to open a WebSocket session.
 	origins []string
+	// taskWriter writes writing tasks for a grammar topic. Nil serves a plain task instead.
+	taskWriter TopicTaskWriter
+	topicTasks *topicTaskCache
 }
 
 type Deps struct {
@@ -92,6 +95,9 @@ type Deps struct {
 	// upgrades are not covered by CORS, so this list is the only thing between a logged-in
 	// learner and a session opened by somebody else's page.
 	AllowedOrigins []string
+	// TopicTasks writes a writing task for the grammar topic a learner has just studied.
+	// Nil falls back to a plain task about the topic rather than to the library.
+	TopicTasks TopicTaskWriter
 }
 
 func NewModule(d Deps) *Module {
@@ -101,7 +107,8 @@ func NewModule(d Deps) *Module {
 	}
 	return &Module{pool: d.Pool, plans: d.Plans, usage: d.Usage, evaluator: d.Evaluator,
 		speaker: d.Speaker, store: d.Storage, maxUpload: maxUpload, track: d.Tracker,
-		conversation: d.Conversation, origins: d.AllowedOrigins}
+		conversation: d.Conversation, origins: d.AllowedOrigins,
+		taskWriter: d.TopicTasks, topicTasks: &topicTaskCache{}}
 }
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {

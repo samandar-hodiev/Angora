@@ -46,6 +46,9 @@ type WritingAssessmentInput struct {
 	MaxWords    int
 	Text        string
 	WordCount   int
+	// Focus is the grammar point the task was set to practise, when it was set for one
+	// ("A / An: a before a consonant sound, an before a vowel sound"). Empty for placement.
+	Focus string
 }
 
 type WritingAssessment struct {
@@ -123,6 +126,14 @@ Criteria:
 func (e *PlacementEvaluator) EvaluateWriting(ctx context.Context, in WritingAssessmentInput) (*WritingAssessment, EvaluationMeta, error) {
 	input := fmt.Sprintf("TASK LEVEL: %s\nTASK: %s\nMIN_WORDS: %d\nMAX_WORDS: %d\nWORD_COUNT: %d\nLEARNER RESPONSE:\n%s",
 		in.TargetLevel, in.TaskPrompt, in.MinWords, in.MaxWords, in.WordCount, in.Text)
+	if focus := strings.TrimSpace(in.Focus); focus != "" {
+		// Placed before the response so it frames the whole reading of it, not as an
+		// afterthought the model weighs less than the rubric it already has.
+		input = "FOCUS GRAMMAR: " + focus + "\n" +
+			"This task was set to practise the focus grammar. Check every place the learner used it — or should have — " +
+			"and report each error in it as its own mistake, before any other mistakes. Let how well the learner used it " +
+			"weigh heavily in the grammar score, and count avoiding it where the task needs it against task_response.\n\n" + input
+	}
 	var out WritingAssessment
 	meta, err := e.analyze(ctx, in.UserID, TaskWritingEvaluation, SchemaPlacementWriting, writingSchema,
 		placementInstructions+"\n\n"+writingCriteriaGuide, input, &out)

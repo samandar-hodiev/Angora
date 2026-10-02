@@ -89,6 +89,19 @@ export interface WritingTask {
   body: { prompt?: string; instructions?: string[]; min_words?: number; recommended_minutes?: number };
 }
 
+/** A task written for the grammar topic a learner has just studied. Not library content: no id. */
+export interface TopicWritingTask {
+  topic: { slug: string; name: string };
+  level: string;
+  title: string;
+  prompt: string;
+  instructions: string[];
+  min_words: number;
+  recommended_minutes: number;
+  /** What the task practises, in one sentence. */
+  focus: string;
+}
+
 export interface WritingFeedback {
   task_response: number;
   grammar: number;
@@ -116,7 +129,8 @@ export interface WritingSubmission {
 
 export const writingApi = {
   tasks: () => apiClient.getPage<WritingTask>("/writing/tasks", { query: { page_size: 50 } }),
-  submit: (input: { task_id?: string; prompt?: string; text: string }) =>
+  topicTask: (topic: string) => apiClient.get<TopicWritingTask>("/writing/topic-task", { query: { topic } }),
+  submit: (input: { task_id?: string; prompt?: string; text: string; grammar_topic?: string }) =>
     apiClient.post<WritingSubmission>("/writing/submissions", input),
   submissions: () => apiClient.getPage<WritingSubmission>("/writing/submissions", { query: { page_size: 20 } }),
 };

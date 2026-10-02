@@ -56,6 +56,8 @@ type writingInput struct {
 	/** Used when no task is given — a learner writing something of their own. */
 	Prompt string `json:"prompt" binding:"omitempty,max=1000"`
 	Text   string `json:"text" binding:"required,min=1"`
+	/** The grammar topic this writing practises (its slug), when it was set for one. */
+	GrammarTopic string `json:"grammar_topic" binding:"omitempty,max=120"`
 }
 
 type WritingFeedback struct {
@@ -106,6 +108,7 @@ func countWords(text string) int {
 func (m *Module) registerWritingRoutes(v1 *gin.RouterGroup) {
 	g := v1.Group("/writing", authz.RequirePermission(authz.PermLearningPractice))
 	g.GET("/tasks", m.writingTasks)
+	g.GET("/topic-task", m.topicWritingTask)
 	g.POST("/submissions", m.submitWriting)
 	g.GET("/submissions", m.listWritingSubmissions)
 	g.GET("/submissions/:id", m.writingSubmission)
@@ -230,6 +233,29 @@ func (m *Module) submitWriting(c *gin.Context) {
 		prompt = "Free writing"
 	}
 
+	// Writing set for a grammar topic is marked with that topic in view: the evaluator is
+	// told what it practises, and the submission remembers which topic it was.
+	var focusTopicID *uuid.UUID
+	focus := ""
+	if slug := strings.TrimSpace(in.GrammarTopic); slug != "" {
+		var id uuid.UUID
+		var name, description string
+		err := m.pool.QueryRow(ctx, `
+			SELECT id, name, description FROM grammar_topics WHERE slug = $1 AND status = 'published'`, slug).
+			Scan(&id, &name, &description)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			httpx.Fail(c, err)
+			return
+		}
+		if err == nil {
+			focusTopicID = &id
+			focus = name
+			if description = strings.TrimSpace(description); description != "" {
+				focus += " — " + description
+			}
+		}
+	}
+
 	// The learner's own level, when they have one, so the rubric judges them against where
 	// they are rather than a fixed target.
 	var learnerLevel *string
@@ -242,9 +268,10 @@ func (m *Module) submitWriting(c *gin.Context) {
 
 	var submissionID uuid.UUID
 	if err := m.pool.QueryRow(ctx, `
-		INSERT INTO writing_submissions (user_id, content_item_id, status, text, word_count, submitted_at, client_platform)
-		VALUES ($1, $2, 'analyzing', $3, $4, now(), $5)
-		RETURNING id`, p.UserID, in.TaskID, in.Text, words, httpx.ClientPlatform(c)).Scan(&submissionID); err != nil {
+		INSERT INTO writing_submissions (user_id, content_item_id, status, text, word_count, submitted_at,
+		                                 client_platform, prompt, grammar_topic_id)
+		VALUES ($1, $2, 'analyzing', $3, $4, now(), $5, $6, $7)
+		RETURNING id`, p.UserID, in.TaskID, in.Text, words, httpx.ClientPlatform(c), prompt, focusTopicID).Scan(&submissionID); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
@@ -273,7 +300,7 @@ func (m *Module) submitWriting(c *gin.Context) {
 	}
 	assessment, meta, err := m.evaluator.EvaluateWriting(ctx, ai.WritingAssessmentInput{
 		UserID: p.UserID, TaskPrompt: prompt, TargetLevel: target,
-		MinWords: minWritingWords, Text: in.Text, WordCount: words,
+		MinWords: minWritingWords, Text: in.Text, WordCount: words, Focus: focus,
 	})
 	if err != nil || assessment == nil {
 		if m.usage != nil {
@@ -284,6 +311,7 @@ func (m *Module) submitWriting(c *gin.Context) {
 		return
 	}
 
+	assessment.Mistakes = realCorrections(assessment.Mistakes)
 	overall := (assessment.TaskResponse + assessment.Grammar + assessment.Vocabulary + assessment.Coherence) / 4
 	if err := m.recordWritingResult(ctx, p.UserID, submissionID, assessment, meta, overall); err != nil {
 		httpx.Fail(c, err)
@@ -296,6 +324,20 @@ func (m *Module) submitWriting(c *gin.Context) {
 		}))
 	}
 	m.respondWithSubmission(c, submissionID, p.UserID)
+}
+
+// realCorrections drops "corrections" that change nothing ("a coffee → a coffee"). The model
+// sometimes lists a phrase it checked and found right; shown as a mistake it tells the learner
+// they got wrong something they got right, and it would be recorded against them as one.
+func realCorrections(mistakes []ai.AssessmentMistake) []ai.AssessmentMistake {
+	out := mistakes[:0]
+	for _, m := range mistakes {
+		if strings.EqualFold(strings.Join(strings.Fields(m.Original), " "), strings.Join(strings.Fields(m.Correction), " ")) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 func itoa(n int) string {
@@ -408,7 +450,7 @@ func (m *Module) listWritingSubmissions(c *gin.Context) {
 	page = page.Normalize()
 
 	rows, err := m.pool.Query(c.Request.Context(), `
-		SELECT ws.id, ws.content_item_id, coalesce(ci.title, ''), ws.text, ws.word_count, ws.status,
+		SELECT ws.id, ws.content_item_id, coalesce(ci.title, nullif(ws.prompt, ''), ''), ws.text, ws.word_count, ws.status,
 		       ws.overall_score::float8, ws.submitted_at, ws.completed_at, ws.created_at, count(*) OVER ()
 		FROM writing_submissions ws
 		LEFT JOIN content_items ci ON ci.id = ws.content_item_id
@@ -459,7 +501,7 @@ func (m *Module) respondWithSubmission(c *gin.Context, id, userID uuid.UUID) {
 		raw []byte
 	)
 	err := m.pool.QueryRow(c.Request.Context(), `
-		SELECT ws.id, ws.content_item_id, coalesce(ci.title, ''), ws.text, ws.word_count, ws.status,
+		SELECT ws.id, ws.content_item_id, coalesce(ci.title, nullif(ws.prompt, ''), ''), ws.text, ws.word_count, ws.status,
 		       ws.overall_score::float8, ws.submitted_at, ws.completed_at, ws.created_at, a.result
 		FROM writing_submissions ws
 		LEFT JOIN content_items ci ON ci.id = ws.content_item_id

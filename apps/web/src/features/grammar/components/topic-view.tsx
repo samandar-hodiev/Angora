@@ -148,7 +148,7 @@ export function GrammarTopicView({ slug }: { slug: string }) {
             />
             <ApplyCard
               icon={PenLine}
-              href="/app/writing"
+              href={`/app/writing?topic=${encodeURIComponent(t.slug)}`}
               title="Writing"
               body={`Write a few sentences using ${t.name.toLowerCase()}.`}
             />
