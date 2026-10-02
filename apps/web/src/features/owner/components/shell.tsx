@@ -14,7 +14,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  Suspense,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
@@ -95,6 +103,49 @@ function subscribeCollapsed(listener: () => void) {
 
 const collapsedOnServer = () => false;
 
+/**
+ * The sidebar's width, dragged by its edge.
+ *
+ * It runs from icons only up to SIDEBAR_MAX. Narrowing it shortens the labels ("Lea…"); below
+ * SIDEBAR_COLLAPSE_AT a label has too little room to say anything, so the sidebar settles into
+ * icons only — the same state the "Collapse sidebar" button gives. The width is remembered in
+ * this browser, like the collapsed state.
+ */
+const WIDTH_KEY = "engora:owner:sidebar-width";
+const SIDEBAR_ICONS = 64;
+const SIDEBAR_COLLAPSE_AT = 136;
+const SIDEBAR_DEFAULT = 240;
+const SIDEBAR_MAX = 264;
+let widthCache: number | null = null;
+
+function clampSidebar(width: number) {
+  return Math.round(Math.min(Math.max(width, SIDEBAR_COLLAPSE_AT), SIDEBAR_MAX));
+}
+
+function readWidth(): number {
+  if (widthCache === null) {
+    try {
+      const stored = Number(window.localStorage.getItem(WIDTH_KEY));
+      widthCache = stored > 0 ? clampSidebar(stored) : SIDEBAR_DEFAULT;
+    } catch {
+      widthCache = SIDEBAR_DEFAULT;
+    }
+  }
+  return widthCache;
+}
+
+function writeWidth(next: number) {
+  widthCache = clampSidebar(next);
+  try {
+    window.localStorage.setItem(WIDTH_KEY, String(widthCache));
+  } catch {
+    /* private mode: the width simply does not persist */
+  }
+  collapseListeners.forEach((listener) => listener());
+}
+
+const widthOnServer = () => SIDEBAR_DEFAULT;
+
 export function OwnerShell({ children }: { children: ReactNode }) {
   return (
     <OwnerPreferencesProvider>
@@ -110,6 +161,70 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
   // what the operator asked for by choosing them.
   const collapsed =
     prefs.sidebar_mode === "collapsed" ? true : prefs.sidebar_mode === "expanded" ? false : remembered;
+
+  const storedWidth = useSyncExternalStore(subscribeCollapsed, readWidth, widthOnServer);
+  /** While the edge is being dragged, the live width; null otherwise. */
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const showCollapsed = dragWidth !== null ? dragWidth < SIDEBAR_COLLAPSE_AT : collapsed;
+  const sidebarWidth = showCollapsed ? SIDEBAR_ICONS : (dragWidth ?? storedWidth);
+
+  /** Commits a width: below the threshold it is "icons only", anything else is remembered. */
+  function settleWidth(width: number) {
+    if (width < SIDEBAR_COLLAPSE_AT) {
+      writeCollapsed(true);
+    } else {
+      writeWidth(width);
+      writeCollapsed(false);
+    }
+  }
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    // The sidebar starts at the window's left edge, so the pointer's x is the width.
+    const widthAt = (x: number) => Math.min(Math.max(x, SIDEBAR_ICONS), SIDEBAR_MAX);
+    let latest = widthAt(event.clientX);
+    setDragWidth(latest);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const move = (e: PointerEvent) => {
+      latest = widthAt(e.clientX);
+      setDragWidth(latest);
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      settleWidth(latest);
+      setDragWidth(null);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+
+  function resizeByKey(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const current = showCollapsed ? SIDEBAR_ICONS : storedWidth;
+    const step = event.shiftKey ? 48 : 16;
+    const next =
+      event.key === "ArrowLeft"
+        ? current - step
+        : event.key === "ArrowRight"
+          ? (showCollapsed ? SIDEBAR_COLLAPSE_AT : current) + step
+          : event.key === "Home"
+            ? SIDEBAR_ICONS
+            : event.key === "End"
+              ? SIDEBAR_MAX
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    settleWidth(next);
+  }
 
   function toggleCollapsed() {
     writeCollapsed(!collapsed);
@@ -137,8 +252,9 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
         accessibility.reduced_motion === true && "[&_*]:!animate-none [&_*]:!transition-none",
         accessibility.high_contrast === true && "contrast-more",
         accessibility.density === "compact" && "[--owner-density:compact]",
-        collapsed ? "md:grid-cols-[4rem_minmax(0,1fr)]" : "md:grid-cols-[15rem_minmax(0,1fr)]",
+        "md:grid-cols-[var(--owner-sidebar-w)_minmax(0,1fr)]",
       )}
+      style={{ "--owner-sidebar-w": `${sidebarWidth}px` } as CSSProperties}
       lang={prefs.locale}
       data-owner-density={typeof accessibility.density === "string" ? accessibility.density : "comfortable"}
     >
@@ -158,16 +274,43 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
       )}
       <aside
         className={cn(
-          "sticky top-0 hidden h-dvh flex-col border-r md:flex",
+          "sticky top-0 hidden h-dvh min-w-0 flex-col border-r md:flex",
           hasWallpaper ? "bg-surface/85 backdrop-blur-sm" : "bg-surface",
         )}
       >
-        <div className={cn("flex h-14 items-center gap-2 border-b px-3", collapsed && "justify-center px-0")}>
+        {/* The edge you drag to resize. Wider than the border it sits on, so it can be found
+            without pixel hunting, and drawn only on hover, focus and drag. */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          aria-valuemin={SIDEBAR_ICONS}
+          aria-valuemax={SIDEBAR_MAX}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          onPointerDown={startResize}
+          onKeyDown={resizeByKey}
+          onDoubleClick={() => settleWidth(SIDEBAR_DEFAULT)}
+          title="Drag to resize · double-click to reset"
+          className={cn(
+            "group/resize absolute inset-y-0 -right-1.5 z-20 w-3 cursor-col-resize touch-none outline-none",
+          )}
+        >
+          <span
+            aria-hidden
+            className={cn(
+              "absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-primary opacity-0 transition-opacity duration-micro",
+              "group-hover/resize:opacity-60 group-focus-visible/resize:opacity-100",
+              dragWidth !== null && "opacity-100",
+            )}
+          />
+        </div>
+        <div className={cn("flex h-14 items-center gap-2 border-b px-3", showCollapsed && "justify-center px-0")}>
           <Link href="/owner/dashboard" className="flex min-w-0 items-center gap-2">
             <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
               <ShieldCheck className="size-4" aria-hidden />
             </span>
-            {!collapsed && (
+            {!showCollapsed && (
               <span className="grid min-w-0">
                 <span className="truncate text-label leading-tight">Engora</span>
                 <span className="truncate text-caption leading-tight text-fg-muted">{t.shell.console}</span>
@@ -178,8 +321,8 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
 
         {/* The nav reads the query string to mark ?type=… destinations active, which makes it
             a client-only read: Suspense keeps the rest of the shell server-rendered. */}
-        <Suspense fallback={<NavFallback collapsed={collapsed} />}>
-          <OwnerNav collapsed={collapsed} />
+        <Suspense fallback={<NavFallback collapsed={showCollapsed} />}>
+          <OwnerNav collapsed={showCollapsed} />
         </Suspense>
 
         {/* Pinned below the scrolling navigation, so the console's own settings and the
@@ -187,18 +330,26 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
             learner app" used to sit here; it is not a place in this console, so it moved to
             the account menu where the other cross-app actions live. */}
         <div className="mt-auto grid gap-1 border-t p-2">
-          <OwnerSettingsLink collapsed={collapsed} />
+          <OwnerSettingsLink collapsed={showCollapsed} />
           <button
             type="button"
             onClick={toggleCollapsed}
-            aria-pressed={collapsed}
+            aria-pressed={showCollapsed}
             className={cn(
               "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm text-fg-muted transition-colors duration-micro hover:bg-surface-hover hover:text-foreground",
-              collapsed && "justify-center px-0",
+              showCollapsed && "justify-center px-0",
             )}
           >
-            {collapsed ? <ChevronsRight className="size-4" aria-hidden /> : <ChevronsLeft className="size-4" aria-hidden />}
-            {collapsed ? <span className="sr-only">Expand sidebar</span> : "Collapse sidebar"}
+            {showCollapsed ? (
+              <ChevronsRight className="size-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronsLeft className="size-4 shrink-0" aria-hidden />
+            )}
+            {showCollapsed ? (
+              <span className="sr-only">Expand sidebar</span>
+            ) : (
+              <span className="truncate">Collapse sidebar</span>
+            )}
           </button>
         </div>
       </aside>
@@ -676,7 +827,7 @@ function OwnerSettingsLink({ collapsed = false }: { collapsed?: boolean }) {
       )}
     >
       <SlidersHorizontal className={cn("size-4 shrink-0", active && "text-primary-text")} aria-hidden />
-      {collapsed ? <span className="sr-only">Owner Settings</span> : "Owner Settings"}
+      {collapsed ? <span className="sr-only">Owner Settings</span> : <span className="truncate">Owner Settings</span>}
     </Link>
   );
 }
