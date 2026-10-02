@@ -262,8 +262,12 @@ export function LearnerGrowthChart({
         />
       )}
 
-      {/* The same numbers as text, for screen readers and for anyone who cannot hover. */}
-      <table className="sr-only">
+      {/* The same numbers as text, for screen readers and for anyone who cannot hover.
+          sr-only goes on a wrapper, not the table: a table will not shrink below its rows, so a
+          "1px" table of ninety days was 2,200px tall, stretched the page past the console, and
+          let the sticky sidebar scroll away with it. A div honours the 1px and clips. */}
+      <div className="sr-only">
+      <table>
         <caption>{label}</caption>
         <thead>
           <tr>
@@ -282,6 +286,7 @@ export function LearnerGrowthChart({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
