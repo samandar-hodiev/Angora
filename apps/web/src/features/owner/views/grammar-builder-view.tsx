@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { isApiError } from "@/lib/api";
+import { formatDuration } from "@/lib/audio";
+import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 
 import { LiveDataState } from "../components/live-state";
@@ -302,7 +304,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
 
         <TabsContent value="editor">
           {isWriting(writing, current.level, language) ? (
-            <WritingPlaceholder level={current.level} languages={writing!.languages} />
+            <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
             <LevelEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
           )}
@@ -310,7 +312,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
 
         <TabsContent value="preview">
           {isWriting(writing, current.level, language) ? (
-            <WritingPlaceholder level={current.level} languages={writing!.languages} />
+            <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
             <LearnerPreview topic={data.topic.name} level={current.level} language={language} content={current} />
           )}
@@ -1684,56 +1686,178 @@ function WritingBadge({ compact = false }: { compact?: boolean }) {
 /**
  * The editor while the model is writing this level.
  *
- * The same sections the editor will have, each field a placeholder that shimmers, so the
- * owner sees the shape of what is coming and where it will land — not a modal with a spinner.
+ * The same sections the editor will have, so the owner sees the shape of what is coming and
+ * where it will land — but alive rather than grey: each field types its lines out and starts
+ * again, a light passes over the fields one after another, and a glint travels round the card
+ * that is being written. The banner says which part the model is on and how long it has been.
+ * All of it stops for anyone who has asked for reduced motion.
  */
-function WritingPlaceholder({ level, languages }: { level: string; languages: ContentLanguage[] }) {
-  const field = (className: string) => <Skeleton className={cn("rounded-lg", className)} />;
+function WritingPlaceholder({
+  level,
+  languages,
+  startedAt,
+}: {
+  level: string;
+  languages: ContentLanguage[];
+  startedAt?: number;
+}) {
   return (
     <div className="grid gap-4" aria-busy aria-live="polite">
-      <p className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary-subtle/40 px-4 py-2.5 text-caption">
-        <Sparkles className="size-4 animate-pulse text-primary-text" aria-hidden />
-        Writing {level} in {languages.map((code) => contentLanguageLabels[code]).join(", ")}… This takes a minute or two;
-        you can leave the page and come back.
-      </p>
+      <WritingBanner level={level} languages={languages} startedAt={startedAt} />
 
-      <SectionCard title={`${level} content`} description="Being written by AI">
+      <WritingCard title={`${level} content`}>
         <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label>Title</Label>
-              {field("h-9")}
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Short description</Label>
-              {field("h-9")}
-            </div>
+            <WritingField label="Title" lines={1} seed={0} />
+            <WritingField label="Short description" lines={1} seed={1} />
           </div>
-          <div className="grid gap-1.5">
-            <Label>What is it?</Label>
-            {field("h-20")}
-          </div>
-          <div className="grid gap-1.5">
-            <Label>When do we use it?</Label>
-            {field("h-28")}
-          </div>
-          <div className="grid gap-1.5">
-            <Label>Usage rules</Label>
-            {field("h-9")}
-            {field("h-9 w-4/5")}
-          </div>
+          <WritingField label="What is it?" lines={2} seed={2} />
+          <WritingField label="When do we use it?" lines={3} seed={4} />
+          <WritingField label="Usage rules" lines={2} seed={7} />
         </div>
-      </SectionCard>
+      </WritingCard>
 
-      {(["Formulas", "Examples", "Common mistakes", "Practice"] as const).map((title) => (
-        <SectionCard key={title} title={title} description="Being written by AI">
+      {(["Formulas", "Examples", "Common mistakes", "Practice"] as const).map((title, index) => (
+        <WritingCard key={title} title={title} quiet>
           <div className="grid gap-2">
-            {field("h-11")}
-            {field("h-11 w-11/12")}
-            {field("h-11 w-4/5")}
+            {[0, 1, 2].map((row) => (
+              <WritingField key={row} lines={1} seed={10 + index * 3 + row} numbered={row + 1} />
+            ))}
           </div>
-        </SectionCard>
+        </WritingCard>
       ))}
+    </div>
+  );
+}
+
+/** The step the model is on, cycling through what a generation actually does, and the time. */
+function WritingBanner({
+  level,
+  languages,
+  startedAt,
+}: {
+  level: string;
+  languages: ContentLanguage[];
+  startedAt?: number;
+}) {
+  const now = useNow();
+  const steps = [
+    `Reading the curriculum for ${level}`,
+    "Writing the explanation",
+    "Choosing examples a learner would actually say",
+    "Collecting the mistakes learners make",
+    "Writing practice questions",
+    ...languages.filter((code) => code !== "en").map((code) => `Translating into ${contentLanguageLabels[code]}`),
+  ];
+  const elapsed = startedAt && now > startedAt ? Math.floor((now - startedAt) / 1000) : 0;
+  const step = steps[Math.floor(elapsed / 4) % steps.length]!;
+
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-primary-subtle/50 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="relative grid size-7 shrink-0 place-items-center rounded-full bg-primary/15">
+          <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-primary/20 motion-reduce:hidden" />
+          <Sparkles className="relative size-4 text-primary-text" aria-hidden />
+        </span>
+        <div className="grid min-w-0 flex-1">
+          {/* Keyed by the step so each new one fades in rather than swapping in place. */}
+          <p key={step} className="truncate text-body-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-500">
+            {step}…
+          </p>
+          <p className="text-caption text-fg-muted">
+            {level} · {languages.map((code) => contentLanguageLabels[code]).join(", ")} · you can leave the page and
+            come back
+          </p>
+        </div>
+        {elapsed > 0 && (
+          <span className="shrink-0 rounded-md bg-surface/70 px-2 py-0.5 text-caption text-fg-secondary tabular-nums">
+            {formatDuration(elapsed * 1000)}
+          </span>
+        )}
+      </div>
+      {/* An indeterminate progress line: the model does not report how far it is, and a bar
+          that pretends to know would be a lie that stalls at 90%. */}
+      <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden bg-primary/10">
+        <span className="absolute inset-y-0 left-0 w-1/3 animate-ai-sweep bg-gradient-to-r from-transparent via-primary to-transparent motion-reduce:hidden" />
+      </span>
+    </div>
+  );
+}
+
+/** A section card with a glint travelling round its edge while it is being written. */
+function WritingCard({ title, quiet = false, children }: { title: string; quiet?: boolean; children: ReactNode }) {
+  return (
+    <div className="relative rounded-[calc(var(--radius-xl)+1px)] p-px">
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-0 animate-ai-orbit rounded-[inherit] motion-reduce:hidden",
+          "bg-[conic-gradient(from_var(--ai-angle),transparent_0deg,transparent_240deg,var(--primary)_320deg,transparent_360deg)]",
+          quiet && "opacity-40",
+        )}
+      />
+      <SectionCard title={title} description="Being written by AI" className="relative">
+        {children}
+      </SectionCard>
+    </div>
+  );
+}
+
+/** Widths the "typed" lines settle at: uneven, the way real lines of text are. */
+const lineWidths = [88, 64, 93, 72, 81, 57, 90, 68, 77, 84, 61, 95];
+
+/**
+ * One field being written: its lines type themselves out left to right, a caret blinks at
+ * the end of the last one, and a light passes over it. `seed` staggers the timing and the
+ * widths so neighbouring fields are not in lockstep.
+ */
+function WritingField({
+  label,
+  lines,
+  seed,
+  numbered,
+}: {
+  label?: string;
+  lines: number;
+  seed: number;
+  numbered?: number;
+}) {
+  const field = (
+    <div className="relative flex items-start gap-2 overflow-hidden rounded-lg border border-primary/15 bg-surface-subtle px-3 py-2.5">
+      {numbered !== undefined && (
+        <span className="w-5 shrink-0 text-caption text-fg-muted tabular-nums">{numbered}</span>
+      )}
+      <div className="grid min-w-0 flex-1 gap-2 py-0.5">
+        {Array.from({ length: lines }, (_, line) => (
+          <div key={line} className="flex h-3 items-center gap-1">
+            <span
+              className="h-2.5 shrink-0 animate-ai-type rounded-full bg-gradient-to-r from-primary/50 via-primary/30 to-primary/15 motion-reduce:animate-none motion-reduce:w-[var(--ai-w)]"
+              style={
+                {
+                  "--ai-w": `${lineWidths[(seed + line) % lineWidths.length]}%`,
+                  animationDelay: `${((seed * 2 + line) % 9) * 160}ms`,
+                } as CSSProperties
+              }
+            />
+            {line === lines - 1 && (
+              <span className="h-3.5 w-0.5 shrink-0 animate-ai-caret rounded-full bg-primary motion-reduce:animate-none" />
+            )}
+          </div>
+        ))}
+      </div>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-1/3 animate-ai-sweep bg-gradient-to-r from-transparent via-primary/12 to-transparent motion-reduce:hidden"
+        style={{ animationDelay: `${(seed % 6) * 200}ms` }}
+      />
+    </div>
+  );
+
+  if (!label) return field;
+  return (
+    <div className="grid gap-1.5">
+      <Label>{label}</Label>
+      {field}
     </div>
   );
 }

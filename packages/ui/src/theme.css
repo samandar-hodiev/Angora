@@ -19,6 +19,13 @@
 
 /* A `.light` subtree inside a dark page (the Owner Console in its light theme) is light: dark:
  * utilities must not reach into it just because <html> carries `.dark`. */
+/* Animatable, so the glint round a card being written can travel (see --animate-ai-orbit). */
+@property --ai-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));
 
 /*
@@ -269,6 +276,54 @@
   --animate-aurora-slow: aurora-ribbon 66s var(--ease-standard) infinite alternate-reverse;
   --animate-breathe: breathe 2.4s var(--ease-standard) infinite;
   --animate-shimmer: shimmer 2s linear infinite;
+  /* "The model is writing this": lines that type themselves out, a light that passes over the
+   * fields, a caret, and a glint that travels round the card being written. */
+  --animate-ai-type: ai-type 3.6s var(--ease-emphasized) infinite;
+  --animate-ai-sweep: ai-sweep 2.4s var(--ease-standard) infinite;
+  --animate-ai-caret: ai-caret 1s steps(1, end) infinite;
+  --animate-ai-orbit: ai-orbit 3.2s linear infinite;
+
+  /* Width, not scale, so the caret after the line moves with it as it is "typed". */
+  @keyframes ai-type {
+    0% {
+      width: 0;
+      opacity: 0.4;
+    }
+    40% {
+      width: var(--ai-w, 80%);
+      opacity: 1;
+    }
+    84% {
+      width: var(--ai-w, 80%);
+      opacity: 1;
+    }
+    100% {
+      width: var(--ai-w, 80%);
+      opacity: 0;
+    }
+  }
+  @keyframes ai-sweep {
+    0% {
+      transform: translateX(-120%);
+    }
+    100% {
+      transform: translateX(220%);
+    }
+  }
+  @keyframes ai-caret {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes ai-orbit {
+    to {
+      --ai-angle: 360deg;
+    }
+  }
 
   @keyframes liquid-drift {
     0% {
