@@ -224,17 +224,19 @@ func (m *Module) topic(c *gin.Context) {
 		       (SELECT count(*) FROM grammar_questions q
 		         WHERE q.grammar_topic_id = t.id AND q.status = 'published')::int`+
 		topicJoins+`
-		-- The explanation written for this learner: their language first, then the level
-		-- closest to their own. A topic explained at C1 to an A2 learner is worse than the
-		-- same topic explained at A2 in the wrong language, so level breaks the tie only
-		-- after language does.
+		-- The explanation written for this learner. Their own level first, then the nearest
+		-- one above it, and at most one level below: a B2 learner served the A1 page reads
+		-- examples written for somebody who started last month. When nothing is published in
+		-- that band the page has no canonical text and the AI explanation, written for their
+		-- level, takes its place. Within the band their language wins, then English.
 		LEFT JOIN LATERAL (
 			SELECT gcx.body, gcx.language, gcx.level_code
 			FROM grammar_content gcx
 			JOIN levels gl ON gl.code = gcx.level_code
 			WHERE gcx.grammar_topic_id = t.id AND gcx.status = 'published'
 			  AND gcx.language IN ($3, 'en')
-			ORDER BY (gcx.language = $3) DESC, abs(gl.rank - $4), gl.rank DESC
+			  AND gl.rank >= $4 - 1
+			ORDER BY (gcx.language = $3) DESC, (gl.rank = $4) DESC, (gl.rank > $4) DESC, abs(gl.rank - $4)
 			LIMIT 1
 		) gc ON true
 		WHERE t.slug = $2 AND t.status = 'published'`, p.UserID, slug, language, levelRank).
@@ -532,7 +534,7 @@ func (m *Module) readingLanguage(ctx context.Context, userID uuid.UUID, requeste
 // or B1 when they have none yet. A rank rather than a code because the choice is "nearest",
 // and nearest is arithmetic.
 func (m *Module) readingLevel(ctx context.Context, userID uuid.UUID) int {
-	const defaultRank = 2 // B1
+	const defaultRank = 3 // B1 (levels.rank: A1=1 … C2=6)
 	if userID == uuid.Nil {
 		return defaultRank
 	}

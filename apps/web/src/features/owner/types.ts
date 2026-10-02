@@ -1211,15 +1211,19 @@ export interface ProposedLevel {
   practice: PracticeQuestion[];
   /** The section that was asked for; empty when the whole level was rewritten. */
   section?: string;
+  /** For regenerate_item: the one item that was replaced. Take only that one. */
+  index?: number;
 }
 
-export type RefineAction = "improve" | "regenerate" | "expand" | "adapt";
+export type RefineAction = "improve" | "regenerate" | "expand" | "adapt" | "regenerate_item";
 
 export interface RefineInput {
   language?: string;
   action: RefineAction;
   section?: string;
   adapt_from?: string;
+  /** For regenerate_item: which item of `section` to replace, counting from zero. */
+  index?: number;
 }
 
 export interface GrammarBody {
@@ -1247,6 +1251,30 @@ export interface LevelContent {
   updated_at: ISODate | null;
   /** The live version a learner is reading, when this draft is not it. */
   published_version: number | null;
+}
+
+export interface GenerateInput {
+  /** Every language to end up with; English is written first and the rest translated from it. */
+  languages: ContentLanguage[];
+  levels: string[];
+  overwrite?: boolean;
+}
+
+/** A queued generation: poll the job until it finishes, then read the content again. */
+export interface GenerationStarted {
+  job_id: string;
+  languages: ContentLanguage[];
+  levels: string[];
+  /** Set by the client when it queued the job, so a job that never finishes can be given up on. */
+  started_at?: number;
+}
+
+export interface JobState {
+  id: string;
+  type: string;
+  status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+  error_code?: string;
+  result?: { languages?: string[]; failed?: string[] };
 }
 
 export interface TopicContent {

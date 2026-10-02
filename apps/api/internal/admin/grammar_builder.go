@@ -13,6 +13,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/cefr"
@@ -33,16 +34,32 @@ type Author interface {
 }
 
 type generateInput struct {
-	Language string   `json:"language" binding:"omitempty,oneof=en uz ru"`
-	Levels   []string `json:"levels" binding:"required,min=1,max=6,dive,max=4"`
+	/** Legacy single-language generation: write directly in this language, no translation. */
+	Language string `json:"language" binding:"omitempty,oneof=en uz ru"`
+	/**
+	 * The languages to end up with. English is always written first and is the source the
+	 * others are translated from, so every language teaches the same thing.
+	 */
+	Languages []string `json:"languages" binding:"omitempty,max=3,dive,oneof=en uz ru"`
+	Levels    []string `json:"levels" binding:"required,min=1,max=6,dive,max=4"`
 	/** Regenerating a level that already has an owner-edited draft needs saying so twice. */
 	Overwrite bool `json:"overwrite"`
 }
 
-// generateGrammarContent writes the requested levels in one call and stores them as drafts.
+// generationStarted is what a queued generation answers with: poll GET /jobs/:id.
+type generationStarted struct {
+	JobID     uuid.UUID `json:"job_id"`
+	Languages []string  `json:"languages"`
+	Levels    []string  `json:"levels"`
+}
+
+// generateGrammarContent writes the requested levels and stores them as drafts — in English,
+// and translated into the other requested languages.
 //
 // Nothing published is touched. A level that already has a published version keeps serving
-// it; the generated text becomes the next version, waiting for review.
+// it; the generated text becomes the next version, waiting for review. With a job queue the
+// work runs in the background and the response is the job to poll; without one (tests) it
+// runs here and the response is the written content.
 func (m *Module) generateGrammarContent(c *gin.Context) {
 	p, err := authz.CurrentPrincipal(c)
 	if err != nil {
@@ -58,67 +75,66 @@ func (m *Module) generateGrammarContent(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	language := editorLanguage(in.Language)
 	levels, err := parseLevels(in.Levels)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-
-	slug := c.Param("slug")
-	ctx := c.Request.Context()
-	current, err := m.loadTopicContent(ctx, slug, language)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
+	plan := generationPlan{Slug: c.Param("slug"), Levels: levelCodes(levels), Actor: p.UserID, Overwrite: in.Overwrite}
+	if len(in.Languages) > 0 {
+		plan.Source = "en"
+		plan.Targets = translationTargets(in.Languages)
+	} else {
+		plan.Source = editorLanguage(in.Language)
 	}
 
+	ctx := c.Request.Context()
 	// Refuse to overwrite work somebody did by hand unless they say so again. An owner who
 	// spent an hour on B2 should not lose it to a mis-click on a button labelled Generate.
+	// Checked here, before anything is queued, so the answer comes back while they look.
 	if !in.Overwrite {
-		if edited := handEditedLevels(current, levels); len(edited) > 0 {
-			httpx.Fail(c, apperr.Conflict("This would replace content that was edited by hand").
-				WithDetails(map[string]any{"levels": edited}))
-			return
+		for _, language := range plan.languages() {
+			current, err := m.loadTopicContent(ctx, plan.Slug, language)
+			if err != nil {
+				httpx.Fail(c, err)
+				return
+			}
+			if edited := handEditedLevels(current, levels); len(edited) > 0 {
+				httpx.Fail(c, apperr.Conflict("This would replace content that was edited by hand").
+					WithDetails(map[string]any{"levels": edited, "language": language}))
+				return
+			}
 		}
 	}
 
-	category := ""
-	if current.Topic.CategoryName != nil {
-		category = *current.Topic.CategoryName
-	}
-	generated, meta, err := m.author.AuthorGrammarContent(ctx, ai.GrammarAuthorRequest{
-		Topic:         current.Topic.Name,
-		Slug:          current.Topic.Slug,
-		Category:      category,
-		Description:   current.Topic.Description,
-		Levels:        levels,
-		Language:      language,
-		RelatedTopics: current.Related,
-		ActorID:       &p.UserID,
-	})
-	if err != nil {
-		// The provider's own words are not shown: they can carry prompt text and model
-		// internals. The owner needs to know it failed and that retrying is reasonable.
-		httpx.Fail(c, apperr.Wrap(err, apperr.CodeUnavailable,
-			"AI content generation failed. Please try again."))
+	if m.jobs != nil {
+		job, err := jobs.New(JobGrammarGenerate, &p.UserID, plan)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		// One attempt: a retry would pay for the whole generation again, and a failure here
+		// is one the owner should see and decide about, not one to hide behind a second try.
+		job.MaxAttempts = 1
+		if err := m.jobs.Enqueue(ctx, job); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarGenerated, plan.Slug, map[string]any{
+			"languages": plan.languages(), "levels": plan.Levels, "overwrite": in.Overwrite, "job_id": job.ID,
+		})
+		httpx.Accepted(c, generationStarted{JobID: job.ID, Languages: plan.languages(), Levels: plan.Levels})
 		return
 	}
 
-	var aiRequestID *uuid.UUID
-	if meta != nil && meta.AIRequestID != uuid.Nil {
-		aiRequestID = &meta.AIRequestID
-	}
-	if err := m.storeGenerated(ctx, current.Topic.ID, language, p.UserID, aiRequestID, generated); err != nil {
+	if _, err := m.runGeneration(ctx, plan); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-
-	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarGenerated, slug, map[string]any{
-		"language": language, "levels": in.Levels, "overwrite": in.Overwrite,
+	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarGenerated, plan.Slug, map[string]any{
+		"languages": plan.languages(), "levels": plan.Levels, "overwrite": in.Overwrite,
 	})
-
-	out, err := m.loadTopicContent(ctx, slug, language)
+	out, err := m.loadTopicContent(ctx, plan.Slug, plan.Source)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

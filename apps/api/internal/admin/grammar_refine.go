@@ -37,11 +37,13 @@ type Refiner interface {
 
 type refineInput struct {
 	Language string `json:"language" binding:"omitempty,oneof=en uz ru"`
-	Action   string `json:"action" binding:"required,oneof=improve regenerate expand adapt"`
+	Action   string `json:"action" binding:"required,oneof=improve regenerate expand adapt regenerate_item"`
 	/** One of ai.RefineSections. Empty means the whole level. */
 	Section string `json:"section" binding:"omitempty,max=32"`
 	/** For adapt: the level the current draft was written for. */
 	AdaptFrom string `json:"adapt_from" binding:"omitempty,max=4"`
+	/** For regenerate_item: which item of Section to replace, counting from zero. */
+	Index *int `json:"index" binding:"omitempty,min=0,max=50"`
 }
 
 type translateInput struct {
@@ -62,6 +64,8 @@ type ProposedLevel struct {
 	Practice   []ai.GeneratedPractice `json:"practice"`
 	/** The section that was asked for, echoed back so the client merges only that one. */
 	Section string `json:"section,omitempty"`
+	/** For regenerate_item: the item that was replaced. The client takes only that one. */
+	Index *int `json:"index,omitempty"`
 }
 
 func (m *Module) refineGrammarLevel(c *gin.Context) {
@@ -84,6 +88,16 @@ func (m *Module) refineGrammarLevel(c *gin.Context) {
 			"reason": "unknown_section", "fields": map[string]any{"section": "not a section of a lesson"},
 		}))
 		return
+	}
+	index := 0
+	if ai.RefineAction(in.Action) == ai.RefineRegenerateItem {
+		if !ai.IsItemSection(in.Section) || in.Index == nil {
+			httpx.Fail(c, apperr.Validation(map[string]any{
+				"reason": "item_required", "fields": map[string]any{"index": "name a list section and the item in it"},
+			}))
+			return
+		}
+		index = *in.Index
 	}
 	level, err := cefr.Parse(strings.ToUpper(c.Param("level")))
 	if err != nil {
@@ -117,7 +131,7 @@ func (m *Module) refineGrammarLevel(c *gin.Context) {
 		Topic: topic.Topic.Name, Slug: topic.Topic.Slug, Category: category,
 		Description: topic.Topic.Description, Level: level, Language: language,
 		Action: ai.RefineAction(in.Action), Section: in.Section,
-		Current: current, AdaptFrom: strings.ToUpper(in.AdaptFrom), ActorID: &p.UserID,
+		Current: current, AdaptFrom: strings.ToUpper(in.AdaptFrom), Index: index, ActorID: &p.UserID,
 	})
 	if err != nil {
 		httpx.Fail(c, apperr.Wrap(err, apperr.CodeUnavailable, "AI content generation failed. Please try again."))
@@ -127,7 +141,11 @@ func (m *Module) refineGrammarLevel(c *gin.Context) {
 	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarRefined, slug, map[string]any{
 		"language": language, "level": level.BaseCode(), "action": in.Action, "section": in.Section,
 	})
-	httpx.OK(c, proposedFrom(*proposed, in.Section))
+	out := proposedFrom(*proposed, in.Section)
+	if ai.RefineAction(in.Action) == ai.RefineRegenerateItem {
+		out.Index = &index
+	}
+	httpx.OK(c, out)
 }
 
 func (m *Module) translateGrammarLevel(c *gin.Context) {

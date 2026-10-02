@@ -12,6 +12,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/audit"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/httpx"
 )
 
@@ -102,6 +103,9 @@ type Module struct {
 	// refiner edits drafts that already exist: one section at a time, and translation.
 	// Nil leaves those actions reporting that AI is not configured, like Generate.
 	refiner Refiner
+	// jobs runs long AI generations in the background. Nil runs them inside the request,
+	// which is what the tests do; a real server always has a queue.
+	jobs jobs.Queue
 }
 
 func NewModule(pool *pgxpool.Pool, recorder audit.Recorder) *Module {
@@ -118,6 +122,13 @@ func (m *Module) WithAuthor(author Author) *Module {
 	if refiner, ok := author.(Refiner); ok {
 		m.refiner = refiner
 	}
+	return m
+}
+
+// WithJobs moves topic generation off the request. Writing six levels and translating them
+// takes minutes, and an HTTP request that long is one the server's write timeout cuts off.
+func (m *Module) WithJobs(queue jobs.Queue) *Module {
+	m.jobs = queue
 	return m
 }
 

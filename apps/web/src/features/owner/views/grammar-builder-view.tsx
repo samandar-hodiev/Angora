@@ -1,6 +1,19 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, Check, Eye, Languages, Pencil, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  Eye,
+  Languages,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
@@ -18,8 +31,8 @@ import { cn } from "@/lib/utils";
 import { LiveDataState } from "../components/live-state";
 import { ActionMenu, ConfirmDialog, KeyValue, OwnerPageHeader, SectionCard } from "../components/primitives";
 import {
-  useGenerateGrammarContent,
   useGrammarContent,
+  useGrammarGeneration,
   useGrammarValidation,
   usePublishGrammarContent,
   useRefineGrammarLevel,
@@ -74,13 +87,35 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   );
   const [level, setLevel] = useState<CEFRLevel>("B1");
   const [tab, setTab] = useState("editor");
-  const [generating, setGenerating] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  /** What was just asked for, shown as being written before the server has said "queued". */
+  const [requested, setRequested] = useState<{ levels: CEFRLevel[]; languages: ContentLanguage[] } | null>(null);
 
   const content = useGrammarContent(slug, language);
   const validation = useGrammarValidation(slug, language);
-  const generate = useGenerateGrammarContent(slug);
   const publish = usePublishGrammarContent(slug);
+  const generation = useGrammarGeneration(slug, {
+    onSucceeded: (job) => {
+      const failed = job.result?.failed ?? [];
+      toast({
+        title: "Draft written",
+        description:
+          failed.length > 0
+            ? `Some translations did not come back (${failed.join(", ")}). Use "Translate from English" on those levels.`
+            : "Every language is a draft now. Read it before publishing.",
+        variant: failed.length > 0 ? "default" : "success",
+      });
+    },
+    onFailed: () =>
+      toast({ title: "AI content generation failed", description: "Nothing was changed. Please try again.", variant: "error" }),
+  });
+  /** Levels and languages the model is writing right now; their fields show placeholders. */
+  const writing = generation.active
+    ? { levels: generation.active.levels as CEFRLevel[], languages: generation.active.languages }
+    : generation.start.isPending
+      ? requested
+      : null;
 
   if (content.isPending) {
     return (
@@ -109,22 +144,24 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const written = data.levels.filter((entry) => entry.status !== "not_created" && entry.status !== "not_applicable");
   const live = data.levels.filter((entry) => entry.status === "published");
 
-  function runGenerate(levels: CEFRLevel[], overwrite: boolean) {
-    generate.mutate(
-      { language, levels, overwrite },
+  function runGenerate(levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[]) {
+    // The dialog closes at once: the editor itself shows what is being written, field by
+    // field, rather than a spinner in a modal that blocks the page for minutes.
+    setDialogOpen(false);
+    setRequested({ levels, languages });
+    if (!levels.includes(level)) setLevel(levels[0]!);
+    generation.start.mutate(
+      { languages, levels, overwrite },
       {
-        onSuccess: () => {
-          toast({ title: "Draft written", description: "Read it before publishing.", variant: "success" });
-          setGenerating(false);
-        },
         onError: (error) => {
           // A refusal to overwrite hand-written work is not a failure; it is the guard
           // asking a second time.
           if (isApiError(error) && error.status === 409) {
             const levelsInDetail = (error.details?.levels as string[] | undefined) ?? [];
+            const inLanguage = error.details?.language as ContentLanguage | undefined;
             toast({
               title: "This would replace content you edited",
-              description: `${levelsInDetail.join(", ")} was written by hand. Use "Replace anyway" to overwrite it.`,
+              description: `${levelsInDetail.join(", ")}${inLanguage ? ` (${contentLanguageLabels[inLanguage]})` : ""} was written by hand. Tick "replace" in Generate to overwrite it.`,
               variant: "error",
             });
             return;
@@ -156,9 +193,9 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
               <ArrowLeft aria-hidden />
               Grammar Map
             </Button>
-            <Button variant="outline" size="sm" loading={generate.isPending} onClick={() => setGenerating(true)}>
+            <Button variant="outline" size="sm" loading={Boolean(writing)} onClick={() => setDialogOpen(true)}>
               <Sparkles aria-hidden />
-              Generate with AI
+              {writing ? "Writing…" : "Generate with AI"}
             </Button>
             <Button size="sm" disabled={written.length === 0} onClick={() => setPublishOpen(true)}>
               <Send aria-hidden />
@@ -192,10 +229,14 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
               {data.levels.map((entry) => (
                 <li key={entry.level} className="flex items-center justify-between gap-2">
                   <span className="tabular-nums">{entry.level}</span>
-                  <span className={cn("rounded px-1.5 py-0.5", levelTone[entry.status])}>
-                    {entry.status.replace(/_/g, " ")}
-                    {entry.status !== "not_created" && entry.version > 0 ? ` · v${entry.version}` : ""}
-                  </span>
+                  {isWriting(writing, entry.level, language) ? (
+                    <WritingBadge />
+                  ) : (
+                    <span className={cn("rounded px-1.5 py-0.5", levelTone[entry.status])}>
+                      {entry.status.replace(/_/g, " ")}
+                      {entry.status !== "not_created" && entry.version > 0 ? ` · v${entry.version}` : ""}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -235,9 +276,13 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
               )}
             >
               {code}
-              <span className={cn("rounded px-1 text-[0.625rem]", levelTone[entry?.status ?? "not_created"])}>
-                {(entry?.status ?? "not_created").replace(/_/g, " ")}
-              </span>
+              {isWriting(writing, code, language) ? (
+                <WritingBadge compact />
+              ) : (
+                <span className={cn("rounded px-1 text-[0.625rem]", levelTone[entry?.status ?? "not_created"])}>
+                  {(entry?.status ?? "not_created").replace(/_/g, " ")}
+                </span>
+              )}
             </button>
           );
         })}
@@ -256,20 +301,27 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         </TabsList>
 
         <TabsContent value="editor">
-          <LevelEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
+          {isWriting(writing, current.level, language) ? (
+            <WritingPlaceholder level={current.level} languages={writing!.languages} />
+          ) : (
+            <LevelEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
+          )}
         </TabsContent>
 
         <TabsContent value="preview">
-          <LearnerPreview topic={data.topic.name} level={current.level} language={language} content={current} />
+          {isWriting(writing, current.level, language) ? (
+            <WritingPlaceholder level={current.level} languages={writing!.languages} />
+          ) : (
+            <LearnerPreview topic={data.topic.name} level={current.level} language={language} content={current} />
+          )}
         </TabsContent>
       </Tabs>
 
       <GenerateDialog
-        open={generating}
-        onOpenChange={setGenerating}
+        key={dialogOpen ? "open" : "closed"}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         levels={data.levels}
-        language={language}
-        loading={generate.isPending}
         onGenerate={runGenerate}
       />
 
@@ -350,6 +402,9 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
   const [questions, setQuestions] = useState<PracticeQuestion[]>(content.questions ?? []);
   /** Which section is waiting on the model, so only that card shows it is busy. */
   const [pending, setPending] = useState<string | null>(null);
+  /** The one item being rewritten, as "section:index", so only that row shows it. */
+  const [pendingItem, setPendingItem] = useState<string | null>(null);
+  const busy = pending ?? pendingItem;
 
   const notApplicable = content.status === "not_applicable";
 
@@ -401,6 +456,66 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         setQuestions(proposed.practice ?? []);
     }
   }
+
+  /**
+   * Puts the model's replacement for one item into that one slot.
+   *
+   * The model answers with the whole list; only the item that was asked about is taken, so
+   * the rest of the list — including anything edited here and not saved yet — stays as it is.
+   */
+  function applyItem(section: string, index: number, proposed: ProposedLevel) {
+    const next = proposed.body ?? {};
+    const pick = <T,>(list: T[] | undefined): T | undefined => list?.[index] ?? list?.[list.length - 1];
+    const replace = <T,>(list: T[], item: T | undefined) =>
+      item === undefined ? list : list.map((old, i) => (i === index ? item : old));
+    switch (section) {
+      case "usage":
+        setUsage((list) => replace(list, pick(next.usage)));
+        break;
+      case "signal_words":
+        setSignalWords((list) => replace(list, pick(next.signal_words)));
+        break;
+      case "formulas":
+        setFormulas((list) => replace(list, pick(next.formulas)));
+        break;
+      case "examples":
+        setExamples((list) => replace(list, pick(next.examples)));
+        break;
+      case "common_mistakes":
+        setMistakes((list) => replace(list, pick(next.common_mistakes)));
+        break;
+      case "practice":
+        setQuestions((list) => replace(list, pick(proposed.practice)));
+        break;
+    }
+  }
+
+  function runItem(section: string, index: number) {
+    setPendingItem(`${section}:${index}`);
+    refine.mutate(
+      { level: content.level, input: { language, action: "regenerate_item", section, index } },
+      {
+        onSuccess: (proposed) => {
+          applyItem(section, index, proposed);
+          toast({ title: "Replaced — review it and save", description: "Nothing is saved until you press Save draft." });
+        },
+        onError: (error) =>
+          toast({
+            title: "The model could not do that",
+            description: isApiError(error) ? error.message : undefined,
+            variant: "error",
+          }),
+        onSettled: () => setPendingItem(null),
+      },
+    );
+  }
+
+  /** The props every list needs to offer "regenerate this one". */
+  const itemAI = (section: string) => ({
+    busy: busy !== null,
+    regenerating: pendingItem?.startsWith(`${section}:`) ? Number(pendingItem.split(":")[1]) : null,
+    onRegenerate: (index: number) => runItem(section, index),
+  });
 
   function runRefine(section: string, action: RefineAction, adaptFrom?: string) {
     setPending(section || "level");
@@ -516,13 +631,13 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
           <span className="flex flex-wrap items-center gap-1">
             <SectionAI
               section=""
-              busy={pending}
+              busy={busy}
               onRun={(_, action) => runRefine("", action)}
               actions={[{ action: "improve", label: "Improve with AI" }]}
             />
-            <AdaptMenu level={content.level} busy={pending} onAdapt={(from) => runRefine("", "adapt", from)} />
+            <AdaptMenu level={content.level} busy={busy} onAdapt={(from) => runRefine("", "adapt", from)} />
             {language !== "en" && (
-              <Button variant="ghost" size="sm" disabled={pending !== null} loading={pending === "translate"} onClick={runTranslate}>
+              <Button variant="ghost" size="sm" disabled={busy !== null} loading={pending === "translate"} onClick={runTranslate}>
                 <Languages aria-hidden /> Translate from English
               </Button>
             )}
@@ -549,7 +664,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
               <Label htmlFor="level-intro">What is it?</Label>
               <SectionAI
                 section="intro"
-                busy={pending}
+                busy={busy}
                 onRun={runRefine}
                 actions={[{ action: "regenerate", label: "Rewrite" }]}
               />
@@ -562,7 +677,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
               <Label htmlFor="level-explanation">When do we use it?</Label>
               <SectionAI
                 section="explanation"
-                busy={pending}
+                busy={busy}
                 onRun={runRefine}
                 actions={[{ action: "regenerate", label: "Rewrite" }]}
               />
@@ -574,11 +689,12 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
             label="Usage rules"
             value={usage}
             onChange={setUsage}
+            {...itemAI("usage")}
             placeholder="Talking about experience"
             action={
               <SectionAI
                 section="usage"
-                busy={pending}
+                busy={busy}
                 onRun={runRefine}
                 actions={[{ action: "expand", label: "Add more" }]}
               />
@@ -588,11 +704,12 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
             label="Signal words"
             value={signalWords}
             onChange={setSignalWords}
+            {...itemAI("signal_words")}
             placeholder="already, yet, since"
             action={
               <SectionAI
                 section="signal_words"
-                busy={pending}
+                busy={busy}
                 onRun={runRefine}
                 actions={[{ action: "expand", label: "Add more" }]}
               />
@@ -607,7 +724,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         action={
           <SectionAI
             section="formulas"
-            busy={pending}
+            busy={busy}
             onRun={runRefine}
             actions={[{ action: "regenerate", label: "Regenerate" }, { action: "expand", label: "Add more" }]}
           />
@@ -616,8 +733,15 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         <RowList
           rows={formulas}
           onChange={setFormulas}
+          {...itemAI("formulas")}
           blank={{ label: "", pattern: "", examples: [] }}
           addLabel="Add a formula"
+          display={(row) => (
+            <div className="grid gap-0.5">
+              <span className="text-caption text-fg-muted">{row.label}</span>
+              <span className="font-mono text-body-sm">{row.pattern}</span>
+            </div>
+          )}
           render={(row, update) => (
             <>
               <Input
@@ -644,7 +768,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         action={
           <SectionAI
             section="examples"
-            busy={pending}
+            busy={busy}
             onRun={runRefine}
             actions={[{ action: "regenerate", label: "Regenerate examples" }, { action: "expand", label: "Add more" }]}
           />
@@ -653,8 +777,15 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         <RowList
           rows={examples}
           onChange={setExamples}
+          {...itemAI("examples")}
           blank={{ text: "", note: "" }}
           addLabel="Add an example"
+          display={(row) => (
+            <div className="grid gap-0.5">
+              <span className="text-body-sm">{row.text}</span>
+              {row.note && <span className="text-caption text-fg-muted">{row.note}</span>}
+            </div>
+          )}
           render={(row, update) => (
             <>
               <Input
@@ -681,7 +812,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         action={
           <SectionAI
             section="common_mistakes"
-            busy={pending}
+            busy={busy}
             onRun={runRefine}
             actions={[{ action: "regenerate", label: "Regenerate" }, { action: "expand", label: "Add more" }]}
           />
@@ -690,8 +821,18 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         <RowList
           rows={mistakes}
           onChange={setMistakes}
+          {...itemAI("common_mistakes")}
           blank={{ wrong: "", right: "", why: "", rule: "" }}
           addLabel="Add a mistake"
+          display={(row) => (
+            <div className="grid gap-0.5 text-body-sm">
+              <span>
+                <span className="text-error line-through">{row.wrong}</span>{" "}
+                <span className="text-success">{row.right}</span>
+              </span>
+              {row.why && <span className="text-caption text-fg-muted">{row.why}</span>}
+            </div>
+          )}
           render={(row, update) => (
             <>
               <Input
@@ -723,7 +864,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         action={
           <SectionAI
             section="practice"
-            busy={pending}
+            busy={busy}
             onRun={runRefine}
             actions={[
               { action: "expand", label: "Generate more" },
@@ -732,7 +873,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
           />
         }
       >
-        <PracticeEditor questions={questions} onChange={setQuestions} />
+        <PracticeEditor questions={questions} onChange={setQuestions} {...itemAI("practice")} />
       </SectionCard>
     </div>
   );
@@ -749,10 +890,14 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
 function PracticeEditor({
   questions,
   onChange,
+  busy,
+  regenerating,
+  onRegenerate,
 }: {
   questions: PracticeQuestion[];
   onChange: (next: PracticeQuestion[]) => void;
-}) {
+} & ItemAIProps) {
+  const editing = useEditingRows();
   const update = (index: number, next: PracticeQuestion) =>
     onChange(questions.map((q, i) => (i === index ? next : q)));
 
@@ -769,6 +914,60 @@ function PracticeEditor({
         // lost its options should be fixable here, not a blank page.
         const question: PracticeQuestion = { ...raw, options: raw.options ?? [] };
         const answerOutOfRange = question.answer_index < 0 || question.answer_index >= question.options.length;
+        const open = editing.isOpen(index);
+        const actions = (
+          <ItemActions
+            label={`question ${index + 1}`}
+            editing={open}
+            onEdit={() => editing.toggle(index)}
+            regenerating={regenerating === index}
+            busy={busy}
+            onRegenerate={() => onRegenerate(index)}
+            onRemove={() => {
+              editing.removed(index);
+              onChange(questions.filter((_, i) => i !== index));
+            }}
+          />
+        );
+
+        if (regenerating === index || !open) {
+          return (
+            <div key={index} className="flex items-start gap-2 rounded-lg border bg-surface py-2 pr-1 pl-3">
+              <span className="mt-0.5 w-5 shrink-0 text-caption text-fg-muted tabular-nums">{index + 1}</span>
+              <div className="min-w-0 flex-1">
+                {regenerating === index ? (
+                  <RowShimmer />
+                ) : (
+                  <div className="grid gap-1.5">
+                    <p className="text-body-sm">{question.prompt || emptyRow}</p>
+                    <ul className="flex flex-wrap gap-1.5">
+                      {question.options.map((option, optionIndex) => (
+                        <li
+                          key={optionIndex}
+                          className={cn(
+                            "rounded-md border px-2 py-0.5 text-caption",
+                            optionIndex === question.answer_index
+                              ? "border-success/50 bg-success/10 text-success"
+                              : "text-fg-secondary",
+                          )}
+                        >
+                          {optionIndex === question.answer_index && <Check className="mr-1 inline size-3" aria-hidden />}
+                          {option || "—"}
+                        </li>
+                      ))}
+                    </ul>
+                    {answerOutOfRange && (
+                      <p className="text-caption text-error">No correct option is selected — press edit to pick one.</p>
+                    )}
+                    {question.explanation && <p className="text-caption text-fg-muted">{question.explanation}</p>}
+                  </div>
+                )}
+              </div>
+              {actions}
+            </div>
+          );
+        }
+
         return (
           <div key={index} className="grid gap-3 rounded-lg border bg-surface p-3">
             <div className="flex items-start gap-2">
@@ -780,14 +979,7 @@ function PracticeEditor({
                 placeholder="She ___ in London since 2019."
                 onChange={(event) => update(index, { ...question, prompt: event.target.value })}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Remove question ${index + 1}`}
-                onClick={() => onChange(questions.filter((_, i) => i !== index))}
-              >
-                <Trash2 aria-hidden />
-              </Button>
+              {actions}
             </div>
 
             <fieldset className="grid gap-1.5">
@@ -859,9 +1051,10 @@ function PracticeEditor({
       <Button
         variant="outline"
         className="justify-self-start"
-        onClick={() =>
-          onChange([...questions, { prompt: "", options: ["", ""], answer_index: 0, explanation: "", target_rule: "" }])
-        }
+        onClick={() => {
+          editing.add(questions.length);
+          onChange([...questions, { prompt: "", options: ["", ""], answer_index: 0, explanation: "", target_rule: "" }]);
+        }}
       >
         <Plus aria-hidden /> Add a question
       </Button>
@@ -938,6 +1131,97 @@ function SectionAI({
   );
 }
 
+/** What every list needs to let one of its items be regenerated on its own. */
+interface ItemAIProps {
+  /** True while any AI action on this level is running. */
+  busy: boolean;
+  /** The index being regenerated right now, if it is in this list. */
+  regenerating: number | null;
+  onRegenerate: (index: number) => void;
+}
+
+/**
+ * Which rows of a list are open for editing.
+ *
+ * Rows read as text until somebody presses Edit, so a long list scans like the lesson it is
+ * rather than a wall of input boxes. A row added by hand opens straight away. Removing a row
+ * shifts the open ones with it, so the box that stays open is the one you were typing in.
+ */
+function useEditingRows() {
+  const [open, setOpen] = useState<Set<number>>(() => new Set());
+  return {
+    isOpen: (index: number) => open.has(index),
+    toggle: (index: number) =>
+      setOpen((current) => {
+        const next = new Set(current);
+        if (next.has(index)) next.delete(index);
+        else next.add(index);
+        return next;
+      }),
+    add: (index: number) => setOpen((current) => new Set(current).add(index)),
+    removed: (index: number) =>
+      setOpen((current) => new Set([...current].filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)))),
+  };
+}
+
+/** Edit, regenerate and remove — the same three controls at the end of every row. */
+function ItemActions({
+  label,
+  editing,
+  onEdit,
+  regenerating,
+  busy,
+  onRegenerate,
+  onRemove,
+}: {
+  label: string;
+  editing: boolean;
+  onEdit: () => void;
+  regenerating: boolean;
+  busy: boolean;
+  onRegenerate: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="flex shrink-0 items-center">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={editing ? `Done editing ${label}` : `Edit ${label}`}
+        aria-pressed={editing}
+        disabled={regenerating}
+        onClick={onEdit}
+      >
+        {editing ? <Check aria-hidden /> : <Pencil aria-hidden />}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={`Regenerate ${label} with AI`}
+        disabled={busy}
+        onClick={onRegenerate}
+      >
+        <RefreshCw className={cn(regenerating && "animate-spin")} aria-hidden />
+      </Button>
+      <Button variant="ghost" size="icon" aria-label={`Remove ${label}`} disabled={regenerating} onClick={onRemove}>
+        <Trash2 aria-hidden />
+      </Button>
+    </span>
+  );
+}
+
+/** A row's text while the model rewrites it. */
+function RowShimmer() {
+  return (
+    <div className="grid gap-1.5 py-0.5" aria-busy aria-label="Being rewritten by AI">
+      <Skeleton className="h-4 w-11/12 rounded" />
+      <Skeleton className="h-3 w-2/3 rounded" />
+    </div>
+  );
+}
+
+const emptyRow = <span className="text-caption text-fg-muted italic">Empty — press edit to write it</span>;
+
 /** A list of plain strings — usage rules, signal words. */
 function StringList({
   label,
@@ -945,13 +1229,17 @@ function StringList({
   onChange,
   placeholder,
   action,
+  busy,
+  regenerating,
+  onRegenerate,
 }: {
   label: string;
   value: string[];
   onChange: (next: string[]) => void;
   placeholder: string;
   action?: ReactNode;
-}) {
+} & ItemAIProps) {
+  const rows = useEditingRows();
   return (
     <div className="grid gap-1.5">
       <span className="flex items-center justify-between gap-2">
@@ -960,25 +1248,48 @@ function StringList({
       </span>
       <div className="grid gap-1.5">
         {value.map((entry, index) => (
-          <div key={index} className="flex gap-1.5">
-            <Input
-              aria-label={`${label} ${index + 1}`}
-              value={entry}
-              placeholder={placeholder}
-              onChange={(e) => onChange(value.map((item, i) => (i === index ? e.target.value : item)))}
+          <div key={index} className="flex items-center gap-1.5 rounded-lg border bg-surface py-1 pr-1 pl-3">
+            <div className="min-w-0 flex-1">
+              {regenerating === index ? (
+                <RowShimmer />
+              ) : rows.isOpen(index) ? (
+                <Input
+                  aria-label={`${label} ${index + 1}`}
+                  value={entry}
+                  placeholder={placeholder}
+                  autoFocus
+                  onChange={(e) => onChange(value.map((item, i) => (i === index ? e.target.value : item)))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") rows.toggle(index);
+                  }}
+                />
+              ) : (
+                <p className="py-1.5 text-body-sm">{entry || emptyRow}</p>
+              )}
+            </div>
+            <ItemActions
+              label={`${label} ${index + 1}`}
+              editing={rows.isOpen(index)}
+              onEdit={() => rows.toggle(index)}
+              regenerating={regenerating === index}
+              busy={busy}
+              onRegenerate={() => onRegenerate(index)}
+              onRemove={() => {
+                rows.removed(index);
+                onChange(value.filter((_, i) => i !== index));
+              }}
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Remove ${label} ${index + 1}`}
-              onClick={() => onChange(value.filter((_, i) => i !== index))}
-            >
-              <X aria-hidden />
-            </Button>
           </div>
         ))}
         <div>
-          <Button variant="outline" size="sm" onClick={() => onChange([...value, ""])}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              rows.add(value.length);
+              onChange([...value, ""]);
+            }}
+          >
             <Plus aria-hidden />
             Add
           </Button>
@@ -988,40 +1299,66 @@ function StringList({
   );
 }
 
-/** A list of structured rows, each edited through the fields the caller renders. */
+/** A list of structured rows: read as text, edited through the fields the caller renders. */
 function RowList<T>({
   rows,
   onChange,
   blank,
   addLabel,
   render,
+  display,
+  busy,
+  regenerating,
+  onRegenerate,
 }: {
   rows: T[];
   onChange: (next: T[]) => void;
   blank: T;
   addLabel: string;
   render: (row: T, update: (next: T) => void) => React.ReactNode;
-}) {
+  display: (row: T) => React.ReactNode;
+} & ItemAIProps) {
+  const editing = useEditingRows();
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       {rows.map((row, index) => (
-        <div key={index} className="flex items-start gap-1.5">
-          <div className="grid flex-1 gap-1.5 sm:grid-cols-3">
-            {render(row, (next) => onChange(rows.map((item, i) => (i === index ? next : item))))}
+        <div key={index} className="flex items-start gap-1.5 rounded-lg border bg-surface py-1.5 pr-1 pl-3">
+          <span className="mt-1.5 w-5 shrink-0 text-caption text-fg-muted tabular-nums">{index + 1}</span>
+          <div className="min-w-0 flex-1 py-1">
+            {regenerating === index ? (
+              <RowShimmer />
+            ) : editing.isOpen(index) ? (
+              <div className="grid gap-1.5 sm:grid-cols-3">
+                {render(row, (next) => onChange(rows.map((item, i) => (i === index ? next : item))))}
+              </div>
+            ) : (
+              display(row)
+            )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Remove row ${index + 1}`}
-            onClick={() => onChange(rows.filter((_, i) => i !== index))}
-          >
-            <Trash2 aria-hidden />
-          </Button>
+          <ItemActions
+            label={`row ${index + 1}`}
+            editing={editing.isOpen(index)}
+            onEdit={() => editing.toggle(index)}
+            regenerating={regenerating === index}
+            busy={busy}
+            onRegenerate={() => onRegenerate(index)}
+            onRemove={() => {
+              editing.removed(index);
+              onChange(rows.filter((_, i) => i !== index));
+            }}
+          />
         </div>
       ))}
       {rows.length === 0 && <p className="text-caption text-fg-muted">Nothing yet.</p>}
       <div>
-        <Button variant="outline" size="sm" onClick={() => onChange([...rows, blank])}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            editing.add(rows.length);
+            onChange([...rows, blank]);
+          }}
+        >
           <Plus aria-hidden />
           {addLabel}
         </Button>
@@ -1196,29 +1533,27 @@ function LearnerPreview({
 }
 
 /**
- * What to write, and whether to overwrite.
+ * What to write, in which languages, and whether to overwrite.
  *
  * Levels that already carry hand-edited text are unticked to begin with: the common case is
  * filling the gaps, not replacing an afternoon's work. Overwriting is possible, once it has
- * been asked for explicitly.
+ * been asked for explicitly. English is always written — it is what the other languages are
+ * translated from, so all three teach the same thing.
  */
 function GenerateDialog({
   open,
   onOpenChange,
   levels,
-  language,
-  loading,
   onGenerate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   levels: LevelContent[];
-  language: ContentLanguage;
-  loading: boolean;
-  onGenerate: (levels: CEFRLevel[], overwrite: boolean) => void;
+  onGenerate: (levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[]) => void;
 }) {
   const untouched = levels.filter((level) => level.status === "not_created").map((level) => level.level);
   const [selected, setSelected] = useState<CEFRLevel[]>(untouched.length > 0 ? untouched : cefrLevels);
+  const [languages, setLanguages] = useState<ContentLanguage[]>([...contentLanguages]);
   const [overwrite, setOverwrite] = useState(false);
 
   const replacing = levels.filter(
@@ -1230,38 +1565,53 @@ function GenerateDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Generate with AI"
-      description={`One request writes every level you pick, in ${contentLanguageLabels[language]}. Everything lands as a draft for you to read.`}
+      description="English is written first and translated into the other languages you pick, so every language teaches the same thing. Everything lands as a draft for you to read."
       confirmLabel={replacing.length > 0 && overwrite ? "Replace" : "Generate"}
-      loading={loading}
       disabled={selected.length === 0 || (replacing.length > 0 && !overwrite)}
-      onConfirm={() => onGenerate(selected, overwrite)}
+      onConfirm={() => onGenerate(selected, overwrite, languages)}
     >
-      <div className="grid gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          {cefrLevels.map((code) => {
-            const picked = selected.includes(code);
-            return (
-              <button
+      <div className="grid gap-4">
+        <div className="grid gap-1.5">
+          <p className="text-label text-fg-muted">Levels</p>
+          <div className="flex flex-wrap gap-1.5">
+            {cefrLevels.map((code) => (
+              <ToggleChip
                 key={code}
-                type="button"
-                onClick={() =>
-                  setSelected(picked ? selected.filter((item) => item !== code) : [...selected, code])
+                pressed={selected.includes(code)}
+                onToggle={() =>
+                  setSelected(selected.includes(code) ? selected.filter((item) => item !== code) : [...selected, code])
                 }
-                aria-pressed={picked}
-                className={cn(
-                  "rounded-lg border px-3 py-1.5 text-body-sm transition-colors duration-micro",
-                  picked ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "hover:bg-surface-hover",
-                )}
               >
                 {code}
-              </button>
-            );
-          })}
+              </ToggleChip>
+            ))}
+          </div>
+          <p className="text-caption text-fg-muted">
+            The model decides which of these the topic is actually worth teaching at, and says so for the rest instead of
+            inventing a version that is wrong.
+          </p>
         </div>
-        <p className="text-caption text-fg-muted">
-          The model decides which of these the topic is actually worth teaching at, and says so for the rest instead of
-          inventing a version that is wrong.
-        </p>
+
+        <div className="grid gap-1.5">
+          <p className="text-label text-fg-muted">Languages</p>
+          <div className="flex flex-wrap gap-1.5">
+            {contentLanguages.map((code) => (
+              <ToggleChip
+                key={code}
+                pressed={languages.includes(code)}
+                // English is the source the others are translated from.
+                disabled={code === "en"}
+                onToggle={() =>
+                  setLanguages(
+                    languages.includes(code) ? languages.filter((item) => item !== code) : [...languages, code],
+                  )
+                }
+              >
+                {contentLanguageLabels[code]}
+              </ToggleChip>
+            ))}
+          </div>
+        </div>
 
         {replacing.length > 0 && (
           <label className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning-subtle/40 p-3">
@@ -1281,5 +1631,109 @@ function GenerateDialog({
         )}
       </div>
     </ConfirmDialog>
+  );
+}
+
+function ToggleChip({
+  pressed,
+  disabled,
+  onToggle,
+  children,
+}: {
+  pressed: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={pressed}
+      className={cn(
+        "rounded-lg border px-3 py-1.5 text-body-sm transition-colors duration-micro disabled:cursor-default",
+        pressed ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "hover:bg-surface-hover",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+type Writing = { levels: CEFRLevel[]; languages: ContentLanguage[] } | null;
+
+function isWriting(writing: Writing, level: string, language: ContentLanguage) {
+  return Boolean(writing && writing.levels.includes(level as CEFRLevel) && writing.languages.includes(language));
+}
+
+function WritingBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded bg-primary-subtle text-primary-subtle-foreground",
+        compact ? "px-1 text-[0.625rem]" : "px-1.5 py-0.5",
+      )}
+    >
+      <Sparkles className="size-3 animate-pulse" aria-hidden />
+      writing
+    </span>
+  );
+}
+
+/**
+ * The editor while the model is writing this level.
+ *
+ * The same sections the editor will have, each field a placeholder that shimmers, so the
+ * owner sees the shape of what is coming and where it will land — not a modal with a spinner.
+ */
+function WritingPlaceholder({ level, languages }: { level: string; languages: ContentLanguage[] }) {
+  const field = (className: string) => <Skeleton className={cn("rounded-lg", className)} />;
+  return (
+    <div className="grid gap-4" aria-busy aria-live="polite">
+      <p className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary-subtle/40 px-4 py-2.5 text-caption">
+        <Sparkles className="size-4 animate-pulse text-primary" aria-hidden />
+        Writing {level} in {languages.map((code) => contentLanguageLabels[code]).join(", ")}… This takes a minute or two;
+        you can leave the page and come back.
+      </p>
+
+      <SectionCard title={`${level} content`} description="Being written by AI">
+        <div className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label>Title</Label>
+              {field("h-9")}
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Short description</Label>
+              {field("h-9")}
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>What is it?</Label>
+            {field("h-20")}
+          </div>
+          <div className="grid gap-1.5">
+            <Label>When do we use it?</Label>
+            {field("h-28")}
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Usage rules</Label>
+            {field("h-9")}
+            {field("h-9 w-4/5")}
+          </div>
+        </div>
+      </SectionCard>
+
+      {(["Formulas", "Examples", "Common mistakes", "Practice"] as const).map((title) => (
+        <SectionCard key={title} title={title} description="Being written by AI">
+          <div className="grid gap-2">
+            {field("h-11")}
+            {field("h-11 w-11/12")}
+            {field("h-11 w-4/5")}
+          </div>
+        </SectionCard>
+      ))}
+    </div>
   );
 }

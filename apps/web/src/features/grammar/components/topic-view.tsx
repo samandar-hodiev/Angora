@@ -71,14 +71,21 @@ export function GrammarTopicView({ slug }: { slug: string }) {
 
         {t.content ? (
           <>
-            <LanguageNotice current={t.content_language} onChange={setLanguage} />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {t.content_level && (
+                <span className="text-caption text-fg-muted">
+                  Written for <Badge variant="outline">{t.content_level}</Badge>
+                </span>
+              )}
+              <LanguageNotice current={t.content_language} onChange={setLanguage} />
+            </div>
             <CanonicalContent topic={t} />
             {/* A second pass over the same rule, written for this learner's level. */}
             <section aria-labelledby="ai-title" className="grid gap-3">
               <h2 id="ai-title" className="text-h3">
                 Explained for your level
               </h2>
-              <ExplainPanel slug={t.slug} level={t.level} />
+              <ExplainPanel slug={t.slug} level={null} />
             </section>
           </>
         ) : (
@@ -87,7 +94,7 @@ export function GrammarTopicView({ slug }: { slug: string }) {
             <h2 id="ai-title" className="text-h3">
               What is {t.name}?
             </h2>
-            <ExplainPanel slug={t.slug} level={t.level} isPrimary />
+            <ExplainPanel slug={t.slug} level={null} isPrimary />
           </section>
         )}
 

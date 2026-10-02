@@ -57,6 +57,9 @@ import type {
   QuestionStats,
   QuestionStatus,
   ProposedLevel,
+  GenerateInput,
+  GenerationStarted,
+  JobState,
   RefineInput,
 } from "../types";
 
@@ -403,8 +406,9 @@ export const grammarMapApi = {
     apiClient.get<TopicContent>(`/admin/grammar/topics/${slug}/content`, { query: { lang } }),
   validate: (slug: string, lang: string) =>
     apiClient.get<ValidationResult>(`/admin/grammar/topics/${slug}/validate`, { query: { lang } }),
-  generate: (slug: string, input: { language: string; levels: string[]; overwrite?: boolean }) =>
-    apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/generate`, input),
+  generate: (slug: string, input: GenerateInput) =>
+    apiClient.post<GenerationStarted>(`/admin/grammar/topics/${slug}/generate`, input),
+  job: (id: string) => apiClient.get<JobState>(`/jobs/${id}`),
   saveLevel: (slug: string, level: string, input: Record<string, unknown>) =>
     apiClient.put<TopicContent>(`/admin/grammar/topics/${slug}/levels/${level}`, input),
   publish: (slug: string, input: { language: string; levels?: string[] }) =>

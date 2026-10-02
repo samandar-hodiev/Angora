@@ -127,6 +127,8 @@ export interface GrammarTopic extends GrammarTopicSummary {
    * than pretending.
    */
   content_language?: "en" | "uz" | "ru";
+  /** The CEFR level the canonical explanation was written for — the learner's, or the nearest one to it. */
+  content_level?: string;
   prerequisites: GrammarRelatedTopic[];
   related: GrammarRelatedTopic[];
   compare: GrammarRelatedTopic[];

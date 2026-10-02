@@ -85,7 +85,7 @@ func (m *Module) startPractice(c *gin.Context) {
 		return
 	}
 
-	questions, err := m.selectQuestions(ctx, p.UserID, topicID, req.Rule, req.Limit)
+	questions, err := m.selectQuestions(ctx, p.UserID, topicID, req.Rule, req.Limit, m.readingLevel(ctx, p.UserID))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -129,7 +129,11 @@ func (m *Module) startPractice(c *gin.Context) {
 //  4. everything else
 //
 // Ties break randomly so two runs on the same topic are not the same run.
-func (m *Module) selectQuestions(ctx context.Context, userID, topicID uuid.UUID, rule string, limit int) ([]Question, error) {
+//
+// Only questions written for the learner's level, or one either side of it, are used — the
+// same band the topic page reads from. A topic with no practice in that band falls back to
+// all of it, nearest level first, rather than offering none.
+func (m *Module) selectQuestions(ctx context.Context, userID, topicID uuid.UUID, rule string, limit, levelRank int) ([]Question, error) {
 	rows, err := m.pool.Query(ctx, `
 		SELECT q.id, q.type, l.code, q.difficulty::float8, q.prompt, q.payload, q.explanation,
 		       q.target_rule, q.tags, q.answer
@@ -144,11 +148,16 @@ func (m *Module) selectQuestions(ctx context.Context, userID, topicID uuid.UUID,
 		) hist ON true
 		WHERE q.grammar_topic_id = $2 AND q.status = 'published'
 		  AND ($3 = '' OR q.target_rule = $3)
-		ORDER BY COALESCE(e.severity_score, 0) DESC,
+		  AND (l.rank BETWEEN $5 - 1 AND $5 + 1 OR NOT EXISTS (
+		        SELECT 1 FROM grammar_questions qb JOIN levels lb ON lb.id = qb.level_id
+		        WHERE qb.grammar_topic_id = $2 AND qb.status = 'published'
+		          AND ($3 = '' OR qb.target_rule = $3) AND lb.rank BETWEEN $5 - 1 AND $5 + 1))
+		ORDER BY abs(COALESCE(l.rank, $5) - $5) > 1,
+		         COALESCE(e.severity_score, 0) DESC,
 		         (hist.seen IS NULL OR hist.seen = 0) DESC,
 		         COALESCE(hist.all_correct, false) ASC,
 		         random()
-		LIMIT $4`, userID, topicID, rule, limit)
+		LIMIT $4`, userID, topicID, rule, limit, levelRank)
 	if err != nil {
 		return nil, err
 	}

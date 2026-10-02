@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/admin"
 	"github.com/samandar-hodiev/engora/apps/api/internal/assessment"
 	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/notifications"
@@ -12,6 +13,8 @@ import (
 // process and the API's embedded development worker use it, so they run the same jobs.
 func RegisterJobHandlers(w *jobs.Worker, c *Container) {
 	w.Handle(assessment.JobEvaluateSection, c.Assessment.HandleEvaluationJob)
+	// Grammar generation writes six levels and translates them: minutes, not a request.
+	w.Handle(admin.JobGrammarGenerate, admin.NewModule(c.DB, c.Audit).WithAuthor(c.GrammarAuthor).HandleGenerateJob)
 }
 
 // StartScheduler runs the sweeps that are about time passing rather than about anything a

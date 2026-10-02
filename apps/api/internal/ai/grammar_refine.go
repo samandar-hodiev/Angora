@@ -40,7 +40,22 @@ const (
 	RefineExpand RefineAction = "expand"
 	// RefineAdapt rewrites the whole level for a different CEFR level.
 	RefineAdapt RefineAction = "adapt"
+	// RefineRegenerateItem replaces one item of a list section — one example, one mistake,
+	// one question — and nothing else.
+	RefineRegenerateItem RefineAction = "regenerate_item"
 )
+
+// ItemSections are the list-shaped sections whose items can be regenerated one at a time.
+var ItemSections = []string{"usage", "formulas", "signal_words", "examples", "common_mistakes", "practice"}
+
+func IsItemSection(name string) bool {
+	for _, s := range ItemSections {
+		if s == name {
+			return true
+		}
+	}
+	return false
+}
 
 // RefineSections are the parts of a level that can be worked on one at a time. "" means the
 // whole level, which is what Improve and Adapt use.
@@ -71,6 +86,8 @@ type GrammarRefineRequest struct {
 	Current GeneratedGrammarLevel
 	// AdaptFrom is the level Current was written for, when Action is adapt.
 	AdaptFrom string
+	// Index is the item to replace, counting from zero, when Action is regenerate_item.
+	Index int
 	ActorID   *uuid.UUID
 }
 
@@ -98,7 +115,7 @@ func (s *GrammarTutorService) RefineGrammarLevel(
 		PromptVersion: GrammarRefinePrompt,
 		Metadata: map[string]any{
 			"topic": req.Slug, "language": req.Language, "level": req.Level.BaseCode(),
-			"action": string(req.Action), "section": req.Section,
+			"action": string(req.Action), "section": req.Section, "index": req.Index,
 		},
 	}, refineInstructions(req), refineBrief(req), req.Level)
 }
@@ -112,14 +129,49 @@ func (s *GrammarTutorService) RefineGrammarLevel(
 func (s *GrammarTutorService) TranslateGrammarLevel(
 	ctx context.Context, req GrammarTranslateRequest,
 ) (*GeneratedGrammarLevel, *EvaluationMeta, error) {
-	return s.oneLevel(ctx, CallMeta{
+	meta := CallMeta{
 		Task:          TaskContentGeneration,
 		UserID:        req.ActorID,
 		PromptVersion: GrammarTranslatePrompt,
 		Metadata: map[string]any{
 			"topic": req.Slug, "from": req.From, "to": req.To, "level": req.Level.BaseCode(),
 		},
-	}, translateInstructions(req), translateBrief(req), req.Level)
+	}
+	got, evaluation, err := s.oneLevel(ctx, meta, translateInstructions(req), translateBrief(req), req.Level)
+	if err != nil || req.From == req.To || !untranslated(req.Source, *got) {
+		return got, evaluation, err
+	}
+	// Smaller models sometimes hand the source back with the prose still in English. That
+	// is not a translation, and a draft that looks finished but is not is worse than an
+	// error, so ask once more, saying what went wrong; a second miss is reported as one.
+	meta.Metadata["retry"] = "untranslated"
+	got, evaluation, err = s.oneLevel(ctx, meta, translateInstructions(req),
+		translateBrief(req)+"\n\nYour previous answer left the explanation in the source language. Translate the prose this time.", req.Level)
+	if err != nil {
+		return nil, nil, err
+	}
+	if untranslated(req.Source, *got) {
+		return nil, nil, fmt.Errorf("translation into %s came back untranslated", req.To)
+	}
+	return got, evaluation, nil
+}
+
+// untranslated reports whether the prose of a "translation" is still the source's. English
+// examples, formulas and signal words are meant to be identical; the explanations are not.
+func untranslated(source, got GeneratedGrammarLevel) bool {
+	if !got.Applicable {
+		return false
+	}
+	same := func(a, b string) bool { return strings.TrimSpace(a) != "" && strings.TrimSpace(a) == strings.TrimSpace(b) }
+	if same(source.Intro, got.Intro) || same(source.Explanation, got.Explanation) {
+		return true
+	}
+	for i := range source.CommonMistakes {
+		if i < len(got.CommonMistakes) && same(source.CommonMistakes[i].Why, got.CommonMistakes[i].Why) {
+			return true
+		}
+	}
+	return false
 }
 
 // oneLevel runs a call that must answer with exactly one level, and checks that it did.
@@ -168,13 +220,15 @@ func refineInstructions(req GrammarRefineRequest) string {
 		b.WriteString("Replace this section with a genuinely different take on the same point: different examples, different angle, same rule. Returning a lightly reworded version of what is already there is a failure.\n")
 	case RefineExpand:
 		b.WriteString("Add to this section. Keep every existing item exactly as it is and append new ones that do not repeat them. New items must earn their place — another way of saying the same thing does not.\n")
+	case RefineRegenerateItem:
+		fmt.Fprintf(&b, "Replace exactly one item: item number %d (counting from zero) of the %q list. Write a genuinely different item that teaches the same point at the same level — a reworded copy of the old one is a failure, and so is one that repeats another item already in the list. Keep the list the same length, keep every other item exactly as it is and in the same position, and return every other field exactly as you received it.\n", req.Index, req.Section)
 	case RefineAdapt:
 		b.WriteString("Rewrite the whole lesson for a different CEFR level. This is not a matter of shortening sentences: a lower level needs simpler vocabulary and fewer exceptions, a higher one needs the nuance and the cases the simpler version leaves out. If the topic cannot honestly be taught at the target level, set applicable to false and say why in one sentence.\n")
 	default:
 		b.WriteString("Improve the text without changing what it teaches.\n")
 	}
 
-	if req.Section != "" {
+	if req.Section != "" && req.Action != RefineRegenerateItem {
 		fmt.Fprintf(&b, "\nChange only the %q section. Return every other field exactly as you received it.\n", req.Section)
 	}
 
@@ -200,6 +254,9 @@ func refineBrief(req GrammarRefineRequest) string {
 	if req.Section != "" {
 		fmt.Fprintf(&b, "Section to change: %s\n", req.Section)
 	}
+	if req.Action == RefineRegenerateItem {
+		fmt.Fprintf(&b, "Item to replace: %s[%d]\n", req.Section, req.Index)
+	}
 	b.WriteString("\nThe current draft, as one level:\n")
 	b.WriteString(marshalLevel(req.Current))
 	return b.String()
@@ -207,10 +264,11 @@ func refineBrief(req GrammarRefineRequest) string {
 
 func translateInstructions(req GrammarTranslateRequest) string {
 	var b strings.Builder
-	b.WriteString("You are translating an approved English-grammar lesson for a language-learning platform.\n\n")
+	fmt.Fprintf(&b, "You are translating an approved English-grammar lesson for a language-learning platform into %s. Every explanatory sentence in your answer must be in %s.\n\n", languageName(req.To), languageName(req.To))
 	b.WriteString("This is a translation, not a new lesson. Say what the source says: the same rules, the same order, the same examples, the same practice questions with the same correct answers. Do not add explanations the source does not make, and do not drop ones it does.\n\n")
 	b.WriteString("Keep every English example sentence, every formula pattern and every signal word in English, exactly as written — the learner is learning English, not reading about it in translation. Grammar terms (present perfect, countable noun) stay in English. Translate the prose around them: the explanation, the usage notes, the reasons in common mistakes, the practice prompts and their explanations.\n\n")
 	b.WriteString("Practice options stay in English when they are English words the learner must choose between. answer_index must not change.\n\n")
+	fmt.Fprintf(&b, "These fields must be written in %s: title, summary, intro, explanation, every usage rule, every formula label, every example note, every common mistake's \"why\", and every practice question's explanation. Returning any of them unchanged in English is a failed translation.\n\n", languageName(req.To))
 	b.WriteString(languageRule(req.To))
 	return b.String()
 }

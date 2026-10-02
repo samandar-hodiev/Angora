@@ -9,11 +9,21 @@
  */
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 
 import { queryKeys } from "@/lib/query/keys";
 
 import * as assessmentApi from "./services/assessments";
-import type { ContentLanguage, QuestionInput, QuestionQuery, QuestionStatus, RefineInput } from "./types";
+import type {
+  ContentLanguage,
+  GenerateInput,
+  GenerationStarted,
+  JobState,
+  QuestionInput,
+  QuestionQuery,
+  QuestionStatus,
+  RefineInput,
+} from "./types";
 
 // ---- Assessment & question bank (live API) --------------------------------------------------
 
@@ -493,17 +503,89 @@ export function useGrammarValidation(slug: string | null, lang: string) {
   });
 }
 
-/** Writes the whole topic in one request; the result replaces the cached content. */
-export function useGenerateGrammarContent(slug: string) {
+/**
+ * Generating a topic, which runs as a background job on the server.
+ *
+ * Writing six levels and translating them into two more languages takes minutes, so the
+ * request only queues it; this hook polls the job and, when it finishes, reloads every
+ * language of the topic. The running job is remembered for the tab, so a refresh in the
+ * middle still shows the editor as being written rather than as finished and empty.
+ */
+export function useGrammarGeneration(
+  slug: string,
+  handlers: { onSucceeded?: (job: JobState) => void; onFailed?: (job: JobState | null) => void } = {},
+) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { language: string; levels: string[]; overwrite?: boolean }) =>
-      assessmentApi.grammarMapApi.generate(slug, input),
-    onSuccess: (content) => {
-      client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
-      client.invalidateQueries({ queryKey: queryKeys.owner.grammarValidation(slug, content.language) });
+  const storageKey = `engora-grammar-generation:${slug}`;
+  const [active, setActive] = useState<GenerationStarted | null>(() => readGeneration(storageKey));
+  const handlersRef = useRef(handlers);
+  useEffect(() => {
+    handlersRef.current = handlers;
+  });
+
+  const start = useMutation({
+    mutationFn: (input: GenerateInput) => assessmentApi.grammarMapApi.generate(slug, input),
+    onSuccess: (started) => {
+      const tracked = { ...started, started_at: Date.now() };
+      writeGeneration(storageKey, tracked);
+      setActive(tracked);
     },
   });
+
+  const job = useQuery({
+    queryKey: ["owner", "grammar-generation", active?.job_id ?? ""],
+    queryFn: () => assessmentApi.grammarMapApi.job(active!.job_id),
+    enabled: Boolean(active),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "succeeded" || status === "failed" ? false : 2000;
+    },
+    retry: 1,
+  });
+
+  const status = job.data?.status;
+  // The server gives a job five minutes. One still "running" well after that belonged to a
+  // worker that stopped mid-way, and will never finish; waiting on it would leave the editor
+  // showing "writing" for ever.
+  const stale = Boolean(active?.started_at && job.dataUpdatedAt - active.started_at > GENERATION_GIVE_UP_MS);
+  const lost = job.isError || stale;
+  useEffect(() => {
+    if (!active || !(status === "succeeded" || status === "failed" || lost)) return;
+    writeGeneration(storageKey, null);
+    // Every language may have changed, and so may the map's view of this topic.
+    void client.invalidateQueries({ queryKey: ["owner", "grammar-content", slug] });
+    void client.invalidateQueries({ queryKey: ["owner", "grammar-validation", slug] });
+    void client.invalidateQueries({ queryKey: ["owner", "grammar-map"] });
+    if (status === "succeeded") handlersRef.current.onSucceeded?.(job.data!);
+    else handlersRef.current.onFailed?.(job.data ?? null);
+    // Clearing the job is what ends the "being written" state; it belongs with the rest of
+    // finishing up, which is why it is here and not in a render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActive(null);
+  }, [active, status, lost, client, slug, storageKey, job.data]);
+
+  return { start, active, generating: Boolean(active) || start.isPending };
+}
+
+const GENERATION_GIVE_UP_MS = 7 * 60 * 1000;
+
+function readGeneration(key: string): GenerationStarted | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as GenerationStarted) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeGeneration(key: string, value: GenerationStarted | null) {
+  try {
+    if (value) sessionStorage.setItem(key, JSON.stringify(value));
+    else sessionStorage.removeItem(key);
+  } catch {
+    // storage unavailable: a refresh simply forgets the running job
+  }
 }
 
 /**
