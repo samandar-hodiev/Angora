@@ -329,14 +329,14 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
             collapse control stay reachable however long the list above gets. "Back to the
             learner app" used to sit here; it is not a place in this console, so it moved to
             the account menu where the other cross-app actions live. */}
-        <div className="mt-auto grid gap-1 border-t p-2">
+        <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-1 border-t p-2">
           <OwnerSettingsLink collapsed={showCollapsed} />
           <button
             type="button"
             onClick={toggleCollapsed}
             aria-pressed={showCollapsed}
             className={cn(
-              "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm text-fg-muted transition-colors duration-micro hover:bg-surface-hover hover:text-foreground",
+              "flex min-w-0 items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm text-fg-muted transition-colors duration-micro hover:bg-surface-hover hover:text-foreground",
               showCollapsed && "justify-center px-0",
             )}
           >
@@ -420,7 +420,7 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
 // no way to reach the end of it.
 function NavFallback({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <div aria-hidden className="scrollbar-slim min-h-0 flex-1 overflow-y-auto p-2">
+    <div aria-hidden className="scrollbar-slim min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2">
       {ownerNav.flatMap((section) => section.items).map((item) => (
         <div key={item.href} className={cn("flex items-center gap-2.5 px-2.5 py-2", collapsed && "justify-center px-0")}>
           <item.icon className="size-4 shrink-0 text-fg-muted" />
@@ -439,16 +439,19 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
   const isOwner = useIsPlatformOwner();
 
   return (
-    <nav aria-label="Owner" className="scrollbar-slim min-h-0 flex-1 overflow-y-auto p-2">
+    // Never scrolls sideways: a narrowed sidebar shortens its labels ("Lea…") instead. The
+    // lists are minmax(0, 1fr) grids for the same reason — a plain grid column will not
+    // shrink below its longest word, which pushed rows (and their highlight) past the edge.
+    <nav aria-label="Owner" className="scrollbar-slim min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2">
       {ownerNav.map((section) => (
         <div key={section.label} className="mb-3 last:mb-0">
           {!collapsed && (
-            <h2 className="px-2.5 pt-2 pb-1 text-caption font-medium tracking-wide text-fg-muted uppercase">
+            <h2 className="truncate px-2.5 pt-2 pb-1 text-caption font-medium tracking-wide text-fg-muted uppercase">
               {section.label}
             </h2>
           )}
           {collapsed && <div className="mx-2 my-2 h-px bg-border-subtle" aria-hidden />}
-          <ul className="grid gap-0.5">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
             {section.items
               .filter((item) => !item.ownerOnly || isOwner)
               .map((item) =>
@@ -480,7 +483,7 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
 
 function navLinkClass(active: boolean, collapsed: boolean, depth: 0 | 1) {
   return cn(
-    "flex items-center gap-2.5 rounded-md text-body-sm transition-colors duration-micro",
+    "flex min-w-0 items-center gap-2.5 rounded-md text-body-sm transition-colors duration-micro",
     // Children are a step quieter than their parent: smaller row, indented, so the tree
     // reads as one thing rather than eleven more top-level destinations.
     depth === 0 ? "px-2.5 py-2" : "py-1.5 pr-2.5 pl-8",
@@ -615,7 +618,7 @@ function NavTree({
         />
       </button>
       {expanded && (
-        <ul id={panelId} className="mt-0.5 grid gap-0.5">
+        <ul id={panelId} className="mt-0.5 grid grid-cols-[minmax(0,1fr)] gap-0.5">
           {children.map((child) => (
             <li key={child.href}>
               <NavLink
@@ -819,7 +822,7 @@ function OwnerSettingsLink({ collapsed = false }: { collapsed?: boolean }) {
       aria-current={active ? "page" : undefined}
       title={collapsed ? "Owner Settings" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm transition-colors duration-micro",
+        "flex min-w-0 items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm transition-colors duration-micro",
         collapsed && "justify-center px-0",
         active
           ? "bg-primary-subtle font-medium text-primary-subtle-foreground"

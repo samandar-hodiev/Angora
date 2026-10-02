@@ -70,8 +70,8 @@
   }
 
   .scrollbar-slim::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   .scrollbar-slim::-webkit-scrollbar-track {
@@ -79,7 +79,7 @@
   }
 
   .scrollbar-slim::-webkit-scrollbar-thumb {
-    background-color: var(--border);
+    background-color: color-mix(in oklch, var(--border) 70%, transparent);
     border-radius: 999px;
   }
 
@@ -90,7 +90,7 @@
   @supports not selector(::-webkit-scrollbar) {
     .scrollbar-slim {
       scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
+      scrollbar-color: color-mix(in oklch, var(--border) 70%, transparent) transparent;
     }
   }
 
