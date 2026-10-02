@@ -53,7 +53,7 @@ const statusLabels: Record<QuestionStatus, string> = {
 
 const statusStyles: Record<QuestionStatus, string> = {
   draft: "border-transparent bg-surface-active text-fg-secondary",
-  review: "border-transparent bg-warning/20 text-warning-foreground",
+  review: "border-transparent bg-warning/20 text-warning-text",
   published: "border-transparent bg-success/15 text-success",
   archived: "border-transparent bg-surface-active text-fg-muted line-through",
 };
@@ -424,7 +424,7 @@ function CoverageCard() {
                           className={cn(
                             "inline-grid h-7 w-10 place-items-center rounded-md tabular-nums",
                             count === 0 && "bg-surface-active text-fg-disabled",
-                            count > 0 && count < 3 && "bg-warning/20 text-warning-foreground",
+                            count > 0 && count < 3 && "bg-warning/20 text-warning-text",
                             count >= 3 && "bg-success/15 text-success",
                           )}
                         >

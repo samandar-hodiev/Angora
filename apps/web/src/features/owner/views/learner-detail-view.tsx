@@ -26,7 +26,7 @@ import { useLiveLearner, useSetLearnerStatus } from "../hooks";
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatRelative } from "../lib/format";
 import type { LevelKind, LiveLearnerDetail } from "../types";
 
-const activeTab = "data-[state=active]:text-primary data-[state=active]:ring-1 data-[state=active]:ring-border";
+const activeTab = "data-[state=active]:text-primary-text data-[state=active]:ring-1 data-[state=active]:ring-border";
 const now = () => new Date().toISOString();
 
 /**

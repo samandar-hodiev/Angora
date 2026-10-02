@@ -95,7 +95,7 @@ export function OwnerNotificationsView() {
                     >
                       <span className="flex items-center gap-1.5 truncate text-body-sm">
                         {row.name}
-                        {flagged && <AlertTriangle className="size-3.5 shrink-0 text-warning" aria-label="Unknown placeholder" />}
+                        {flagged && <AlertTriangle className="size-3.5 shrink-0 text-warning-text" aria-label="Unknown placeholder" />}
                       </span>
                       <span className="truncate font-mono text-caption text-fg-muted">{row.code}</span>
                     </button>
@@ -210,7 +210,7 @@ function TemplateEditor({ template }: { template: NotificationTemplateRow }) {
 
         {missing.length > 0 && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning-subtle/40 p-3">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-text" aria-hidden />
             <p className="text-caption">
               {missing.map((v) => `{{${v}}}`).join(", ")} {missing.length === 1 ? "is" : "are"} not filled by anything.
               Learners will read {missing.length === 1 ? "it" : "them"} exactly as written.

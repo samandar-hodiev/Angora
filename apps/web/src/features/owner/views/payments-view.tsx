@@ -189,7 +189,7 @@ export function OwnerPaymentsView() {
 
           {(report?.callback_signature_failures ?? 0) > 0 && (
             <div className="mb-6 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-subtle/40 p-4">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-text" aria-hidden />
               <div className="grid gap-0.5">
                 <p className="text-body-sm font-medium">
                   {formatNumber(report?.callback_signature_failures ?? 0)} payment callbacks failed their signature check

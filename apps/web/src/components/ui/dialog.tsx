@@ -6,6 +6,8 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { usePortalContainer } from "./portal-container";
+
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
@@ -33,7 +35,7 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
 
 function DialogContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
-    <DialogPrimitive.Portal>
+    <DialogPrimitive.Portal container={usePortalContainer()}>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"

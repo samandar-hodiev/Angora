@@ -76,7 +76,7 @@ export function LearnerAppSettingsView() {
                         : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
                     )}
                   >
-                    <entry.icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-fg-muted")} aria-hidden />
+                    <entry.icon className={cn("size-4 shrink-0", active ? "text-primary-text" : "text-fg-muted")} aria-hidden />
                     {entry.label}
                   </button>
                 </li>

@@ -17,7 +17,9 @@
  * glass-hover (interactive lift), glass-button, btn-liquid (primary CTA), liquid-field (ambient light).
  */
 
-@custom-variant dark (&:where(.dark, .dark *));
+/* A `.light` subtree inside a dark page (the Owner Console in its light theme) is light: dark:
+ * utilities must not reach into it just because <html> carries `.dark`. */
+@custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));
 
 /*
  * The light palette is bound to `.light` as well as `:root` so a subtree can opt out of the
@@ -53,6 +55,10 @@
   --success-foreground: oklch(0.99 0 0);
   --warning: oklch(0.74 0.14 72);
   --warning-foreground: oklch(0.26 0.05 72);
+  /* The brand green and the amber are fills first. As text on a light surface they fall
+   * under 3:1, so text gets its own, deeper shade of the same hue. */
+  --primary-text: oklch(0.5 0.12 162.48);
+  --warning-text: oklch(0.52 0.12 65);
   --error: oklch(0.57 0.2 25);
   --error-foreground: oklch(0.99 0 0);
   --info: oklch(0.55 0.05 230);
@@ -131,6 +137,8 @@
   --success-foreground: oklch(0.16 0.02 165);
   --warning: oklch(0.8 0.13 75);
   --warning-foreground: oklch(0.2 0.04 75);
+  --primary-text: var(--primary);
+  --warning-text: var(--warning);
   --error: oklch(0.68 0.18 25);
   --error-foreground: oklch(0.16 0.02 165);
   --info: oklch(0.72 0.05 230);
@@ -201,6 +209,8 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-text: var(--warning-text);
+  --color-primary-text: var(--primary-text);
   --color-error: var(--error);
   --color-error-foreground: var(--error-foreground);
   --color-info: var(--info);

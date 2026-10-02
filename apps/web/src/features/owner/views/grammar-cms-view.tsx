@@ -43,7 +43,7 @@ const PAGE_SIZE = 25;
 
 const statusStyles: Record<string, string> = {
   draft: "border-transparent bg-surface-active text-fg-secondary",
-  review: "border-transparent bg-warning/20 text-warning-foreground",
+  review: "border-transparent bg-warning/20 text-warning-text",
   published: "border-transparent bg-success/15 text-success",
   archived: "border-transparent bg-surface-active text-fg-muted line-through",
 };

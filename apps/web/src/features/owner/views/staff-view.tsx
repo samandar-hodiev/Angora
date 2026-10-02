@@ -49,7 +49,7 @@ const roleLabels: Record<string, string> = {
 
 const roleTone: Record<string, string> = {
   OWNER: "border-transparent bg-primary text-primary-foreground",
-  ADMIN: "border-transparent bg-warning/20 text-warning-foreground",
+  ADMIN: "border-transparent bg-warning/20 text-warning-text",
 };
 
 export function StaffView() {

@@ -15,6 +15,20 @@ import type { OwnerLocale, OwnerPreferences, OwnerWallpaper } from "./types";
  *  anything into the stylesheet. */
 const assetPath = /^\/api\/v1\/owner-wallpapers\/[A-Za-z0-9/_.-]+$/;
 
+/**
+ * How strongly the console's background is laid over a wallpaper, from the operator's slider.
+ *
+ * The slider runs 0–100, but 0 cannot mean "the photo, untouched": headings, breadcrumbs and
+ * buttons sit straight on the wallpaper, in the theme's text colour, and a dark photo under
+ * the light theme's dark text is unreadable. So the scale starts where text still reads —
+ * further in light, because most wallpapers (and every preset) are darker than its text is
+ * light — and the slider spends its range above that.
+ */
+export function wallpaperScrim(overlay: number, theme: "dark" | "light"): number {
+  const floor = theme === "light" ? 0.6 : 0.35;
+  return floor + (1 - floor) * (Math.min(Math.max(overlay, 0), 100) / 100);
+}
+
 export function ownerWallpaperImage(wallpaper: OwnerWallpaper): string | null {
   if (wallpaper.preset === "none") return null;
   if (wallpaper.preset === "custom") {

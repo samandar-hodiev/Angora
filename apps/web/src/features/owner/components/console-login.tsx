@@ -261,7 +261,7 @@ function StaffPasswordForm() {
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-caption text-fg-muted">The owner sets this for you. Change it once you are in.</p>
-          <Link href="/forgot-password?for=console" className="text-caption text-fg-secondary underline-offset-4 hover:text-primary hover:underline">
+          <Link href="/forgot-password?for=console" className="text-caption text-fg-secondary underline-offset-4 hover:text-primary-text hover:underline">
             Forgot password?
           </Link>
         </div>

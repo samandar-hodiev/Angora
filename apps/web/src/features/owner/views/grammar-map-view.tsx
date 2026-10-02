@@ -95,11 +95,12 @@ const levelIcon: Record<LevelStatus, typeof Circle> = {
 
 const levelTone: Record<LevelStatus, string> = {
   published: "text-success",
-  draft: "text-warning",
-  review: "text-warning",
+  draft: "text-warning-text",
+  review: "text-warning-text",
   archived: "text-fg-disabled",
   not_applicable: "text-fg-disabled",
-  not_created: "text-fg-disabled",
+  // Not written yet is work to do, not something switched off: it must stay readable.
+  not_created: "text-fg-muted",
 };
 
 /** Six dots, one per CEFR level. A topic does not have to be taught at all six — the ones
@@ -255,7 +256,7 @@ function CategoryGroup({ name, topics, language }: { name: string; topics: MapTo
                   )}
                   <StatusPill topic={topic} />
                   {topic.content.status === "not_created" && (
-                    <Sparkles className="size-3.5 text-primary" aria-label="Ready to write" />
+                    <Sparkles className="size-3.5 text-primary-text" aria-label="Ready to write" />
                   )}
                 </span>
               </Link>

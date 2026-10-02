@@ -45,7 +45,7 @@ import {
   useUpdateOwnerPreferences,
   useUploadOwnerWallpaper,
 } from "../hooks";
-import { ownerLocales, ownerWallpaperImage, useOwnerConsole } from "../preferences";
+import { ownerLocales, ownerWallpaperImage, useOwnerConsole, wallpaperScrim } from "../preferences";
 import type { OwnerLocale, OwnerTheme } from "../types";
 
 /**
@@ -257,7 +257,7 @@ function Language() {
             selected={prefs.locale === locale.code}
             onClick={() => !pending && save({ locale: locale.code satisfies OwnerLocale })}
           >
-            <Globe className="size-5 text-primary" aria-hidden />
+            <Globe className="size-5 text-primary-text" aria-hidden />
             {locale.label}
           </OptionCard>
         ))}
@@ -289,7 +289,7 @@ function Appearance() {
               selected={prefs.theme === theme.value}
               onClick={() => !pending && save({ theme: theme.value })}
             >
-              <theme.icon className="size-5 text-primary" aria-hidden />
+              <theme.icon className="size-5 text-primary-text" aria-hidden />
               {theme.label}
             </OptionCard>
           ))}
@@ -303,7 +303,7 @@ function Appearance() {
 }
 
 function WallpaperCard() {
-  const { t, prefs, wallpaperImage } = useOwnerConsole();
+  const { t, prefs, wallpaperImage, resolvedTheme } = useOwnerConsole();
   const { save } = useSave();
   const upload = useUploadOwnerWallpaper();
   const remove = useRemoveOwnerWallpaper();
@@ -345,7 +345,7 @@ function WallpaperCard() {
             <>
               <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: wallpaperImage }} />
               {isAnimatedPreset(presetById(wallpaper.preset)) && <AuroraCurtain />}
-              <span className="absolute inset-0 bg-background" style={{ opacity: wallpaper.overlay / 100 }} />
+              <span className="absolute inset-0 bg-background" style={{ opacity: wallpaperScrim(wallpaper.overlay, resolvedTheme) }} />
               <span className="absolute inset-0 grid place-items-center text-body-sm text-fg-secondary">
                 {t.settings.general.preview}
               </span>
@@ -515,7 +515,7 @@ function Sidebar() {
             selected={prefs.sidebar_mode === mode.value}
             onClick={() => !pending && save({ sidebar_mode: mode.value })}
           >
-            <PanelLeft className="size-5 text-primary" aria-hidden />
+            <PanelLeft className="size-5 text-primary-text" aria-hidden />
             {mode.label}
           </OptionCard>
         ))}

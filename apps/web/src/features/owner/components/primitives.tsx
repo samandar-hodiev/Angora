@@ -228,7 +228,7 @@ export function StatCardSkeleton() {
 const statusVariants: Record<ContentStatus, string> = {
   draft: "border-transparent bg-surface-active text-fg-secondary",
   ai_generated: "border-transparent bg-info/15 text-info",
-  review: "border-transparent bg-warning/20 text-warning-foreground",
+  review: "border-transparent bg-warning/20 text-warning-text",
   approved: "border-transparent bg-primary-subtle text-primary-subtle-foreground",
   published: "border-transparent bg-success/15 text-success",
   archived: "border-transparent bg-surface-active text-fg-muted line-through",
@@ -241,7 +241,7 @@ export function StatusBadge({ status, className }: { status: ContentStatus; clas
 const planVariants: Record<PlanCode, string> = {
   free: "border-border bg-surface text-fg-secondary",
   premium: "border-transparent bg-primary-subtle text-primary-subtle-foreground",
-  unlimited: "border-transparent bg-warning/20 text-warning-foreground",
+  unlimited: "border-transparent bg-warning/20 text-warning-text",
 };
 
 export function PlanBadge({ plan, className }: { plan: PlanCode; className?: string }) {
@@ -251,7 +251,7 @@ export function PlanBadge({ plan, className }: { plan: PlanCode; className?: str
 const learnerStatusVariants: Record<LearnerStatus, string> = {
   active: "border-transparent bg-success/15 text-success",
   suspended: "border-transparent bg-error/15 text-error",
-  pending: "border-transparent bg-warning/20 text-warning-foreground",
+  pending: "border-transparent bg-warning/20 text-warning-text",
   archived: "border-transparent bg-surface-active text-fg-muted",
 };
 
@@ -685,11 +685,17 @@ export function LearnerAvatar({
 
 // ---- Misc -----------------------------------------------------------------------------------
 
+/**
+ * A label and its value: side by side while the row has room for both, the value wrapping
+ * under its label when it does not. Decided by the row, not the window — the same row sits
+ * in a full-width card on one page and in one column of a two-column card on the next, where
+ * a fixed 10rem label left the value no room and the two ran into each other.
+ */
 export function KeyValue({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-0.5 border-b py-2.5 last:border-b-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-baseline sm:gap-3">
-      <dt className="text-label text-fg-muted">{label}</dt>
-      <dd className="min-w-0 text-body-sm">{children}</dd>
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b py-2.5 last:border-b-0">
+      <dt className="w-40 max-w-full shrink-0 text-label text-fg-muted">{label}</dt>
+      <dd className="min-w-[8rem] flex-1 text-body-sm break-words">{children}</dd>
     </div>
   );
 }
@@ -700,7 +706,7 @@ export function CountPill({ label, value, tone = "muted" }: { label: string; val
       className={cn(
         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-caption tabular-nums",
         tone === "success" && "bg-success/12 text-success",
-        tone === "warning" && "bg-warning/18 text-warning-foreground",
+        tone === "warning" && "bg-warning/18 text-warning-text",
         tone === "muted" && "bg-surface-active text-fg-secondary",
       )}
     >

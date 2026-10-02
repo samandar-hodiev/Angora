@@ -6,6 +6,8 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { usePortalContainer } from "./portal-container";
+
 // ---- Avatar ---------------------------------------------------------------------------
 
 function Avatar({ className, ...props }: React.ComponentProps<typeof AvatarPrimitive.Root>) {
@@ -51,7 +53,7 @@ function Tooltip({
     <TooltipPrimitive.Provider delayDuration={300}>
       <TooltipPrimitive.Root>
         <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Portal container={usePortalContainer()}>
           <TooltipPrimitive.Content
             side={side}
             sideOffset={6}
@@ -74,7 +76,7 @@ const DropdownMenuRadioGroup = MenuPrimitive.RadioGroup;
 
 function DropdownMenuContent({ className, sideOffset = 6, ...props }: React.ComponentProps<typeof MenuPrimitive.Content>) {
   return (
-    <MenuPrimitive.Portal>
+    <MenuPrimitive.Portal container={usePortalContainer()}>
       <MenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
@@ -128,7 +130,7 @@ function SheetContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { side?: "left" | "right" | "bottom"; title: string }) {
   return (
-    <DialogPrimitive.Portal>
+    <DialogPrimitive.Portal container={usePortalContainer()}>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
       <DialogPrimitive.Content
         className={cn(

@@ -65,12 +65,12 @@ import type {
  * same shape the page reads is the only way what you see here is what they get.
  */
 
-const activeTab = "data-[state=active]:text-primary data-[state=active]:ring-1 data-[state=active]:ring-border";
+const activeTab = "data-[state=active]:text-primary-text data-[state=active]:ring-1 data-[state=active]:ring-border";
 
 const levelTone: Record<LevelStatus, string> = {
   published: "bg-success/15 text-success",
-  draft: "bg-warning/20 text-warning-foreground",
-  review: "bg-warning/20 text-warning-foreground",
+  draft: "bg-warning/20 text-warning-text",
+  review: "bg-warning/20 text-warning-text",
   archived: "bg-surface-active text-fg-muted",
   not_applicable: "bg-surface-active text-fg-disabled line-through",
   not_created: "bg-surface-active text-fg-muted",
@@ -247,7 +247,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
       {issues.length > 0 && (
         <div className="mb-5 grid gap-1.5 rounded-xl border border-warning/40 bg-warning-subtle/40 p-4">
           <p className="flex items-center gap-2 text-body-sm font-medium">
-            <AlertTriangle className="size-4 text-warning" aria-hidden />
+            <AlertTriangle className="size-4 text-warning-text" aria-hidden />
             {issues.length} {issues.length === 1 ? "issue" : "issues"} found
           </p>
           <ul className="grid gap-0.5 text-caption text-fg-secondary">
@@ -1449,7 +1449,7 @@ function LearnerPreview({
           <ul className="grid gap-1.5">
             {(body.usage ?? []).map((entry, index) => (
               <li key={index} className="flex gap-2 text-body-sm">
-                <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                <Check className="mt-0.5 size-4 shrink-0 text-primary-text" aria-hidden />
                 {entry}
               </li>
             ))}
@@ -1692,7 +1692,7 @@ function WritingPlaceholder({ level, languages }: { level: string; languages: Co
   return (
     <div className="grid gap-4" aria-busy aria-live="polite">
       <p className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary-subtle/40 px-4 py-2.5 text-caption">
-        <Sparkles className="size-4 animate-pulse text-primary" aria-hidden />
+        <Sparkles className="size-4 animate-pulse text-primary-text" aria-hidden />
         Writing {level} in {languages.map((code) => contentLanguageLabels[code]).join(", ")}… This takes a minute or two;
         you can leave the page and come back.
       </p>

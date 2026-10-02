@@ -38,11 +38,13 @@ import { useSession } from "@/features/auth/hooks";
 import { AuroraCurtain } from "@/features/profile/components/wallpaper-layer";
 import { cn } from "@/lib/utils";
 
+import { PortalContainerContext } from "@/components/ui/portal-container";
+
 import { ownerPreviewMode } from "../guard";
 import { useAuditLogs } from "../hooks";
 import { formatRelative } from "../lib/format";
 import { useIsPlatformOwner } from "../guard";
-import { OwnerPreferencesProvider, useOwnerConsole } from "../preferences";
+import { OwnerPreferencesProvider, useOwnerConsole, wallpaperScrim } from "../preferences";
 import { isInsideTree, isNavActive, ownerNav, type OwnerNavItem } from "./nav";
 
 /**
@@ -115,15 +117,22 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
 
   const accessibility = prefs.accessibility as Record<string, unknown>;
   const hasWallpaper = wallpaperImage !== null;
+  /** Dialogs and menus open in here, inside the theme, rather than on the learner's <body>. */
+  const [portal, setPortal] = useState<HTMLElement | null>(null);
 
   return (
+    <PortalContainerContext.Provider value={portal}>
     <div
       // The theme class sits here, not on <html>: it is this operator's console theme, and
       // it must not touch the learner app's — theme.css binds the light palette to `.light`
       // for exactly this reason.
       className={cn(
         resolvedTheme,
-        "relative isolate min-h-dvh bg-background md:grid",
+        // text-foreground is not decoration. The palette is redefined on this element, but
+        // `color` is inherited as a value body already resolved against the learner theme —
+        // without restating it here, every heading, input and select that does not name its
+        // own colour stays light-on-light in the light console.
+        "relative isolate min-h-dvh bg-background text-foreground md:grid",
         accessibility.larger_text === true && "text-[1.0625rem]",
         accessibility.reduced_motion === true && "[&_*]:!animate-none [&_*]:!transition-none",
         accessibility.high_contrast === true && "contrast-more",
@@ -144,7 +153,7 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
           {wallpaperAnimated && <AuroraCurtain />}
           {/* Dimmed by the amount the operator chose. A console is tables and numbers
               first, and a table you cannot read is not a nicer table. */}
-          <span className="absolute inset-0 bg-background" style={{ opacity: prefs.wallpaper.overlay / 100 }} />
+          <span className="absolute inset-0 bg-background" style={{ opacity: wallpaperScrim(prefs.wallpaper.overlay, resolvedTheme) }} />
         </div>
       )}
       <aside
@@ -247,7 +256,11 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
           <div className="mx-auto w-full max-w-[160rem]">{children}</div>
         </main>
       </div>
+      {/* display: contents, so it is not a cell of the shell's grid; what is portalled into
+          it is fixed-position anyway. */}
+      <div ref={setPortal} className="contents" />
     </div>
+    </PortalContainerContext.Provider>
   );
 }
 
@@ -355,7 +368,7 @@ function NavLink({
       className={navLinkClass(active, collapsed, depth)}
     >
       <item.icon
-        className={cn(depth === 0 ? "size-4" : "size-3.5", "shrink-0", active ? "text-primary" : "text-fg-muted")}
+        className={cn(depth === 0 ? "size-4" : "size-3.5", "shrink-0", active ? "text-primary-text" : "text-fg-muted")}
         aria-hidden
       />
       {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
@@ -411,7 +424,7 @@ function NavTree({
               aria-label={item.label}
               className={cn(navLinkClass(inside, true, 0), "w-full")}
             >
-              <item.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+              <item.icon className={cn("size-4 shrink-0", inside ? "text-primary-text" : "text-fg-muted")} aria-hidden />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="w-56">
@@ -443,7 +456,7 @@ function NavTree({
         aria-controls={panelId}
         className={cn(navLinkClass(inside, false, 0), "w-full text-left")}
       >
-        <item.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+        <item.icon className={cn("size-4 shrink-0", inside ? "text-primary-text" : "text-fg-muted")} aria-hidden />
         <span className="truncate">{item.label}</span>
         <ChevronDown
           className={cn("ml-auto size-3.5 shrink-0 transition-transform duration-micro", !expanded && "-rotate-90")}
@@ -600,7 +613,7 @@ function OwnerSettingsLink({ collapsed = false }: { collapsed?: boolean }) {
           : "text-fg-muted hover:bg-surface-hover hover:text-foreground",
       )}
     >
-      <SlidersHorizontal className={cn("size-4 shrink-0", active && "text-primary")} aria-hidden />
+      <SlidersHorizontal className={cn("size-4 shrink-0", active && "text-primary-text")} aria-hidden />
       {collapsed ? <span className="sr-only">Owner Settings</span> : "Owner Settings"}
     </Link>
   );

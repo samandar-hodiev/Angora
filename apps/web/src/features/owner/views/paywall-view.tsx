@@ -225,7 +225,7 @@ export function PaywallView() {
                     <span>{formatNumber(plan.subscribers)} subscribers</span>
                   </div>
                   {!plan.price_uzs && plan.price_cents > 0 && (
-                    <p className="text-caption text-warning">
+                    <p className="text-caption text-warning-text">
                       Cannot be bought with Click until a so&apos;m price is set.
                     </p>
                   )}

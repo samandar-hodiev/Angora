@@ -22,7 +22,7 @@ import type { AIFailureRow, AIQualityRow } from "../types";
  * grouping by prompt and rubric version is what makes a change in them visible.
  */
 
-const activeTab = "data-[state=active]:text-primary data-[state=active]:ring-1 data-[state=active]:ring-border";
+const activeTab = "data-[state=active]:text-primary-text data-[state=active]:ring-1 data-[state=active]:ring-border";
 
 const rangeOptions = [
   { value: "1", label: "24H" },

@@ -33,7 +33,7 @@ import { formatDateTime, formatNumber } from "../lib/format";
 import type { AssessmentAttempt, AssessmentConfig, AttemptStatus, CEFRLevel } from "../types";
 import { cefrLevels } from "../types";
 
-const activeTab = "data-[state=active]:text-primary data-[state=active]:ring-1 data-[state=active]:ring-border";
+const activeTab = "data-[state=active]:text-primary-text data-[state=active]:ring-1 data-[state=active]:ring-border";
 
 const attemptStatusStyles: Record<AttemptStatus, string> = {
   completed: "border-transparent bg-success/15 text-success",
