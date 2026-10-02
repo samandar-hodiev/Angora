@@ -498,7 +498,7 @@ func (m *Module) visualsOf(ctx context.Context, topicID uuid.UUID) ([]Visual, er
 		if err := rows.Scan(&v.ID, &v.Kind, &v.AltText, &v.Caption, &v.Status); err != nil {
 			return nil, err
 		}
-		v.URL = VisualRoute + "/" + v.ID.String()
+		v.URL = visualURL(v.ID)
 		out = append(out, v)
 	}
 	return out, rows.Err()

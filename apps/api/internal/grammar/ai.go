@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -23,6 +24,15 @@ import (
 
 // VisualRoute is where generated diagrams are served from.
 const VisualRoute = "/api/v1/grammar/visuals"
+
+// visualRenderVersion changes whenever what is served for a stored diagram changes (see
+// ai.ThemeSVG). Diagrams are cached for a day, so without it a browser keeps showing the
+// version it fetched before the fix.
+const visualRenderVersion = "2"
+
+func visualURL(id uuid.UUID) string {
+	return VisualRoute + "/" + id.String() + "?v=" + visualRenderVersion
+}
 
 // Tutor is the grammar module's view of the AI layer. The module depends on this interface,
 // never on a provider, so grammar works with a mock provider in tests and in development.
@@ -247,14 +257,13 @@ func (m *Module) aiVisual(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	if req.Kind == "" {
-		req.Kind = "timeline"
-	}
-
 	subject, err := m.aiSubject(ctx, p.UserID, c.Param("slug"))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
+	}
+	if req.Kind == "" {
+		req.Kind = ai.DefaultVisualKind(subject.topic.Category)
 	}
 
 	var (
@@ -282,7 +291,7 @@ func (m *Module) aiVisual(c *gin.Context) {
 		subject.topicID, req.Kind, compareID).
 		Scan(&existing.ID, &existing.Kind, &existing.AltText, &existing.Caption, &existing.Status)
 	if err == nil {
-		existing.URL = VisualRoute + "/" + existing.ID.String()
+		existing.URL = visualURL(existing.ID)
 		if err := m.markEngagement(ctx, p.UserID, subject.topicID, "visual_viewed_at"); err != nil {
 			m.log.Warn("grammar visual view not recorded", "topic", subject.topic.Slug, "error", err.Error())
 		}
@@ -342,7 +351,7 @@ func (m *Module) aiVisual(c *gin.Context) {
 
 	m.track(ctx, p.UserID, EventAIVisual, map[string]any{"topic": subject.topic.Slug, "cached": false, "kind": req.Kind})
 	httpx.OK(c, Visual{
-		ID: visualID, Kind: req.Kind, URL: VisualRoute + "/" + visualID.String(),
+		ID: visualID, Kind: req.Kind, URL: visualURL(visualID),
 		AltText: generated.AltText, Caption: generated.Caption, Status: "ready",
 	})
 }
@@ -375,16 +384,22 @@ func (m *Module) visual(c *gin.Context) {
 		return
 	}
 
-	body, info, err := m.storage.Get(ctx, key)
+	body, _, err := m.storage.Get(ctx, key)
 	if err != nil {
 		httpx.Fail(c, apperr.Wrap(err, apperr.CodeUnavailable, "The visual is temporarily unavailable"))
 		return
 	}
 	defer body.Close()
+	// Diagrams are capped at 64 KiB when they are generated; the limit here is only a guard.
+	svg, err := io.ReadAll(io.LimitReader(body, 256<<10))
+	if err != nil {
+		httpx.Fail(c, apperr.Wrap(err, apperr.CodeUnavailable, "The visual is temporarily unavailable"))
+		return
+	}
 
 	// Shared content, so it may be cached by the browser rather than re-fetched per page.
 	c.Header("Cache-Control", "public, max-age=86400")
-	c.DataFromReader(200, info.Size, mimeType, body, nil)
+	c.Data(200, mimeType, ai.ThemeSVG(svg))
 }
 
 // analyzeFreeWriting marks one free-writing answer. It is the only AI call the practice

@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,7 +28,7 @@ const (
 	GrammarExplainPrompt      = "grammar-explain.v1"
 	GrammarTutorPrompt        = "grammar-tutor.v1"
 	GrammarWritingPrompt      = "grammar-writing.v1"
-	GrammarVisualPrompt       = "grammar-visual.v1"
+	GrammarVisualPrompt       = "grammar-visual.v2"
 	SchemaGrammarExplain      = "grammar_explanation"
 	SchemaGrammarWriting      = "grammar_writing_analysis"
 	TaskGrammarExplain   Task = "grammar_explanation"
@@ -618,13 +619,13 @@ type GeneratedVisual struct {
 func (s *GrammarTutorService) VisualizeGrammar(ctx context.Context, topic GrammarTopicContext, compare *GrammarTopicContext, kind string, learner GrammarLearner) (*GeneratedVisual, uuid.UUID, error) {
 	var b strings.Builder
 	b.WriteString("Draw one English grammar concept as a single, self-contained SVG diagram.\n\n")
+	fmt.Fprintf(&b, "The diagram explains %s, and only %s. Every label, example and arrow must be about it. Do not draw a tense timeline unless %s is itself about time or tense.\n\n", topic.Name, topic.Name, topic.Name)
 	b.WriteString("Output rules — these are strict:\n")
 	b.WriteString("- Output ONLY the SVG element. No markdown fence, no prose, no XML declaration.\n")
 	b.WriteString("- Root element: <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 400\"> with no width or height.\n")
 	b.WriteString("- No <script>, no <foreignObject>, no <image>, no external URLs, no CSS @import, no event attributes.\n")
-	b.WriteString("- Use only currentColor and these CSS variables for colour: var(--primary), var(--fg-muted), var(--border), var(--surface). ")
-	b.WriteString("The diagram must be legible on both a light and a dark background, so never rely on a filled background.\n")
-	b.WriteString("- Font: font-family=\"inherit\", font-size 13-18. Keep text short enough not to overflow its shape.\n")
+	b.WriteString("- It is shown as an image on a light card. Use only currentColor (dark text) and these CSS variables for colour, which are defined for you: var(--primary) for the point being taught, var(--fg-muted) for secondary text, var(--border) for lines, var(--surface) for shape fills. No other colours, no full-size background.\n")
+	b.WriteString("- Font: font-family=\"inherit\", font-size 15-20 for labels and examples. Keep text short enough not to overflow its shape, and fill the 800×400 frame — a small drawing in the middle of empty space is unreadable at card size.\n")
 	b.WriteString("- Start with a <title> element: it is what a screen reader announces.\n\n")
 	fmt.Fprintf(&b, "Diagram type: %s.\n", visualKindBrief(kind))
 	if compare != nil {
@@ -674,6 +675,87 @@ func visualKindBrief(kind string) string {
 	default:
 		return "a rule diagram: the pattern broken into labelled parts"
 	}
+}
+
+// DefaultVisualKind picks the diagram that suits a topic when the learner did not ask for one.
+// A time line only explains grammar that is about time; drawing one for articles produced a
+// tense chart on the A/An page.
+func DefaultVisualKind(category string) string {
+	c := strings.ToLower(category)
+	switch {
+	case strings.Contains(c, "tense"):
+		return "timeline"
+	case strings.Contains(c, "comparison"):
+		return "comparison_table"
+	case strings.Contains(c, "conditional"), strings.Contains(c, "passive"), strings.Contains(c, "reported"),
+		strings.Contains(c, "question"), strings.Contains(c, "negation"), strings.Contains(c, "word order"),
+		strings.Contains(c, "word-order"):
+		return "transformation"
+	default:
+		return "rule_diagram"
+	}
+}
+
+// visualColours are what the diagram's CSS variables mean once it is an image. A visual is
+// served to an <img>, where the page's own variables do not exist and currentColor is black:
+// without this every generated diagram rendered black on the dark card. The diagram gets a
+// light card of its own, so it reads the same in both themes.
+var visualColours = map[string]string{
+	"primary":    "#059669",
+	"fg-muted":   "#475569",
+	"border":     "#94a3b8",
+	"surface":    "#e2f5ec",
+	"foreground": "#0f172a",
+}
+
+// visualBackground is the light card the diagram is drawn on, so it reads in both themes.
+const visualBackground = `<rect x="0" y="0" width="100%" height="100%" rx="18" fill="#f8fafc"/>`
+
+// visualRootAttrs are set on the root element as attributes, not in a <style>: the API serves
+// everything under `default-src 'none'`, which blocks a stylesheet inside the SVG but not a
+// presentation attribute. They are what currentColor and font-family="inherit" resolve to.
+const visualRootAttrs = ` color="#0f172a" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"`
+
+// cssVar matches var(--name) and var(--name, fallback), wherever the model wrote it.
+var cssVar = regexp.MustCompile(`var\(\s*--([a-z-]+)\s*(?:,[^)]*)?\)`)
+
+// rootFontColour matches font-family and color already on the root element, which ours replace.
+var rootFontColour = regexp.MustCompile(`\s(?:font-family|color)\s*=\s*("[^"]*"|'[^']*')`)
+
+// ThemeSVG makes a stored diagram readable as an image. Every var(--…) becomes the colour it
+// stands for — in an <img> the page's variables do not exist, and in presentation attributes
+// (fill="var(--surface)") var() is not resolved at all and paints black. The root gets a text
+// colour and a font, and a light card goes in behind the drawing. Applied when it is served
+// rather than when it is stored, so diagrams drawn before this existed are fixed too.
+func ThemeSVG(svg []byte) []byte {
+	svg = cssVar.ReplaceAllFunc(svg, func(m []byte) []byte {
+		name := string(cssVar.FindSubmatch(m)[1])
+		if colour, ok := visualColours[name]; ok {
+			return []byte(colour)
+		}
+		return []byte("currentColor")
+	})
+	open := bytes.Index(bytes.ToLower(svg), []byte("<svg"))
+	if open < 0 {
+		return svg
+	}
+	end := bytes.IndexByte(svg[open:], '>')
+	if end < 0 {
+		return svg
+	}
+	closeAt := open + end
+	if closeAt > open && svg[closeAt-1] == '/' {
+		return svg // an empty <svg/> has nothing to draw
+	}
+	root := rootFontColour.ReplaceAll(svg[open:closeAt], nil)
+
+	out := make([]byte, 0, len(svg)+len(visualRootAttrs)+len(visualBackground))
+	out = append(out, svg[:open]...)
+	out = append(out, root...)
+	out = append(out, visualRootAttrs...)
+	out = append(out, '>')
+	out = append(out, visualBackground...)
+	return append(out, svg[closeAt+1:]...)
 }
 
 // parseVisual splits the model's reply into SVG, alt text and caption, and refuses anything

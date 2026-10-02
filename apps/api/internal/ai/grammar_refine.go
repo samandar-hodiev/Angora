@@ -87,8 +87,8 @@ type GrammarRefineRequest struct {
 	// AdaptFrom is the level Current was written for, when Action is adapt.
 	AdaptFrom string
 	// Index is the item to replace, counting from zero, when Action is regenerate_item.
-	Index int
-	ActorID   *uuid.UUID
+	Index   int
+	ActorID *uuid.UUID
 }
 
 type GrammarTranslateRequest struct {
@@ -162,7 +162,9 @@ func untranslated(source, got GeneratedGrammarLevel) bool {
 	if !got.Applicable {
 		return false
 	}
-	same := func(a, b string) bool { return strings.TrimSpace(a) != "" && strings.TrimSpace(a) == strings.TrimSpace(b) }
+	same := func(a, b string) bool {
+		return strings.TrimSpace(a) != "" && strings.TrimSpace(a) == strings.TrimSpace(b)
+	}
 	if same(source.Intro, got.Intro) || same(source.Explanation, got.Explanation) {
 		return true
 	}
