@@ -5,6 +5,16 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    /* No rubber-band at the page's ends. Pulling past the top or bottom on a trackpad used to
+     * drag the whole page with it: a black band opened above or below, and the sticky sidebar
+     * and header slid out of place. Inner panels still scroll and bounce on their own. */
+    overscroll-behavior: none;
+    /* What shows if an edge is ever uncovered anyway: the app's own background, not black. */
+    background-color: var(--background);
+  }
+
+  body {
+    overscroll-behavior: none;
   }
 
   /*
