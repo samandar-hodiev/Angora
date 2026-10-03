@@ -31,7 +31,9 @@ export function AuroraCurtain() {
 }
 
 /** The learning area, in the shell's own terms: below the header, right of the sidebar. */
-const frame = "pointer-events-none fixed top-14 right-0 bottom-0 left-0 md:left-62";
+// The shell's own measurements, read from the variables it sets: the sidebar can be resized.
+const frame =
+  "pointer-events-none fixed top-(--app-header-h,3rem) right-0 bottom-0 left-0 md:left-(--learner-sidebar-w,13.5rem)";
 
 /** Everything above this line belongs to the title, not to the scrolling content. */
 const maskHeight = "calc(var(--main-pt, 1.5rem) + var(--page-title-h, 3.5rem) + 0.75rem)";

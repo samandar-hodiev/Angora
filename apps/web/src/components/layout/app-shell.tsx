@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
-import { Brand } from "@/components/common/brand";
+import { Brand, BrandMark } from "@/components/common/brand";
 import { OfflineBanner } from "@/components/common/offline-banner";
 import { Button, IconButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,6 +30,7 @@ import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
 import { useSyncAppearance } from "@/features/profile/appearance";
 import { WallpaperLayer } from "@/features/profile/components/wallpaper-layer";
+import { useSidebarWidth } from "@/components/layout/sidebar-resize";
 import { NotificationsMenu } from "@/features/notifications/components/notifications-menu";
 import { useProfile } from "@/features/profile/hooks";
 import { useWallpaper } from "@/features/profile/wallpaper";
@@ -40,26 +41,47 @@ import { cn } from "@/lib/utils";
  * Authenticated layout. Desktop: sidebar. Mobile: top bar + floating glass bottom
  * navigation (the same five destinations the native app will use).
  */
+/** Sidebar sizes in px: icons only, the threshold below which it becomes that, default, widest. */
+const SIDEBAR = { icons: 64, collapseAt: 136, initial: 216, max: 264 };
+
 export function AppShell({ children }: { children: ReactNode }) {
   useSyncAppearance();
   const wallpaper = useWallpaper();
+  const sidebar = useSidebarWidth("engora:app:sidebar-width", SIDEBAR);
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[15.5rem_minmax(0,1fr)]">
-      <aside className="glass-frosted sticky top-0 isolate hidden h-dvh flex-col overflow-hidden border-y-0 border-l-0 md:flex">
+    <div
+      className="min-h-dvh md:grid md:grid-cols-[var(--learner-sidebar-w)_minmax(0,1fr)]"
+      // Read by the wallpaper frame too, so the photo always starts where the sidebar ends.
+      style={{ "--learner-sidebar-w": `${sidebar.width}px`, "--app-header-h": "3rem" } as CSSProperties}
+    >
+      {/* Not overflow-hidden: the resize edge sits a few pixels outside the border. The glow below
+          clips itself, and the nav scrolls on its own. */}
+      <aside className="glass-frosted sticky top-0 isolate hidden h-dvh min-w-0 flex-col border-y-0 border-l-0 md:flex">
         {/* Faint moving green light behind the frosted surface */}
         <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
           <span className="absolute -top-16 -left-12 size-56 animate-liquid-slow rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-70 blur-2xl motion-reduce:animate-none" />
         </span>
-        <div className="relative px-5 pt-5 pb-4">
-          <Brand href="/app/dashboard" />
+        <div className={cn("relative flex h-12 shrink-0 items-center px-4", sidebar.collapsed && "justify-center px-0")}>
+          {sidebar.collapsed ? (
+            <Link
+              href="/app/dashboard"
+              aria-label="Engora home"
+              className="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+            >
+              <BrandMark />
+            </Link>
+          ) : (
+            <Brand href="/app/dashboard" className="min-w-0 text-body font-semibold" />
+          )}
         </div>
-        <SidebarNav />
+        <SidebarNav collapsed={sidebar.collapsed} />
+        {sidebar.handle}
       </aside>
 
       <div className="flex min-w-0 flex-col">
         <OfflineBanner />
-        <header className="glass-frosted sticky top-0 z-30 flex h-14 items-center gap-2 overflow-hidden border-x-0 border-t-0 px-3 sm:px-6">
+        <header className="glass-frosted sticky top-0 z-30 flex h-12 items-center gap-2 overflow-hidden border-x-0 border-t-0 px-3 sm:px-6">
           <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
             <span className="absolute -top-10 left-1/4 h-24 w-1/2 animate-liquid rounded-full bg-[radial-gradient(closest-side,var(--glass-tint),transparent)] opacity-60 blur-2xl motion-reduce:animate-none" />
           </span>
@@ -88,7 +110,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           // can follow the picture instead of the theme (see theme.css). --app-header-h is the
           // header above: anything pinned inside the area measures from it.
           data-wallpaper-tone={wallpaper.tone ?? (wallpaper.selection === "custom" ? "dark" : undefined)}
-          style={{ "--app-header-h": "3.5rem" } as CSSProperties}
           className="relative isolate flex-1 px-4 pt-(--main-pt) pb-32 [--main-pt:1.5rem] sm:px-6 md:pb-12 lg:px-10 lg:[--main-pt:2rem]"
         >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
@@ -134,7 +155,7 @@ function MobileNavLink({ item }: { item: NavItem }) {
   );
 }
 
-function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
+function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
   const skills = useSkills();
   const isAdmin = useIsAdmin();
@@ -146,38 +167,51 @@ function SidebarNav({ inSheet = false }: { inSheet?: boolean }) {
       <Link
         href={item.href}
         aria-current={active ? "page" : undefined}
+        title={collapsed ? item.label : undefined}
         className={cn(
-          "relative flex items-center gap-3 rounded-lg px-3 py-2 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
-          nested && "py-1.5 pl-10",
+          "relative flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+          nested && "py-1 pl-9",
+          collapsed && "justify-center px-0",
           // Hover is a wash of the shell's own colour: a white one disappears against the cards.
           active ? "nav-liquid font-medium text-foreground" : "text-(--nav-text) hover:bg-(--nav-hover) hover:text-foreground",
         )}
       >
-        {!nested && <item.icon className={cn("size-4", active ? "text-primary" : "text-fg-muted")} aria-hidden />}
-        {item.label}
+        {!nested && <item.icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-fg-muted")} aria-hidden />}
+        {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
       </Link>
     );
     return inSheet ? <SheetClose asChild>{node}</SheetClose> : node;
   };
 
   return (
-    <nav aria-label="Main" className="scrollbar-slim relative flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-5">
-      <ul className="grid gap-0.5">
+    // Never scrolls sideways: a narrowed sidebar shortens its labels instead, and the lists are
+    // minmax(0, 1fr) grids because a plain grid column will not shrink below its longest word.
+    <nav
+      aria-label="Main"
+      className={cn(
+        "scrollbar-slim relative flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-2.5 pb-4",
+        collapsed && "px-2",
+      )}
+    >
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
         <li>{link(homeNav)}</li>
         <li>{link(grammarNav)}</li>
         <li>
           {link(learnNav)}
-          <ul className="mt-0.5 grid gap-0.5">
-            {learnSkills.map((skill) => (
-              <li key={skill.id}>{link({ href: skillHref(skill.code), label: skill.name, icon: learnNav.icon }, true)}</li>
-            ))}
-          </ul>
+          {/* Icons only, the skills have no icon of their own to show: Learn leads to them. */}
+          {!collapsed && (
+            <ul className="mt-0.5 grid grid-cols-[minmax(0,1fr)] gap-0.5">
+              {learnSkills.map((skill) => (
+                <li key={skill.id}>{link({ href: skillHref(skill.code), label: skill.name, icon: learnNav.icon }, true)}</li>
+              ))}
+            </ul>
+          )}
         </li>
         {primaryNav.map((item) => (
           <li key={item.href}>{link(item)}</li>
         ))}
       </ul>
-      <div className="mt-auto grid gap-0.5 border-t pt-4">
+      <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-0.5 border-t pt-3">
         {isAdmin && link({ href: "/admin", label: "Admin console", icon: Shield })}
         {secondaryNav.map((item) => (
           <div key={item.href}>{link(item)}</div>
