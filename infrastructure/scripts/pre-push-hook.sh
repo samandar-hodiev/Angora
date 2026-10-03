@@ -16,6 +16,9 @@ NOTIFY="$REPO_ROOT/infrastructure/scripts/gitpulse-notify.sh"
 [ -x "$NOTIFY" ] || exit 0
 
 REMOTE_NAME="${1:-origin}"
+# One push can carry the same commit to two refs — the feature branch and main, which is
+# what the contribution graph counts. Announce each commit once, for the first ref.
+SEEN=""
 
 while read -r _local_ref local_sha remote_ref _remote_sha; do
   # Skip empty SHAs and all-zero SHAs (branch deletions): nothing to announce.
@@ -25,6 +28,10 @@ while read -r _local_ref local_sha remote_ref _remote_sha; do
     *[!0]*) ;;
     *) continue ;;
   esac
+  case " $SEEN " in
+    *" $local_sha "*) continue ;;
+  esac
+  SEEN="$SEEN $local_sha"
 
   (
     i=0

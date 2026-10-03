@@ -199,3 +199,16 @@ make gitpulse-hook
 After a successful `git push`, the hook signs the commit payload with GitPulse's webhook secret
 and posts it to `http://localhost:8080/webhook/github`. If GitPulse is not running, the push is
 unaffected.
+
+### Contribution graph
+
+GitHub's contribution graph counts commits on the default branch (`main`) only. While work
+happens on a feature branch, this clone is set so a plain `git push` updates both the branch
+and `main` (fast-forward), so every day's commits show on that day:
+
+```bash
+git config --add remote.origin.push refs/heads/<branch>:refs/heads/<branch>
+git config --add remote.origin.push refs/heads/<branch>:refs/heads/main
+```
+
+The hook announces each commit once, even though one push now updates two refs.
