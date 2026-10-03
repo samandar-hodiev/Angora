@@ -285,9 +285,11 @@ type LevelContent struct {
 	/** Practice questions authored against this level. */
 	QuestionCount int `json:"question_count"`
 	/** The questions themselves, so the builder can edit them beside the text they test. */
-	Questions   []ai.GeneratedPractice `json:"questions"`
-	PublishedAt *time.Time             `json:"published_at"`
-	UpdatedAt   *time.Time             `json:"updated_at"`
+	Questions []ai.GeneratedPractice `json:"questions"`
+	/** The level's writing and speaking tasks: the draft when there is one, else the live one. */
+	Tasks       []PracticeTask `json:"tasks"`
+	PublishedAt *time.Time     `json:"published_at"`
+	UpdatedAt   *time.Time     `json:"updated_at"`
 	/** The live version a learner is reading, when this draft is not it. */
 	PublishedVersion *int `json:"published_version"`
 }
@@ -398,6 +400,10 @@ func (m *Module) loadTopicContent(ctx context.Context, slug, language string) (T
 	if err != nil {
 		return out, err
 	}
+	tasks, err := m.tasksByLevel(ctx, topicID)
+	if err != nil {
+		return out, err
+	}
 
 	// Every level is offered, written or not: the editor's job is to see the gaps.
 	for _, code := range allLevels {
@@ -408,6 +414,10 @@ func (m *Module) loadTopicContent(ctx context.Context, slug, language string) (T
 		level.Questions = questions[code]
 		if level.Questions == nil {
 			level.Questions = []ai.GeneratedPractice{}
+		}
+		level.Tasks = tasks[code]
+		if level.Tasks == nil {
+			level.Tasks = []PracticeTask{}
 		}
 		out.Levels = append(out.Levels, level)
 	}

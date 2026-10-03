@@ -71,6 +71,8 @@ type Module struct {
 	// taskWriter writes writing tasks for a grammar topic. Nil serves a plain task instead.
 	taskWriter TopicTaskWriter
 	topicTasks *topicTaskCache
+	// topicSpeaking caches speaking tasks written on the spot, like topicTasks for writing.
+	topicSpeaking *speakingTaskCache
 }
 
 type Deps struct {
@@ -108,7 +110,7 @@ func NewModule(d Deps) *Module {
 	return &Module{pool: d.Pool, plans: d.Plans, usage: d.Usage, evaluator: d.Evaluator,
 		speaker: d.Speaker, store: d.Storage, maxUpload: maxUpload, track: d.Tracker,
 		conversation: d.Conversation, origins: d.AllowedOrigins,
-		taskWriter: d.TopicTasks, topicTasks: &topicTaskCache{}}
+		taskWriter: d.TopicTasks, topicTasks: &topicTaskCache{}, topicSpeaking: &speakingTaskCache{}}
 }
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {

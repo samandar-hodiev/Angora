@@ -164,6 +164,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/grammar/topics/:slug/validate", content, m.validateGrammarContent)
 	g.POST("/grammar/topics/:slug/generate", content, m.generateGrammarContent)
 	g.PUT("/grammar/topics/:slug/levels/:level", content, m.saveGrammarLevel)
+	g.PUT("/grammar/topics/:slug/levels/:level/tasks/:kind", content, m.saveGrammarTask)
 	g.POST("/grammar/topics/:slug/publish", content, m.publishGrammarContent)
 	// Editing a draft that exists. Neither writes: both return a suggestion for review.
 	g.POST("/grammar/topics/:slug/levels/:level/refine", content, m.refineGrammarLevel)

@@ -68,6 +68,20 @@ func (a *translatingAuthor) WriteGrammarPractice(_ context.Context, req ai.Gramm
 	return out, &ai.EvaluationMeta{}, nil
 }
 
+func (a *translatingAuthor) WriteGrammarTask(_ context.Context, req ai.GrammarWritingTaskRequest) (*ai.GrammarWritingTask, error) {
+	return &ai.GrammarWritingTask{
+		Title: "Write at " + req.Level.BaseCode(), Prompt: "Describe your room.", Instructions: []string{"Use a or an."},
+		MinWords: 60, Minutes: 15, Focus: "This practises a / an.",
+	}, nil
+}
+
+func (a *translatingAuthor) WriteGrammarSpeakingTask(_ context.Context, req ai.GrammarWritingTaskRequest) (*ai.GrammarSpeakingTask, error) {
+	return &ai.GrammarSpeakingTask{
+		Title: "Talk at " + req.Level.BaseCode(), Prompt: "Describe your street.", Points: []string{"Where it is", "What is there"},
+		TargetSeconds: 60, Focus: "This practises a / an.",
+	}, nil
+}
+
 func TestGrammarGenerateEveryLanguagePostgres(t *testing.T) {
 	dbURL := os.Getenv("TEST_DATABASE_URL")
 	if dbURL == "" {
@@ -360,6 +374,77 @@ func TestGrammarGenerateEveryLanguagePostgres(t *testing.T) {
 		})
 		if w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
 			t.Errorf("status = %d, want a refusal for a gap-fill with no gap", w.Code)
+		}
+	})
+
+	t.Run("one generate writes the writing and speaking tasks too, as drafts per level", func(t *testing.T) {
+		var n int
+		if err := pool.QueryRow(ctx, `
+			SELECT count(*) FROM grammar_practice_tasks WHERE grammar_topic_id = $1 AND status IN ('draft', 'published')`,
+			topicID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		// A2 and B2, each a writing and a speaking task; the refused C2 gets none.
+		if n != 4 {
+			t.Errorf("tasks = %d, want 4", n)
+		}
+	})
+
+	t.Run("generating only the tasks leaves the explanation and the test alone, and publishes on its own", func(t *testing.T) {
+		var before int
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM grammar_content WHERE grammar_topic_id = $1`, topicID).Scan(&before)
+		var buf bytes.Buffer
+		_ = json.NewEncoder(&buf).Encode(map[string]any{"levels": []string{"A2"}, "parts": []string{"writing", "speaking"}})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/grammar/topics/"+slug+"/generate", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("generate status = %d body = %s", w.Code, w.Body.String())
+		}
+		var after int
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM grammar_content WHERE grammar_topic_id = $1`, topicID).Scan(&after)
+		if after != before {
+			t.Errorf("content rows %d -> %d, want no new explanation", before, after)
+		}
+
+		buf.Reset()
+		_ = json.NewEncoder(&buf).Encode(map[string]any{"languages": []string{"en", "uz", "ru"}})
+		req = httptest.NewRequest(http.MethodPost, "/api/v1/admin/grammar/topics/"+slug+"/publish", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("publish status = %d body = %s — new tasks alone must be publishable", w.Code, w.Body.String())
+		}
+		var live, drafts int
+		_ = pool.QueryRow(ctx, `
+			SELECT count(*) FILTER (WHERE status = 'published'), count(*) FILTER (WHERE status = 'draft')
+			FROM grammar_practice_tasks WHERE grammar_topic_id = $1`, topicID).Scan(&live, &drafts)
+		if live != 4 || drafts != 0 {
+			t.Errorf("tasks live/draft = %d/%d, want 4/0 — one live task per kind and level", live, drafts)
+		}
+	})
+
+	t.Run("the owner edits a task and the editor reads it back as a draft", func(t *testing.T) {
+		var buf bytes.Buffer
+		_ = json.NewEncoder(&buf).Encode(map[string]any{
+			"title": "My room", "prompt": "Write about your room.", "instructions": []string{"Use a / an", " "},
+			"min_words": 70, "minutes": 12, "focus": "a / an",
+		})
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/grammar/topics/"+slug+"/levels/A2/tasks/writing", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("save status = %d body = %s", w.Code, w.Body.String())
+		}
+		var got struct {
+			Data PracticeTask `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &got)
+		if got.Data.Status != "draft" || !got.Data.Live || got.Data.Source != "curated" || len(got.Data.Instructions) != 1 {
+			t.Errorf("saved task = %+v, want a curated draft over a live one, blank lines dropped", got.Data)
 		}
 	})
 }

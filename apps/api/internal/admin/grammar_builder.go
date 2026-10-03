@@ -44,6 +44,8 @@ type generateInput struct {
 	Levels    []string `json:"levels" binding:"required,min=1,max=6,dive,max=4"`
 	/** Regenerating a level that already has an owner-edited draft needs saying so twice. */
 	Overwrite bool `json:"overwrite"`
+	/** What to write: explanation, test, writing, speaking. Empty means all of them. */
+	Parts []string `json:"parts" binding:"omitempty,max=4,dive,oneof=explanation test writing speaking"`
 }
 
 // generationStarted is what a queued generation answers with: poll GET /jobs/:id.
@@ -51,6 +53,7 @@ type generationStarted struct {
 	JobID     uuid.UUID `json:"job_id"`
 	Languages []string  `json:"languages"`
 	Levels    []string  `json:"levels"`
+	Parts     []string  `json:"parts"`
 }
 
 // generateGrammarContent writes the requested levels and stores them as drafts — in English,
@@ -80,7 +83,9 @@ func (m *Module) generateGrammarContent(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	plan := generationPlan{Slug: c.Param("slug"), Levels: levelCodes(levels), Actor: p.UserID, Overwrite: in.Overwrite}
+	plan := generationPlan{
+		Slug: c.Param("slug"), Levels: levelCodes(levels), Actor: p.UserID, Overwrite: in.Overwrite, Parts: in.Parts,
+	}
 	if len(in.Languages) > 0 {
 		plan.Source = "en"
 		plan.Targets = translationTargets(in.Languages)
@@ -92,7 +97,8 @@ func (m *Module) generateGrammarContent(c *gin.Context) {
 	// Refuse to overwrite work somebody did by hand unless they say so again. An owner who
 	// spent an hour on B2 should not lose it to a mis-click on a button labelled Generate.
 	// Checked here, before anything is queued, so the answer comes back while they look.
-	if !in.Overwrite {
+	// Only a new explanation replaces text; a test or a task on its own does not.
+	if !in.Overwrite && plan.wants(PartExplanation) {
 		for _, language := range plan.languages() {
 			current, err := m.loadTopicContent(ctx, plan.Slug, language)
 			if err != nil {
@@ -121,9 +127,9 @@ func (m *Module) generateGrammarContent(c *gin.Context) {
 			return
 		}
 		recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarGenerated, plan.Slug, map[string]any{
-			"languages": plan.languages(), "levels": plan.Levels, "overwrite": in.Overwrite, "job_id": job.ID,
+			"languages": plan.languages(), "levels": plan.Levels, "parts": plan.partsOrAll(), "overwrite": in.Overwrite, "job_id": job.ID,
 		})
-		httpx.Accepted(c, generationStarted{JobID: job.ID, Languages: plan.languages(), Levels: plan.Levels})
+		httpx.Accepted(c, generationStarted{JobID: job.ID, Languages: plan.languages(), Levels: plan.Levels, Parts: plan.partsOrAll()})
 		return
 	}
 
@@ -200,40 +206,51 @@ func (m *Module) storeGenerated(
 				return err
 			}
 
-			// Practice is regenerated wholesale for the level: the questions belong to the
-			// explanation they were written against, and keeping the old ones beside a
-			// rewritten lesson is how a question ends up testing a rule the page no longer
-			// mentions. Only this level's generated questions go; curated ones stay. A level
-			// the model now refuses loses its unpublished test too.
+			// A level the model now refuses loses its unpublished test too; an applicable
+			// level with no new questions keeps the test it has.
 			if level.Applicable && len(level.Practice) == 0 {
 				continue
 			}
-			if _, err := tx.Exec(ctx, `
-				DELETE FROM grammar_questions
-				WHERE grammar_topic_id = $1 AND source = 'ai' AND status <> 'published'
-				  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, level.Level); err != nil {
-				return err
-			}
+			practice := level.Practice
 			if !level.Applicable {
-				continue
+				practice = nil
 			}
-			for _, q := range level.Practice {
-				kind, payload, answer, err := questionColumns(q)
-				if err != nil {
-					return err
-				}
-				if _, err := tx.Exec(ctx, `
-					INSERT INTO grammar_questions (grammar_topic_id, type, level_id, prompt, payload, answer,
-					                               explanation, target_rule, source, status, ai_request_id)
-					VALUES ($1, $2, (SELECT id FROM levels WHERE code = $3), $4, $5, $6, $7, $8,
-					        'ai', 'draft', $9)`,
-					topicID, kind, level.Level, q.Prompt, payload, answer, q.Explanation, q.TargetRule, aiRequestID); err != nil {
-					return err
-				}
+			if err := replaceAIPractice(ctx, tx, topicID, level.Level, practice, aiRequestID); err != nil {
+				return err
 			}
 		}
 		return nil
 	})
+}
+
+// replaceAIPractice swaps a level's unpublished generated questions for a new set.
+//
+// Practice is regenerated wholesale for the level: the questions belong to the explanation
+// they were written against, and keeping the old ones beside a rewritten lesson is how a
+// question ends up testing a rule the page no longer mentions. Only generated questions go;
+// curated ones stay.
+func replaceAIPractice(ctx context.Context, tx pgx.Tx, topicID uuid.UUID, level string, practice []ai.GeneratedPractice, aiRequestID *uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM grammar_questions
+		WHERE grammar_topic_id = $1 AND source = 'ai' AND status <> 'published'
+		  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, level); err != nil {
+		return err
+	}
+	for _, q := range practice {
+		kind, payload, answer, err := questionColumns(q)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO grammar_questions (grammar_topic_id, type, level_id, prompt, payload, answer,
+			                               explanation, target_rule, source, status, ai_request_id)
+			VALUES ($1, $2, (SELECT id FROM levels WHERE code = $3), $4, $5, $6, $7, $8,
+			        'ai', 'draft', $9)`,
+			topicID, kind, level, q.Prompt, payload, answer, q.Explanation, q.TargetRule, aiRequestID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // questionColumns is how a practice question is stored: its type, and the payload and
@@ -686,7 +703,12 @@ func (m *Module) publishGrammarContent(c *gin.Context) {
 			WithDetails(map[string]any{"issues": issues}))
 		return
 	}
-	if len(plans) == 0 {
+	extras, err := m.pendingExtras(ctx, topicID, levels)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if len(plans) == 0 && !extras {
 		httpx.Fail(c, apperr.New(apperr.CodeConflict, "There is nothing to publish yet").
 			WithDetails(map[string]any{"issues": []Issue{}}))
 		return
@@ -701,6 +723,27 @@ func (m *Module) publishGrammarContent(c *gin.Context) {
 			}
 			if len(levels) > 0 {
 				published[pl.language] = levels
+			}
+		}
+		// The test and the tasks go live for every level whose explanation is live —
+		// including levels whose explanation did not change in this publish.
+		for _, code := range liveLevelsIn(levels) {
+			var live bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM grammar_content WHERE grammar_topic_id = $1
+				               AND level_code = $2::cefr_code AND status = 'published')`,
+				topicID, code).Scan(&live); err != nil {
+				return err
+			}
+			if !live {
+				continue // a test with no explanation in front of it is not a lesson
+			}
+			changed, err := publishLevelExtras(ctx, tx, topicID, code)
+			if err != nil {
+				return err
+			}
+			if changed {
+				published["extras"] = append(published["extras"], code)
 			}
 		}
 		if len(published) == 0 {
@@ -726,7 +769,11 @@ func (m *Module) publishGrammarContent(c *gin.Context) {
 
 	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarPublished, slug, map[string]any{"published": published})
 
-	out, err := m.loadTopicContent(ctx, slug, plans[0].language)
+	language := languages[0]
+	if len(plans) > 0 {
+		language = plans[0].language
+	}
+	out, err := m.loadTopicContent(ctx, slug, language)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -785,26 +832,32 @@ func publishLanguage(ctx context.Context, tx pgx.Tx, topicID uuid.UUID, language
 			topicID, language, code); err != nil {
 			return nil, err
 		}
-		// A level with a new test replaces its old one, the way new text replaces old text.
-		// Without this, every regenerate-and-publish added fifteen questions to the fifteen
-		// already live. Archived, not deleted: past attempts still point at them.
-		if _, err := tx.Exec(ctx, `
-			UPDATE grammar_questions SET status = 'archived'
-			WHERE grammar_topic_id = $1 AND status = 'published'
-			  AND level_id = (SELECT id FROM levels WHERE code = $2)
-			  AND EXISTS (SELECT 1 FROM grammar_questions d
-			              WHERE d.grammar_topic_id = $1 AND d.status = 'draft'
-			                AND d.level_id = (SELECT id FROM levels WHERE code = $2))`, topicID, code); err != nil {
-			return nil, err
-		}
-		if _, err := tx.Exec(ctx, `
-			UPDATE grammar_questions SET status = 'published'
-			WHERE grammar_topic_id = $1 AND status = 'draft'
-			  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, code); err != nil {
-			return nil, err
-		}
 	}
 	return published, nil
+}
+
+// liveLevelsIn is the levels a publish covers: the ones asked for, or all of them.
+func liveLevelsIn(levels []cefr.Level) []string {
+	if len(levels) == 0 {
+		return allLevels
+	}
+	return levelCodes(levels)
+}
+
+// pendingExtras reports whether a level that is live has a draft test or task waiting.
+func (m *Module) pendingExtras(ctx context.Context, topicID uuid.UUID, levels []cefr.Level) (bool, error) {
+	var pending bool
+	err := m.pool.QueryRow(ctx, `
+		WITH live AS (
+		    SELECT DISTINCT level_code::text AS code FROM grammar_content
+		    WHERE grammar_topic_id = $1 AND status = 'published' AND level_code::text = ANY ($2)
+		)
+		SELECT EXISTS (SELECT 1 FROM grammar_questions q JOIN levels l ON l.id = q.level_id
+		               WHERE q.grammar_topic_id = $1 AND q.status = 'draft' AND l.code IN (SELECT code FROM live))
+		    OR EXISTS (SELECT 1 FROM grammar_practice_tasks t
+		               WHERE t.grammar_topic_id = $1 AND t.status = 'draft' AND t.level_code::text IN (SELECT code FROM live))`,
+		topicID, liveLevelsIn(levels)).Scan(&pending)
+	return pending, err
 }
 
 // errNothingToPublish is returned from inside the publish transaction when no language had a

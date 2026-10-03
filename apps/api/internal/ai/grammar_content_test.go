@@ -196,6 +196,10 @@ func TestUsablePracticeDropsDuplicateOptions(t *testing.T) {
 	}
 }
 
+func TestGrammarSpeakingTaskSchemaIsStrictModeSafe(t *testing.T) {
+	assertStrictSchema(t, grammarSpeakingTaskSchema)
+}
+
 func TestGrammarPracticeCheckSchemaIsStrictModeSafe(t *testing.T) {
 	assertStrictSchema(t, grammarPracticeCheckSchema)
 }

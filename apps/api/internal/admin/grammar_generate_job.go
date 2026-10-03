@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -39,10 +40,35 @@ type generationPlan struct {
 	Targets   []string  `json:"targets,omitempty"`
 	Actor     uuid.UUID `json:"actor"`
 	Overwrite bool      `json:"overwrite"`
+	// Parts is what to write: explanation, test, writing, speaking. Empty is all of them —
+	// jobs queued before parts existed meant everything.
+	Parts []string `json:"parts,omitempty"`
 }
+
+// The parts of a topic one Generate can write.
+const (
+	PartExplanation = "explanation"
+	PartTest        = "test"
+	PartWriting     = "writing"
+	PartSpeaking    = "speaking"
+)
+
+var allParts = []string{PartExplanation, PartTest, PartWriting, PartSpeaking}
 
 func (p generationPlan) languages() []string {
 	return append([]string{p.Source}, p.Targets...)
+}
+
+func (p generationPlan) wants(part string) bool {
+	if len(p.Parts) == 0 {
+		return true
+	}
+	for _, x := range p.Parts {
+		if x == part {
+			return true
+		}
+	}
+	return false
 }
 
 // translationTargets is every requested language other than English, in a stable order.
@@ -104,37 +130,72 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 	}
 
 	actor := plan.Actor
-	generated, meta, err := m.author.AuthorGrammarContent(ctx, ai.GrammarAuthorRequest{
-		Topic:         current.Topic.Name,
-		Slug:          current.Topic.Slug,
-		Category:      category,
-		Description:   current.Topic.Description,
-		Levels:        levels,
-		Language:      plan.Source,
-		RelatedTopics: current.Related,
-		ActorID:       &actor,
-	})
-	if err != nil {
-		// The provider's own words are not shown: they can carry prompt text and model
-		// internals. The owner needs to know it failed and that retrying is reasonable.
-		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "AI content generation failed. Please try again.")
-	}
+	failed := []string{}
+	languages := []string{}
 
+	// The lessons the test is written against, by level: the ones written now, or — when the
+	// explanation is not being rewritten — the English drafts already there.
+	var generated *ai.GeneratedGrammarContent
 	var aiRequestID *uuid.UUID
-	if meta != nil && meta.AIRequestID != uuid.Nil {
-		aiRequestID = &meta.AIRequestID
+	if plan.wants(PartExplanation) {
+		var meta *ai.EvaluationMeta
+		generated, meta, err = m.author.AuthorGrammarContent(ctx, ai.GrammarAuthorRequest{
+			Topic:         current.Topic.Name,
+			Slug:          current.Topic.Slug,
+			Category:      category,
+			Description:   current.Topic.Description,
+			Levels:        levels,
+			Language:      plan.Source,
+			RelatedTopics: current.Related,
+			ActorID:       &actor,
+		})
+		if err != nil {
+			// The provider's own words are not shown: they can carry prompt text and model
+			// internals. The owner needs to know it failed and that retrying is reasonable.
+			return nil, apperr.Wrap(err, apperr.CodeUnavailable, "AI content generation failed. Please try again.")
+		}
+		if meta != nil && meta.AIRequestID != uuid.Nil {
+			aiRequestID = &meta.AIRequestID
+		}
+		for _, code := range generated.Dropped {
+			failed = append(failed, plan.Source+":"+code)
+		}
+	}
+	lessons, taskLevels, err := m.lessonsFor(ctx, plan, levels, generated)
+	if err != nil {
+		return nil, err
 	}
 
-	// The tests are written while the translations run: both need only the English, and
-	// one after the other would double the wait for nothing.
+	// The test and the tasks are written while the translations run: they need only the
+	// English, and one after the other would multiply the wait for nothing.
 	type testResult struct {
 		practice [][]ai.GeneratedPractice
 		failed   []string
 	}
 	tests := make(chan testResult, 1)
 	go func() {
-		practice, failed := m.writeTests(ctx, current, category, actor, generated.Levels)
+		if !plan.wants(PartTest) {
+			tests <- testResult{}
+			return
+		}
+		practice, failed := m.writeTests(ctx, current, category, actor, lessons)
 		tests <- testResult{practice, failed}
+	}()
+	type taskResult struct {
+		tasks  []PracticeTask
+		failed []string
+	}
+	tasks := make(chan taskResult, 1)
+	go func() {
+		var kinds []string
+		if plan.wants(PartWriting) {
+			kinds = append(kinds, TaskWriting)
+		}
+		if plan.wants(PartSpeaking) {
+			kinds = append(kinds, TaskSpeaking)
+		}
+		written, failed := m.writeTasks(ctx, current, actor, taskLevels, kinds)
+		tasks <- taskResult{written, failed}
 	}()
 
 	type translation struct {
@@ -143,38 +204,122 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 		missing []string
 	}
 	var translations []translation
-	if len(plan.Targets) > 0 && m.refiner != nil {
+	if generated != nil && len(plan.Targets) > 0 && m.refiner != nil {
 		for _, target := range plan.Targets {
 			done, missing := m.translateAll(ctx, current, category, plan.Source, target, actor, generated.Levels)
 			translations = append(translations, translation{target, done, missing})
 		}
 	}
-	written := <-tests
-	failed := written.failed
-	for _, code := range generated.Dropped {
-		failed = append(failed, plan.Source+":"+code)
-	}
-	for i, practice := range written.practice {
-		if practice != nil {
-			generated.Levels[i].Practice = practice
-		}
-	}
+	writtenTests := <-tests
+	writtenTasks := <-tasks
+	failed = append(failed, writtenTests.failed...)
+	failed = append(failed, writtenTasks.failed...)
 
-	if err := m.storeGenerated(ctx, current.Topic.ID, plan.Source, actor, aiRequestID, generated); err != nil {
-		return nil, err
-	}
-	languages := []string{plan.Source}
-	for _, t := range translations {
-		if err := m.storeTranslated(ctx, current.Topic.ID, t.target, actor, t.levels); err != nil {
+	if generated != nil {
+		// Without a new test, the lesson's own few questions do not replace the test there is.
+		for i := range generated.Levels {
+			generated.Levels[i].Practice = nil
+		}
+		for i, practice := range writtenTests.practice {
+			if practice != nil {
+				code := lessons[i].Level
+				for j := range generated.Levels {
+					if generated.Levels[j].Level == code {
+						generated.Levels[j].Practice = practice
+					}
+				}
+			}
+		}
+		if err := m.storeGenerated(ctx, current.Topic.ID, plan.Source, actor, aiRequestID, generated); err != nil {
 			return nil, err
 		}
-		if len(t.levels) > 0 {
-			languages = append(languages, t.target)
+		languages = append(languages, plan.Source)
+		for _, t := range translations {
+			if err := m.storeTranslated(ctx, current.Topic.ID, t.target, actor, t.levels); err != nil {
+				return nil, err
+			}
+			if len(t.levels) > 0 {
+				languages = append(languages, t.target)
+			}
+			failed = append(failed, t.missing...)
 		}
-		failed = append(failed, t.missing...)
+	} else if len(writtenTests.practice) > 0 {
+		if err := database.WithTx(ctx, m.pool, func(tx pgx.Tx) error {
+			for i, practice := range writtenTests.practice {
+				if practice != nil {
+					if err := replaceAIPractice(ctx, tx, current.Topic.ID, lessons[i].Level, practice, nil); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	if err := m.storeTasks(ctx, current.Topic.ID, actor, "ai", writtenTasks.tasks); err != nil {
+		return nil, err
 	}
 
-	return map[string]any{"slug": plan.Slug, "languages": languages, "levels": plan.Levels, "failed": failed}, nil
+	return map[string]any{
+		"slug": plan.Slug, "languages": languages, "levels": plan.Levels, "parts": plan.partsOrAll(), "failed": failed,
+	}, nil
+}
+
+func (p generationPlan) partsOrAll() []string {
+	if len(p.Parts) == 0 {
+		return allParts
+	}
+	return p.Parts
+}
+
+// lessonsFor is what the test and the tasks are written against. With a new explanation it
+// is that explanation's applicable levels. Without one it is the English text already
+// drafted or live for each asked-for level; a level with none gets no test, and a level an
+// editor marked not applicable gets nothing at all.
+func (m *Module) lessonsFor(
+	ctx context.Context, plan generationPlan, levels []cefr.Level, generated *ai.GeneratedGrammarContent,
+) ([]ai.GeneratedGrammarLevel, []cefr.Level, error) {
+	var lessons []ai.GeneratedGrammarLevel
+	var taskLevels []cefr.Level
+	if generated != nil {
+		for _, l := range generated.Levels {
+			if !l.Applicable {
+				continue
+			}
+			lessons = append(lessons, l)
+			if parsed, err := cefr.Parse(l.Level); err == nil {
+				taskLevels = append(taskLevels, parsed)
+			}
+		}
+		return lessons, taskLevels, nil
+	}
+	for _, level := range levels {
+		var status string
+		err := m.pool.QueryRow(ctx, `
+			SELECT gc.status FROM grammar_content gc JOIN grammar_topics t ON t.id = gc.grammar_topic_id
+			WHERE t.slug = $1 AND gc.language = 'en' AND gc.level_code = $2::cefr_code
+			ORDER BY gc.version DESC LIMIT 1`, plan.Slug, level.BaseCode()).Scan(&status)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, err
+		}
+		if status == ContentNotApplicable {
+			continue
+		}
+		taskLevels = append(taskLevels, level)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		lesson, found, err := m.levelDraft(ctx, plan.Slug, "en", level)
+		if err != nil {
+			return nil, nil, err
+		}
+		if found {
+			lesson.Practice = nil
+			lessons = append(lessons, lesson)
+		}
+	}
+	return lessons, taskLevels, nil
 }
 
 // PracticeWriter writes a level's test. The content author implements it; an author that

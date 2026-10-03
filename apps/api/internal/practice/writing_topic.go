@@ -2,6 +2,7 @@ package practice
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -117,8 +118,23 @@ func (m *Module) topicWritingTask(c *gin.Context) {
 		}
 	}
 
+	// The task the topic was published with comes first: an owner has read it. Only a topic
+	// published without one falls back to a task written on the spot.
 	key := slug + "|" + level.BaseCode()
-	task, ok := m.topicTasks.get(key)
+	task, ok := ai.GrammarWritingTask{}, false
+	if published, found, err := m.publishedTopicTask(ctx, slug, "writing", level); err != nil {
+		httpx.Fail(c, err)
+		return
+	} else if found {
+		task, ok = ai.GrammarWritingTask{
+			Title: published.Title, Prompt: published.Prompt, Instructions: published.Instructions,
+			MinWords: published.MinWords, Minutes: published.Minutes, Focus: published.Focus,
+		}, true
+		level = published.Level
+	}
+	if !ok {
+		task, ok = m.topicTasks.get(key)
+	}
 	if !ok {
 		task = ai.FallbackGrammarTask(name, level)
 		if m.taskWriter != nil {
@@ -144,4 +160,46 @@ func (m *Module) topicWritingTask(c *gin.Context) {
 	}
 	out.Topic.Slug, out.Topic.Name = slug, name
 	httpx.OK(c, out)
+}
+
+// topicTask is a task a grammar topic was published with.
+type topicTask struct {
+	Level         cefr.Level
+	Title         string
+	Prompt        string
+	Instructions  []string
+	MinWords      int
+	TargetSeconds int
+	Minutes       int
+	Focus         string
+}
+
+// publishedTopicTask is the topic's live task of one kind, for the learner's level — or, when
+// that level has none, the nearest level that does, the lower one first.
+func (m *Module) publishedTopicTask(ctx context.Context, slug, kind string, level cefr.Level) (topicTask, bool, error) {
+	var (
+		t            topicTask
+		code         string
+		instructions []byte
+	)
+	err := m.pool.QueryRow(ctx, `
+		SELECT t.level_code::text, t.title, t.prompt, t.instructions, t.min_words, t.target_seconds, t.minutes, t.focus
+		FROM grammar_practice_tasks t
+		JOIN grammar_topics g ON g.id = t.grammar_topic_id
+		JOIN levels l ON l.code = t.level_code::text
+		WHERE g.slug = $1 AND g.status = 'published' AND t.kind = $2 AND t.status = 'published'
+		ORDER BY abs(l.rank - COALESCE((SELECT rank FROM levels WHERE code = $3), l.rank)), l.rank
+		LIMIT 1`, slug, kind, level.BaseCode()).
+		Scan(&code, &t.Title, &t.Prompt, &instructions, &t.MinWords, &t.TargetSeconds, &t.Minutes, &t.Focus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return t, false, nil
+	}
+	if err != nil {
+		return t, false, err
+	}
+	_ = json.Unmarshal(instructions, &t.Instructions)
+	if t.Level, err = cefr.Parse(code); err != nil {
+		t.Level = level
+	}
+	return t, true, nil
 }

@@ -70,6 +70,8 @@ type SpeakingAssessmentInput struct {
 	WordsPerMinute float64
 	// PauseRatio is the share of the recording spent in long pauses, when segments are known.
 	PauseRatio *float64
+	// Focus is the grammar point the task was set to practise, when it was set for one.
+	Focus string
 }
 
 type SpeakingAssessment struct {
@@ -154,6 +156,12 @@ func (e *PlacementEvaluator) EvaluateSpeaking(ctx context.Context, in SpeakingAs
 	}
 	input := fmt.Sprintf("TASK LEVEL: %s\nTASK: %s\nSPEECH_SECONDS: %.0f\nWORDS_PER_MINUTE: %.0f\nLONG_PAUSES: %s\nTRANSCRIPT:\n%s",
 		in.TargetLevel, in.TaskPrompt, in.SpeechSeconds, in.WordsPerMinute, pauses, in.Transcript)
+	if focus := strings.TrimSpace(in.Focus); focus != "" {
+		input = "FOCUS GRAMMAR: " + focus + "\n" +
+			"This task was set to practise the focus grammar. Check every place the speaker used it — or should have — " +
+			"and report each error in it as its own mistake, before any other mistakes. Let how well they used it " +
+			"weigh heavily in the grammar score.\n\n" + input
+	}
 	var out SpeakingAssessment
 	meta, err := e.analyze(ctx, in.UserID, TaskSpeakingEvaluation, SchemaPlacementSpeaking, speakingSchema,
 		placementInstructions+"\n\n"+speakingCriteriaGuide, input, &out)

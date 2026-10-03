@@ -91,6 +91,7 @@ type SpeakingSession struct {
 func (m *Module) registerSpeakingRoutes(v1 *gin.RouterGroup) {
 	g := v1.Group("/speaking", authz.RequirePermission(authz.PermLearningPractice))
 	g.GET("/tasks", m.speakingTasks)
+	g.GET("/topic-task", m.topicSpeakingTask)
 	g.POST("/sessions", m.submitSpeaking)
 	g.GET("/sessions", m.listSpeakingSessions)
 	g.GET("/sessions/:id", m.speakingSession)
@@ -201,6 +202,39 @@ func (m *Module) submitSpeaking(c *gin.Context) {
 
 	prompt, level := m.speakingPrompt(ctx, p.UserID, taskID)
 
+	// A recording made for a grammar topic carries the prompt it answered and the topic, the
+	// way a writing submission does: the evaluator is told what it practises, the session
+	// remembers both, and the learner is judged at their own level.
+	var focusTopicID *uuid.UUID
+	focus := ""
+	if taskID == nil {
+		if given := strings.TrimSpace(c.Request.FormValue("prompt")); given != "" {
+			prompt = given
+			if r := []rune(prompt); len(r) > 1000 {
+				prompt = string(r[:1000])
+			}
+			level = m.learnerLevel(ctx, p.UserID).BaseCode()
+		}
+		if slug := strings.TrimSpace(c.Request.FormValue("grammar_topic")); slug != "" {
+			var id uuid.UUID
+			var name, description string
+			err := m.pool.QueryRow(ctx, `
+				SELECT id, name, description FROM grammar_topics WHERE slug = $1 AND status = 'published'`, slug).
+				Scan(&id, &name, &description)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				httpx.Fail(c, err)
+				return
+			}
+			if err == nil {
+				focusTopicID = &id
+				focus = name
+				if description = strings.TrimSpace(description); description != "" {
+					focus += " — " + description
+				}
+			}
+		}
+	}
+
 	// Stage one: store the bytes. Nothing else happens until they are safe.
 	key := storage.NewKey("audio", p.UserID, allowed.Extension, time.Now())
 	if err := m.store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), allowed.Canonical); err != nil {
@@ -221,9 +255,9 @@ func (m *Module) submitSpeaking(c *gin.Context) {
 	}
 	if err := m.pool.QueryRow(ctx, `
 		INSERT INTO speaking_sessions (user_id, content_item_id, mode, status, audio_file_id, duration_ms,
-		                               client_platform, submitted_at)
-		VALUES ($1, $2, 'practice', 'analyzing', $3, $4, $5, now()) RETURNING id`,
-		p.UserID, taskID, audioID, durationMs, httpx.ClientPlatform(c)).Scan(&sessionID); err != nil {
+		                               client_platform, submitted_at, prompt, grammar_topic_id)
+		VALUES ($1, $2, 'practice', 'analyzing', $3, $4, $5, now(), $6, $7) RETURNING id`,
+		p.UserID, taskID, audioID, durationMs, httpx.ClientPlatform(c), prompt, focusTopicID).Scan(&sessionID); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
@@ -284,7 +318,7 @@ func (m *Module) submitSpeaking(c *gin.Context) {
 	}
 	assessment, meta, err := m.speaker.EvaluateSpeaking(ctx, ai.SpeakingAssessmentInput{
 		UserID: p.UserID, TaskPrompt: prompt, TargetLevel: target,
-		Transcript: transcription.Text, SpeechSeconds: speechSeconds, WordsPerMinute: wpm,
+		Transcript: transcription.Text, SpeechSeconds: speechSeconds, WordsPerMinute: wpm, Focus: focus,
 	})
 	if err != nil || assessment == nil {
 		refund()
@@ -427,7 +461,7 @@ func (m *Module) listSpeakingSessions(c *gin.Context) {
 	page = page.Normalize()
 
 	rows, err := m.pool.Query(c.Request.Context(), `
-		SELECT sp.id, sp.content_item_id, coalesce(ci.title, ''), sp.mode, sp.status,
+		SELECT sp.id, sp.content_item_id, coalesce(ci.title, nullif(sp.prompt, ''), ''), sp.mode, sp.status,
 		       sp.overall_score::float8, sp.duration_ms, sp.created_at, sp.completed_at, count(*) OVER ()
 		FROM speaking_sessions sp
 		LEFT JOIN content_items ci ON ci.id = sp.content_item_id
@@ -480,7 +514,7 @@ func (m *Module) respondWithSpeakingSession(c *gin.Context, id, userID uuid.UUID
 	)
 	ctx := c.Request.Context()
 	err := m.pool.QueryRow(ctx, `
-		SELECT sp.id, sp.content_item_id, coalesce(ci.title, ''), sp.mode, sp.status,
+		SELECT sp.id, sp.content_item_id, coalesce(ci.title, nullif(sp.prompt, ''), ''), sp.mode, sp.status,
 		       sp.overall_score::float8, sp.duration_ms, sp.created_at, sp.completed_at, a.result, t.text
 		FROM speaking_sessions sp
 		LEFT JOIN content_items ci ON ci.id = sp.content_item_id
