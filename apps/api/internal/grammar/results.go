@@ -3,10 +3,12 @@ package grammar
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // Scoring a run, turning what went wrong into weaknesses, and choosing what to do next.
@@ -283,6 +285,26 @@ func (m *Module) nextStep(ctx context.Context, userID, topicID uuid.UUID, r Resu
 		  AND COALESCE(p.state, 'not_started') <> 'mastered'
 		ORDER BY r.sort_order
 		LIMIT 1`, userID, topicID).Scan(&nextSlug, &nextName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Most topics have no hand-drawn "next": the curriculum order decides instead —
+		// level first, then the map's own order — starting after this topic and wrapping
+		// round to anything earlier still left to learn.
+		err = m.pool.QueryRow(ctx, `
+			WITH ordered AS (
+			    SELECT t.id, t.slug, t.name, t.status,
+			           row_number() OVER (ORDER BY COALESCE(l.rank, 99), c.sort_order, t.group_order, t.sort_order) AS pos
+			    FROM grammar_topics t
+			    JOIN grammar_categories c ON c.id = t.category_id
+			    LEFT JOIN levels l ON l.id = t.level_id
+			    WHERE t.status = 'published' OR t.id = $2
+			)
+			SELECT o.slug, o.name
+			FROM ordered o
+			LEFT JOIN user_grammar_progress p ON p.grammar_topic_id = o.id AND p.user_id = $1
+			WHERE o.id <> $2 AND o.status = 'published' AND COALESCE(p.state, 'not_started') <> 'mastered'
+			ORDER BY o.pos > (SELECT pos FROM ordered WHERE id = $2) DESC, o.pos
+			LIMIT 1`, userID, topicID).Scan(&nextSlug, &nextName)
+	}
 	if err != nil {
 		return nil, nil //nolint:nilerr // no next topic is a normal outcome, not a failure
 	}

@@ -114,18 +114,18 @@ func seedGrammar(ctx context.Context, pool *pgxpool.Pool) error {
 					(slug, name, description, level_id, sort_order, status, category_id,
 					 group_label, group_order, cefr_levels, difficulty, keywords,
 					 ielts_relevant, estimated_minutes, published_at)
-				VALUES ($1, $2, $3, (SELECT id FROM levels WHERE code = $4), $5, 'published',
+				VALUES ($1, $2, $3, (SELECT id FROM levels WHERE code = $4), $5, 'draft',
 				        (SELECT id FROM grammar_categories WHERE slug = $6),
-				        $7, $8, $9, $10, $11, $12, $13, now())
+				        $7, $8, $9, $10, $11, $12, $13, NULL)
 				ON CONFLICT (slug) DO UPDATE SET
 					name = EXCLUDED.name, description = EXCLUDED.description,
 					level_id = EXCLUDED.level_id, sort_order = EXCLUDED.sort_order,
-					status = 'published', category_id = EXCLUDED.category_id,
+					status = CASE WHEN grammar_topics.status = 'archived' THEN 'draft' ELSE grammar_topics.status END,
+					category_id = EXCLUDED.category_id,
 					group_label = EXCLUDED.group_label, group_order = EXCLUDED.group_order,
 					cefr_levels = EXCLUDED.cefr_levels, difficulty = EXCLUDED.difficulty,
 					keywords = EXCLUDED.keywords, ielts_relevant = EXCLUDED.ielts_relevant,
-					estimated_minutes = EXCLUDED.estimated_minutes,
-					published_at = COALESCE(grammar_topics.published_at, now())`,
+					estimated_minutes = EXCLUDED.estimated_minutes`,
 				t.Slug, t.Name, description, t.Level, topicIndex+1, cat.Slug,
 				t.Group, groupOrder[t.Group], t.CEFRLevels, t.Difficulty, t.Keywords,
 				t.IELTSRelevant, t.EstimatedMinutes); err != nil {
@@ -138,7 +138,7 @@ func seedGrammar(ctx context.Context, pool *pgxpool.Pool) error {
 
 	archived, err := pool.Exec(ctx, `
 		UPDATE grammar_topics SET status = 'archived'
-		WHERE status = 'published' AND NOT (slug = ANY($1))`, curriculumSlugs)
+		WHERE status <> 'archived' AND NOT (slug = ANY($1))`, curriculumSlugs)
 	if err != nil {
 		return fmt.Errorf("archive superseded grammar topics: %w", err)
 	}
@@ -223,6 +223,15 @@ func seedGrammar(ctx context.Context, pool *pgxpool.Pool) error {
 			}
 			questions++
 		}
+	}
+
+	// A topic is in the library once it has something to read, and not before: the map
+	// lists every topic, but a learner opening an empty one would find a title and nothing.
+	if _, err := pool.Exec(ctx, `
+		UPDATE grammar_topics t SET status = 'published', published_at = COALESCE(t.published_at, now())
+		WHERE t.status = 'draft'
+		  AND EXISTS (SELECT 1 FROM grammar_content gc WHERE gc.grammar_topic_id = t.id AND gc.status = 'published')`); err != nil {
+		return fmt.Errorf("publish grammar topics with content: %w", err)
 	}
 
 	fmt.Printf("grammar ready: %d categories, %d topics (%d archived), %d relations, %d comparisons, %d topics with content, %d questions\n",

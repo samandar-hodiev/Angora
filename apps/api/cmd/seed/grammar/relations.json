@@ -400,20 +400,6 @@
    "sort_order": 1
   },
   {
-   "from": "few-little",
-   "to": "a-few-a-little",
-   "kind": "compare",
-   "note": "Not enough vs some",
-   "sort_order": 1
-  },
-  {
-   "from": "a-few-a-little",
-   "to": "few-little",
-   "kind": "compare",
-   "note": "Some vs not enough",
-   "sort_order": 1
-  },
-  {
    "from": "comparative",
    "to": "superlative",
    "kind": "next",
@@ -582,33 +568,6 @@
      "aspect": "Stative verbs",
      "left": "I know the answer.",
      "right": "NOT: I am knowing the answer."
-    }
-   ]
-  },
-  {
-   "left": "few-little",
-   "right": "a-few-a-little",
-   "summary": "Few and little mean not enough. A few and a little mean some — enough to be useful.",
-   "rows": [
-    {
-     "aspect": "Feeling",
-     "left": "Negative: not enough",
-     "right": "Positive: some"
-    },
-    {
-     "aspect": "Countable",
-     "left": "Few people came.",
-     "right": "A few people came."
-    },
-    {
-     "aspect": "Uncountable",
-     "left": "I have little time.",
-     "right": "I have a little time."
-    },
-    {
-     "aspect": "Meaning",
-     "left": "Almost nobody / almost nothing",
-     "right": "Not many, but some"
     }
    ]
   },

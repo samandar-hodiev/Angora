@@ -148,7 +148,11 @@ func (m *Module) grammarMap(c *gin.Context) {
 		FROM grammar_topics t
 		LEFT JOIN grammar_categories cat ON cat.id = t.category_id
 		LEFT JOIN levels l ON l.id = t.level_id
-		WHERE ($2 = '' OR t.name ILIKE '%' || $2 || '%' OR t.slug ILIKE '%' || $2 || '%'
+		-- Archived topics have left the curriculum: a duplicate or a topic folded into
+		-- another. They keep their rows for the progress that points at them, not a place
+		-- on the map an editor works from.
+		WHERE t.status <> 'archived'
+		  AND ($2 = '' OR t.name ILIKE '%' || $2 || '%' OR t.slug ILIKE '%' || $2 || '%'
 		       OR t.description ILIKE '%' || $2 || '%')
 		  AND ($3 = '' OR cat.slug = $3)
 		  AND ($4 = '' OR l.code = upper($4) OR upper($4) = ANY (t.cefr_levels))
