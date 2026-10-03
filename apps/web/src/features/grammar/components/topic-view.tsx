@@ -39,10 +39,11 @@ export function GrammarTopicView({ slug }: { slug: string }) {
   const t = topic.data;
 
   return (
-    // A lesson is something you read, and a line of text you have to track back across half a
-    // desk monitor is harder to read, not easier. The learning area is free to be as wide as
-    // the window; this column is not.
-    <div className="mx-auto grid w-full max-w-[84rem] gap-8 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-10">
+    // One column, the full width of the learning area: the lesson is the page. Progress sits
+    // under the title as a strip — read once on arrival, not pinned beside the text taking a
+    // fifth of the width for the whole read — and where to go next comes at the end, which is
+    // when the learner is looking for it.
+    <div className="mx-auto w-full max-w-[84rem]">
       <article className="grid min-w-0 gap-8">
         <header className="grid gap-3">
           <Link
@@ -62,10 +63,11 @@ export function GrammarTopicView({ slug }: { slug: string }) {
               <span aria-hidden>·</span>
               <span>{t.estimated_minutes} min</span>
               {t.ielts_relevant && <Badge variant="secondary">IELTS</Badge>}
-              <StateBadge state={t.state} mastery={t.mastery} />
             </p>
           </div>
         </header>
+
+        <ProgressStrip topic={t} />
 
         {t.content ? (
           <>
@@ -157,9 +159,8 @@ export function GrammarTopicView({ slug }: { slug: string }) {
             />
           </div>
         </section>
+        <WhereNext topic={t} />
       </article>
-
-      <TopicRail topic={t} />
     </div>
   );
 }
@@ -396,44 +397,79 @@ function ApplyCard({
   );
 }
 
-/** On a narrow screen this becomes an ordinary section under the article. */
-function TopicRail({ topic }: { topic: GrammarTopic }) {
+/**
+ * The learner's standing on this topic, as one strip under the title.
+ *
+ * Overall mastery on the left, the three things it is made of beside it. Wide screens get
+ * them in one row; narrow ones stack them. It is not sticky: it is context for arriving at the
+ * page, and the lesson below it is what the page is for.
+ */
+function ProgressStrip({ topic }: { topic: GrammarTopic }) {
   const p = topic.progress;
+  const parts = [
+    ["Understanding", p.understanding],
+    ["Practice", p.practice],
+    ["Application", p.application],
+  ] as const;
   return (
-    <aside className="grid gap-6 lg:sticky lg:top-[calc(var(--app-header-h,3.5rem)+var(--main-pt,1.5rem))]">
-      <section aria-labelledby="your-progress-title" className="grid gap-3 rounded-xl border bg-surface p-4">
+    <section
+      aria-labelledby="your-progress-title"
+      className="grid gap-4 rounded-xl border bg-surface p-4 sm:p-5 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)] md:items-center md:gap-8"
+    >
+      <div className="grid gap-2">
         <h2 id="your-progress-title" className="text-label text-fg-muted">
           Your progress
         </h2>
-        <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-h2 tabular-nums">{Math.round(p.mastery)}%</span>
           <StateBadge state={p.state} mastery={p.mastery} />
         </div>
         <MasteryBar value={p.mastery} />
-        <dl className="grid gap-2 pt-1">
-          {(
-            [
-              ["Understanding", p.understanding],
-              ["Practice", p.practice],
-              ["Application", p.application],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label}>
-              <Meter label={label} value={value} display={`${Math.round(value)}%`} tone={value >= 80 ? "success" : value < 50 ? "warning" : "primary"} />
-            </div>
-          ))}
-        </dl>
         {p.attempts > 0 && (
           <p className="text-caption text-fg-muted">
             {p.attempts} practice {p.attempts === 1 ? "run" : "runs"}
           </p>
         )}
-      </section>
+      </div>
+      <dl className="grid gap-3 sm:grid-cols-3 sm:gap-6">
+        {parts.map(([label, value]) => (
+          <div key={label}>
+            <Meter
+              label={label}
+              value={value}
+              display={`${Math.round(value)}%`}
+              tone={value >= 80 ? "success" : value < 50 ? "warning" : "primary"}
+            />
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
 
-      <RailList title="Prerequisites" topics={topic.prerequisites} />
-      <RailList title="Related" topics={topic.related} />
-      <RailList title="Next" topics={topic.next} />
-    </aside>
+/** Prerequisites, related topics and what comes next — at the end, where the learner looks for them. */
+function WhereNext({ topic }: { topic: GrammarTopic }) {
+  const groups = [
+    ["Before this", topic.prerequisites],
+    ["Related", topic.related],
+    ["Next", topic.next],
+  ] as const;
+  if (groups.every(([, topics]) => !topics?.length)) return null;
+  return (
+    <section aria-labelledby="where-next-title" className="grid gap-3">
+      <h2 id="where-next-title" className="text-h3">
+        Where to go next
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {groups.map(([title, topics]) =>
+          topics?.length ? (
+            <div key={title} className="rounded-xl border bg-surface p-3">
+              <RailList title={title} topics={topics} />
+            </div>
+          ) : null,
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -471,15 +507,12 @@ function RailList({ title, topics }: { title: string; topics: GrammarRelatedTopi
 
 function TopicSkeleton() {
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-10">
-      <div className="grid gap-6">
-        <Skeleton className="h-10 w-2/3 rounded-lg" />
-        <Skeleton className="h-4 w-1/3 rounded" />
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-48 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
-      </div>
-      <Skeleton className="h-64 rounded-xl" />
+    <div className="mx-auto grid w-full max-w-[84rem] gap-6">
+      <Skeleton className="h-10 w-2/3 rounded-lg" />
+      <Skeleton className="h-4 w-1/3 rounded" />
+      <Skeleton className="h-28 rounded-xl" />
+      <Skeleton className="h-48 rounded-xl" />
+      <Skeleton className="h-40 rounded-xl" />
     </div>
   );
 }

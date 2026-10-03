@@ -451,16 +451,16 @@ export function VisualPanel({ slug, existing }: { slug: string; existing: Gramma
         <h3 className="text-h4">Visual</h3>
         <AIBadge cached />
       </div>
-      {/* The diagram is an SVG served by the API. It inherits the app's colours, so it
-          reads correctly in both themes rather than being a picture of a light-mode page.
-          next/image is deliberately not used: it would proxy and rasterize a vector that is
-          already a few kilobytes, losing exactly the theming this relies on. */}
+      {/* The diagram is an SVG served by the API on a light card of its own (see ai.ThemeSVG),
+          so it reads the same in both themes. next/image is deliberately not used: it would
+          proxy and rasterize a vector that is already a few kilobytes. Capped and centred: on
+          a full-width lesson a diagram stretched edge to edge is bigger than anyone reads. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={apiAssetUrl(visual.url) ?? visual.url}
         alt={visual.alt_text}
         loading="lazy"
-        className="w-full rounded-lg bg-background p-2"
+        className="mx-auto w-full max-w-4xl rounded-lg"
       />
       {visual.caption && <figcaption className="text-caption text-fg-muted">{visual.caption}</figcaption>}
     </figure>
