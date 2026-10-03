@@ -23,7 +23,8 @@ const (
 )
 
 const (
-	defaultQuestionCount = 10
+	// A topic's test is fifteen questions per level; a run is one whole test.
+	defaultQuestionCount = 15
 	maxQuestionCount     = 25
 )
 
@@ -125,8 +126,9 @@ func (m *Module) startPractice(c *gin.Context) {
 //
 //  1. rules this learner has recurring errors on
 //  2. questions they have never answered
-//  3. questions they got wrong before
-//  4. everything else
+//  3. questions written for their own level, before the levels either side
+//  4. questions they got wrong before
+//  5. everything else
 //
 // Ties break randomly so two runs on the same topic are not the same run.
 //
@@ -155,6 +157,7 @@ func (m *Module) selectQuestions(ctx context.Context, userID, topicID uuid.UUID,
 		ORDER BY abs(COALESCE(l.rank, $5) - $5) > 1,
 		         COALESCE(e.severity_score, 0) DESC,
 		         (hist.seen IS NULL OR hist.seen = 0) DESC,
+		         abs(COALESCE(l.rank, $5) - $5),
 		         COALESCE(hist.all_correct, false) ASC,
 		         random()
 		LIMIT $4`, userID, topicID, rule, limit, levelRank)
@@ -391,6 +394,8 @@ type ReviewItem struct {
 	Explanation string   `json:"explanation,omitempty"`
 	Rule        string   `json:"rule,omitempty"`
 	Response    Response `json:"response"`
+	// Skipped is a question the learner moved past without answering. It counts as wrong.
+	Skipped bool `json:"skipped,omitempty"`
 }
 
 // NextStep is the one thing worth doing next, chosen by the same rules the coach uses.

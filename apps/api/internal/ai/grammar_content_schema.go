@@ -118,17 +118,8 @@ var grammarContentSchema = json.RawMessage(`{
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["prompt", "options", "answer_index", "explanation", "target_rule"],
-              "properties": {
-                "prompt": { "type": "string" },
-                "options": { "type": "array", "items": { "type": "string" } },
-                "answer_index": {
-                  "type": "integer",
-                  "description": "Position of the correct option, counting from zero."
-                },
-                "explanation": { "type": "string", "description": "Why that option is right." },
-                "target_rule": { "type": "string", "description": "The rule slug this question tests." }
-              }
+              "required": ["type", "prompt", "options", "answer_index", "accepted", "hint", "explanation", "target_rule"],
+              "properties": ` + practiceItemProperties + `
             }
           }
         }
@@ -136,3 +127,45 @@ var grammarContentSchema = json.RawMessage(`{
     }
   }
 }`)
+
+// practiceItemProperties is one practice question, shared by the lesson schema and the
+// practice-set schema so a question means the same thing wherever it is written.
+//
+// Two kinds. multiple_choice marks on answer_index; fill_blank has a prompt with one ___
+// gap and marks the typed answer against accepted. Strict mode has no optional fields, so
+// each kind fills the other's with an empty value: options [] and answer_index -1 for a
+// gap-fill, accepted [] for a choice.
+const practiceItemProperties = `{
+                "type": {
+                  "type": "string",
+                  "enum": ["multiple_choice", "fill_blank"],
+                  "description": "multiple_choice: pick one option. fill_blank: type the missing word(s) into the ___ gap."
+                },
+                "prompt": {
+                  "type": "string",
+                  "description": "The question. A fill_blank prompt contains exactly one ___ where the answer goes."
+                },
+                "options": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "multiple_choice: 2 to 4 options. fill_blank: empty."
+                },
+                "answer_index": {
+                  "type": "integer",
+                  "description": "multiple_choice: position of the correct option, counting from zero. fill_blank: -1."
+                },
+                "accepted": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "fill_blank: every answer that is correct in the gap, e.g. [\"has gone\", \"'s gone\"]. multiple_choice: empty."
+                },
+                "hint": {
+                  "type": "string",
+                  "description": "fill_blank: the base form or a short cue shown beside the gap, e.g. (go). Empty when none is needed."
+                },
+                "explanation": {
+                  "type": "string",
+                  "description": "Why the right answer is right and why the tempting wrong one is wrong, in one or two sentences."
+                },
+                "target_rule": { "type": "string", "description": "The rule slug this question tests." }
+              }`

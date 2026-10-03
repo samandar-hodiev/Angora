@@ -1192,10 +1192,21 @@ export interface MapCategory {
 
 /** The structured sections the learner page renders. Same shape as internal/grammar.Content. */
 /** One multiple-choice practice question, as the builder edits it. */
+export type PracticeKind = "multiple_choice" | "fill_blank";
+
+/**
+ * One question of a level's test. A multiple choice marks on answer_index; a fill_blank has
+ * one ___ in its prompt and marks what is typed against accepted. Each kind leaves the
+ * other's fields empty (options [] and answer_index -1 for a gap).
+ */
 export interface PracticeQuestion {
+  /** Absent on questions from before gaps existed: those are multiple choice. */
+  type?: PracticeKind;
   prompt: string;
   options: string[];
   answer_index: number;
+  accepted?: string[];
+  hint?: string;
   explanation?: string;
   target_rule?: string;
 }

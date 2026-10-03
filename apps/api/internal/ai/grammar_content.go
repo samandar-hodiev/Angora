@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -70,16 +71,31 @@ type GeneratedMistake struct {
 	Rule  string `json:"rule"`
 }
 
-// GeneratedPractice is one multiple-choice question. The answer is an index, never text:
-// a string answer has to be matched back against the options, and "The" and "the" then
-// decide whether a learner was right.
+// GeneratedPractice is one practice question: a multiple choice or a gap the learner types
+// into. A choice's answer is an index, never text: a string answer has to be matched back
+// against the options, and "The" and "the" then decide whether a learner was right. A gap's
+// answer is the list of everything that is correct in it, compared after normalising.
 type GeneratedPractice struct {
+	/** multiple_choice or fill_blank. Empty is multiple_choice: rows written before gaps existed. */
+	Type        string   `json:"type"`
 	Prompt      string   `json:"prompt"`
 	Options     []string `json:"options"`
 	AnswerIndex int      `json:"answer_index"`
+	Accepted    []string `json:"accepted"`
+	Hint        string   `json:"hint"`
 	Explanation string   `json:"explanation"`
 	TargetRule  string   `json:"target_rule"`
 }
+
+const (
+	PracticeMultipleChoice = "multiple_choice"
+	PracticeFillBlank      = "fill_blank"
+	// BlankMarker is where a fill_blank prompt's answer goes.
+	BlankMarker = "___"
+)
+
+// IsFillBlank reports whether the question is answered by typing.
+func (q GeneratedPractice) IsFillBlank() bool { return q.Type == PracticeFillBlank }
 
 type GeneratedGrammarLevel struct {
 	Level string `json:"level"`
@@ -171,7 +187,7 @@ func validateAuthoredContent(out *GeneratedGrammarContent, req GrammarAuthorRequ
 		if len(level.Examples) == 0 && len(level.Formulas) == 0 {
 			return fmt.Errorf("level %s has neither examples nor formulas", level.Level)
 		}
-		level.Practice = usablePractice(level.Practice)
+		level.Practice = UsablePractice(level.Practice)
 		kept = append(kept, *level)
 	}
 	out.Levels = kept
@@ -182,19 +198,69 @@ func validateAuthoredContent(out *GeneratedGrammarContent, req GrammarAuthorRequ
 	return nil
 }
 
-// usablePractice keeps only questions that can actually be marked.
-func usablePractice(questions []GeneratedPractice) []GeneratedPractice {
+// UsablePractice keeps only questions that can actually be marked, each with its kind's
+// fields and nothing of the other's.
+func UsablePractice(questions []GeneratedPractice) []GeneratedPractice {
 	kept := questions[:0]
 	for _, q := range questions {
-		if strings.TrimSpace(q.Prompt) == "" || len(q.Options) < 2 {
+		// Models draw the gap as anything from three underscores to ten; one width is what
+		// the learner page and the check below look for.
+		q.Prompt = longGap.ReplaceAllString(strings.TrimSpace(q.Prompt), BlankMarker)
+		if q.Prompt == "" {
 			continue
 		}
-		if q.AnswerIndex < 0 || q.AnswerIndex >= len(q.Options) {
-			continue
+		if q.IsFillBlank() {
+			// Exactly one gap: with none there is nowhere to type, and with two the one
+			// answer box cannot say which gap it fills.
+			if strings.Count(q.Prompt, BlankMarker) != 1 {
+				continue
+			}
+			accepted := make([]string, 0, len(q.Accepted))
+			for _, a := range q.Accepted {
+				if a = strings.TrimSpace(a); a != "" {
+					accepted = append(accepted, a)
+				}
+			}
+			if len(accepted) == 0 {
+				continue
+			}
+			q.Accepted, q.Options, q.AnswerIndex = accepted, []string{}, -1
+			q.Hint = strings.TrimSpace(q.Hint)
+		} else {
+			if len(q.Options) < 2 || q.AnswerIndex < 0 || q.AnswerIndex >= len(q.Options) {
+				continue
+			}
+			// Two options that say the same thing are a question with two right answers,
+			// or one with a duplicate distractor; either way it cannot be marked fairly.
+			if !distinctOptions(q.Options) {
+				continue
+			}
+			q.Type, q.Accepted, q.Hint = PracticeMultipleChoice, []string{}, ""
 		}
 		kept = append(kept, q)
 	}
 	return kept
+}
+
+var longGap = regexp.MustCompile(`_{3,}`)
+
+func distinctOptions(options []string) bool {
+	seen := map[string]bool{}
+	for _, o := range options {
+		key := normalizeChoice(o)
+		if key == "" || seen[key] {
+			return false
+		}
+		seen[key] = true
+	}
+	return true
+}
+
+// normalizeChoice is how two answers are compared: case, spacing and final punctuation
+// do not make them different.
+func normalizeChoice(s string) string {
+	s = strings.ToLower(strings.Join(strings.Fields(s), " "))
+	return strings.TrimRight(s, ".!?,;:")
 }
 
 func levelCodes(levels []cefr.Level) []string {
@@ -220,7 +286,7 @@ func authorInstructions(req GrammarAuthorRequest) string {
 
 	b.WriteString("Examples must be sentences someone would actually say. Common mistakes must be mistakes learners actually make — the wrong form, the right form, and why, in that order.\n\n")
 
-	b.WriteString("Practice questions are multiple choice. answer_index is the position of the correct option in the options array, counting from zero. Every distractor must be wrong for a reason a learner would recognise; never include two options that are both acceptable.\n\n")
+	b.WriteString(practiceRules)
 
 	switch req.Language {
 	case "uz":

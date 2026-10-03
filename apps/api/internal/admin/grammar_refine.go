@@ -269,15 +269,20 @@ func (m *Module) levelDraft(ctx context.Context, slug, language string, level ce
 	return out, true, nil
 }
 
-// levelQuestions reads the practice attached to one level, newest first.
+// levelQuestions reads the practice attached to one level, oldest first: the choices and
+// gaps the builder edits. Other question types live in the question bank, not here.
 func (m *Module) levelQuestions(ctx context.Context, topicID uuid.UUID, level cefr.Level) ([]ai.GeneratedPractice, error) {
 	rows, err := m.pool.Query(ctx, `
-		SELECT q.prompt, q.payload, q.answer, q.explanation, q.target_rule
+		SELECT q.type, q.prompt, q.payload, q.answer, q.explanation, q.target_rule
 		FROM grammar_questions q
 		JOIN levels l ON l.id = q.level_id
 		WHERE q.grammar_topic_id = $1 AND l.code = $2 AND q.status <> 'archived'
-		  AND q.type = 'multiple_choice'
-		ORDER BY q.created_at`, topicID, level.BaseCode())
+		  AND q.type IN ('multiple_choice', 'fill_blank')
+		  AND (q.status <> 'published' OR NOT EXISTS (
+		        SELECT 1 FROM grammar_questions d
+		        WHERE d.grammar_topic_id = q.grammar_topic_id AND d.level_id = q.level_id
+		          AND d.status = 'draft' AND d.type IN ('multiple_choice', 'fill_blank')))
+		ORDER BY q.created_at, q.id`, topicID, level.BaseCode())
 	if err != nil {
 		return nil, err
 	}
@@ -289,33 +294,10 @@ func (m *Module) levelQuestions(ctx context.Context, topicID uuid.UUID, level ce
 			q               ai.GeneratedPractice
 			payload, answer []byte
 		)
-		if err := rows.Scan(&q.Prompt, &payload, &answer, &q.Explanation, &q.TargetRule); err != nil {
+		if err := rows.Scan(&q.Type, &q.Prompt, &payload, &answer, &q.Explanation, &q.TargetRule); err != nil {
 			return nil, err
 		}
-		var options struct {
-			Options []string `json:"options"`
-		}
-		_ = json.Unmarshal(payload, &options)
-		var index struct {
-			CorrectIndex *int `json:"correct_index"`
-			// Rows written before the key was corrected. Read, never written.
-			Legacy *int `json:"index"`
-		}
-		_ = json.Unmarshal(answer, &index)
-		// A list is a list even when it is empty. Sending null here put a crash in the
-		// editor for any question whose payload lost its options.
-		q.Options = options.Options
-		switch {
-		case index.CorrectIndex != nil:
-			q.AnswerIndex = *index.CorrectIndex
-		case index.Legacy != nil:
-			q.AnswerIndex = *index.Legacy
-		default:
-			q.AnswerIndex = -1
-		}
-		if q.Options == nil {
-			q.Options = []string{}
-		}
+		q = decodePractice(q, payload, answer)
 		out = append(out, q)
 	}
 	return out, rows.Err()

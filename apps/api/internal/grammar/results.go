@@ -119,6 +119,10 @@ func (m *Module) buildResult(ctx context.Context, userID uuid.UUID, a attemptRow
 		return result, err
 	}
 
+	if err := m.addSkipped(ctx, a, &result); err != nil {
+		return result, err
+	}
+
 	// Unanswered questions count against the run: skipping ten questions is not a 100%.
 	if a.Total > 0 {
 		result.Score = round2(scoreSum / float64(a.Total) * 100)
@@ -294,4 +298,57 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return string(r[:n])
+}
+
+// addSkipped puts the questions nobody answered into the review, with their answer and
+// explanation, and orders the review the way the run was asked. A learner who skipped
+// a question still needs to see what it wanted — that is most of what a skip is for.
+func (m *Module) addSkipped(ctx context.Context, a attemptRow, result *Result) error {
+	answered := map[string]bool{}
+	for _, item := range result.Review {
+		answered[item.QuestionID] = true
+	}
+	var missing []uuid.UUID
+	for _, id := range a.QuestionIDs {
+		if !answered[id.String()] {
+			missing = append(missing, id)
+		}
+	}
+	if len(missing) > 0 {
+		rows, err := m.pool.Query(ctx, `
+			SELECT id, type, prompt, payload, answer, explanation, target_rule
+			FROM grammar_questions WHERE id = ANY($1)`, missing)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var (
+				id                  uuid.UUID
+				q                   Question
+				payload, answerJSON []byte
+			)
+			if err := rows.Scan(&id, &q.Type, &q.Prompt, &payload, &answerJSON, &q.Explanation, &q.TargetRule); err != nil {
+				return err
+			}
+			_ = json.Unmarshal(payload, &q.Payload)
+			q.answer, _ = parseAnswer(answerJSON)
+			result.Review = append(result.Review, ReviewItem{
+				QuestionID: id.String(), Prompt: q.Prompt, Expected: Score(q, Response{}).Expected,
+				Explanation: q.Explanation, Rule: q.TargetRule, Skipped: true,
+			})
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	}
+
+	position := make(map[string]int, len(a.QuestionIDs))
+	for i, id := range a.QuestionIDs {
+		position[id.String()] = i
+	}
+	sort.SliceStable(result.Review, func(i, j int) bool {
+		return position[result.Review[i].QuestionID] < position[result.Review[j].QuestionID]
+	})
+	return nil
 }

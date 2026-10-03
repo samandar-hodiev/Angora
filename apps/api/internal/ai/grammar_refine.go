@@ -202,7 +202,7 @@ func (s *GrammarTutorService) oneLevel(
 	// mismatch here would put B2 text under the B1 tab.
 	got.Level = level.BaseCode()
 	if got.Applicable {
-		got.Practice = usablePractice(got.Practice)
+		got.Practice = UsablePractice(got.Practice)
 	}
 	return &got, &EvaluationMeta{
 		Versions:    Versions{SchemaVersion: GrammarSchemaVersion, ModelVersion: res.Model, PromptVersion: meta.PromptVersion},
@@ -234,7 +234,8 @@ func refineInstructions(req GrammarRefineRequest) string {
 		fmt.Fprintf(&b, "\nChange only the %q section. Return every other field exactly as you received it.\n", req.Section)
 	}
 
-	b.WriteString("\nExamples must be sentences someone would actually say. Common mistakes must be mistakes learners actually make. Practice questions are multiple choice; answer_index counts from zero, and no two options may both be acceptable.\n\n")
+	b.WriteString("\nExamples must be sentences someone would actually say. Common mistakes must be mistakes learners actually make.\n\n")
+	b.WriteString(practiceRules)
 	b.WriteString(languageRule(req.Language))
 	return b.String()
 }

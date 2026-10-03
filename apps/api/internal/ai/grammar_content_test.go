@@ -11,8 +11,17 @@ import (
 // additionalProperties:false or leaves a property out of `required`. A rejected request is
 // not a worse generation — it is no generation at all — so the shape is asserted here.
 func TestGrammarContentSchemaIsStrictModeSafe(t *testing.T) {
+	assertStrictSchema(t, grammarContentSchema)
+}
+
+func TestGrammarPracticeSchemaIsStrictModeSafe(t *testing.T) {
+	assertStrictSchema(t, grammarPracticeSchema)
+}
+
+func assertStrictSchema(t *testing.T, schema json.RawMessage) {
+	t.Helper()
 	var root map[string]any
-	if err := json.Unmarshal(grammarContentSchema, &root); err != nil {
+	if err := json.Unmarshal(schema, &root); err != nil {
 		t.Fatalf("schema is not valid JSON: %v", err)
 	}
 
@@ -149,4 +158,78 @@ func contains(haystack, needle string) bool {
 		}
 		return false
 	})()
+}
+
+func TestUsablePracticeKeepsBothKinds(t *testing.T) {
+	got := UsablePractice([]GeneratedPractice{
+		{Type: "multiple_choice", Prompt: "She ___ here.", Options: []string{"live", "lives"}, AnswerIndex: 1, Accepted: []string{"x"}},
+		{Type: "fill_blank", Prompt: "He ___ (go) home.", Accepted: []string{" goes ", ""}, Hint: " (go) ", Options: []string{"a"}, AnswerIndex: 0},
+		// No gap: nowhere to type the answer.
+		{Type: "fill_blank", Prompt: "He goes home.", Accepted: []string{"goes"}},
+		// Two gaps: one box cannot fill both.
+		{Type: "fill_blank", Prompt: "He ___ home ___.", Accepted: []string{"goes"}},
+		// Nothing accepted: no answer could ever be right.
+		{Type: "fill_blank", Prompt: "He ___ home.", Accepted: []string{"  "}},
+		{Type: "multiple_choice", Prompt: "Pick", Options: []string{"a", "b"}, AnswerIndex: 2},
+	})
+	if len(got) != 2 {
+		t.Fatalf("kept %d questions, want 2: %+v", len(got), got)
+	}
+	if got[0].Type != PracticeMultipleChoice || len(got[0].Accepted) != 0 {
+		t.Errorf("choice = %+v, want its gap fields cleared", got[0])
+	}
+	gap := got[1]
+	if !gap.IsFillBlank() || len(gap.Accepted) != 1 || gap.Accepted[0] != "goes" || gap.Hint != "(go)" {
+		t.Errorf("gap = %+v, want accepted [goes] and hint (go)", gap)
+	}
+	if len(gap.Options) != 0 || gap.AnswerIndex != -1 {
+		t.Errorf("gap = %+v, want its choice fields cleared", gap)
+	}
+}
+
+func TestUsablePracticeDropsDuplicateOptions(t *testing.T) {
+	got := UsablePractice([]GeneratedPractice{
+		{Prompt: "Which is correct?", Options: []string{"He is an teacher.", "He is a teacher.", "He is a teacher"}, AnswerIndex: 1},
+	})
+	if len(got) != 0 {
+		t.Errorf("kept %+v, want a question with the same option twice dropped", got)
+	}
+}
+
+func TestGrammarPracticeCheckSchemaIsStrictModeSafe(t *testing.T) {
+	assertStrictSchema(t, grammarPracticeCheckSchema)
+}
+
+func TestAgreedPracticeDropsWhatTheCheckDisputes(t *testing.T) {
+	questions := []GeneratedPractice{
+		{Type: PracticeMultipleChoice, Prompt: "He gave me ___ one-time offer.", Options: []string{"a", "an"}, AnswerIndex: 1},
+		{Type: PracticeMultipleChoice, Prompt: "I ate ___ egg.", Options: []string{"a", "an"}, AnswerIndex: 1},
+		{Type: PracticeFillBlank, Prompt: "She is ___ honest person.", Accepted: []string{"an"}},
+		{Type: PracticeFillBlank, Prompt: "I need ___ hour.", Accepted: []string{"an"}},
+		{Type: PracticeFillBlank, Prompt: "It is ___ historic day.", Accepted: []string{"a"}},
+		{Type: PracticeFillBlank, Prompt: "I want to eat ___ banana.", Accepted: []string{"a", "an"}},
+	}
+	var check practiceCheck
+	_ = json.Unmarshal([]byte(`{"answers":[
+		{"index":1,"answer_index":0,"answer_text":"","ambiguous":false},
+		{"index":2,"answer_index":1,"answer_text":"","ambiguous":false},
+		{"index":6,"answer_index":-1,"answer_text":"a","acceptable":[],"ambiguous":false},
+		{"index":3,"answer_index":-1,"answer_text":"An.","ambiguous":false},
+		{"index":4,"answer_index":-1,"answer_text":"a","ambiguous":false},
+		{"index":5,"answer_index":-1,"answer_text":"a","ambiguous":true}
+	]}`), &check)
+	got := agreedPractice(questions, check)
+	if len(got) != 3 || got[0].Prompt != "I ate ___ egg." || got[1].Prompt != "She is ___ honest person." {
+		t.Fatalf("kept %+v, want the egg, honest and banana questions only", got)
+	}
+	if banana := got[2]; len(banana.Accepted) != 1 || banana.Accepted[0] != "a" {
+		t.Errorf("banana accepts %v, want only the answer both sides agree on", banana.Accepted)
+	}
+}
+
+func TestUsablePracticeNormalisesTheGap(t *testing.T) {
+	got := UsablePractice([]GeneratedPractice{{Type: PracticeFillBlank, Prompt: "He ______ home.", Accepted: []string{"went"}}})
+	if len(got) != 1 || got[0].Prompt != "He ___ home." {
+		t.Errorf("got %+v, want the long gap drawn as ___", got)
+	}
 }

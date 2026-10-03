@@ -311,6 +311,8 @@ export interface GrammarReviewItem {
   explanation?: string;
   rule?: string;
   response: GrammarResponse;
+  /** Moved past without an answer. It counts as wrong. */
+  skipped?: boolean;
 }
 
 export interface GrammarNextStep {

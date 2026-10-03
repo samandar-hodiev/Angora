@@ -200,43 +200,62 @@ func (m *Module) storeGenerated(
 				return err
 			}
 
-			if !level.Applicable || len(level.Practice) == 0 {
-				continue
-			}
 			// Practice is regenerated wholesale for the level: the questions belong to the
 			// explanation they were written against, and keeping the old ones beside a
 			// rewritten lesson is how a question ends up testing a rule the page no longer
-			// mentions. Only this level's generated questions go; curated ones stay.
+			// mentions. Only this level's generated questions go; curated ones stay. A level
+			// the model now refuses loses its unpublished test too.
+			if level.Applicable && len(level.Practice) == 0 {
+				continue
+			}
 			if _, err := tx.Exec(ctx, `
 				DELETE FROM grammar_questions
 				WHERE grammar_topic_id = $1 AND source = 'ai' AND status <> 'published'
 				  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, level.Level); err != nil {
 				return err
 			}
+			if !level.Applicable {
+				continue
+			}
 			for _, q := range level.Practice {
-				payload, err := json.Marshal(map[string]any{"options": q.Options})
-				if err != nil {
-					return err
-				}
-				// correct_index, not index: this is the marking key, and internal/grammar's
-				// scorer reads correct_index. Writing the other name produced questions that
-				// looked fine in the console and could not be marked right by a learner.
-				answer, err := json.Marshal(map[string]any{"correct_index": q.AnswerIndex})
+				kind, payload, answer, err := questionColumns(q)
 				if err != nil {
 					return err
 				}
 				if _, err := tx.Exec(ctx, `
 					INSERT INTO grammar_questions (grammar_topic_id, type, level_id, prompt, payload, answer,
 					                               explanation, target_rule, source, status, ai_request_id)
-					VALUES ($1, 'multiple_choice', (SELECT id FROM levels WHERE code = $2), $3, $4, $5, $6, $7,
-					        'ai', 'draft', $8)`,
-					topicID, level.Level, q.Prompt, payload, answer, q.Explanation, q.TargetRule, aiRequestID); err != nil {
+					VALUES ($1, $2, (SELECT id FROM levels WHERE code = $3), $4, $5, $6, $7, $8,
+					        'ai', 'draft', $9)`,
+					topicID, kind, level.Level, q.Prompt, payload, answer, q.Explanation, q.TargetRule, aiRequestID); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	})
+}
+
+// questionColumns is how a practice question is stored: its type, and the payload and
+// answer in the keys internal/grammar's scorer reads. correct_index, not index, for a
+// choice — writing the other name produced questions that looked fine in the console and
+// could not be marked right by a learner. accepted for a gap, with the hint in the payload
+// because the learner is shown it.
+func questionColumns(q ai.GeneratedPractice) (string, []byte, []byte, error) {
+	if q.IsFillBlank() {
+		payload, err := json.Marshal(map[string]any{"hint": q.Hint})
+		if err != nil {
+			return "", nil, nil, err
+		}
+		answer, err := json.Marshal(map[string]any{"accepted": q.Accepted})
+		return ai.PracticeFillBlank, payload, answer, err
+	}
+	payload, err := json.Marshal(map[string]any{"options": q.Options})
+	if err != nil {
+		return "", nil, nil, err
+	}
+	answer, err := json.Marshal(map[string]any{"correct_index": q.AnswerIndex})
+	return ai.PracticeMultipleChoice, payload, answer, err
 }
 
 // grammarBody maps a generated level onto the shape the learner page already renders, so
@@ -290,15 +309,40 @@ type levelInput struct {
 	 * questions every time somebody fixed a typo in the intro would be worse than one that
 	 * could not edit them at all.
 	 */
-	Questions *[]levelQuestionInput `json:"questions" binding:"omitempty,max=50,dive"`
+	Questions *[]levelQuestionInput `json:"questions" binding:"omitempty,max=60,dive"`
 }
 
 type levelQuestionInput struct {
+	/** multiple_choice (the default) or fill_blank. */
+	Type        string   `json:"type" binding:"omitempty,oneof=multiple_choice fill_blank"`
 	Prompt      string   `json:"prompt" binding:"required,min=3,max=600"`
-	Options     []string `json:"options" binding:"required,min=2,max=6,dive,required,max=300"`
-	AnswerIndex int      `json:"answer_index" binding:"min=0,max=5"`
+	Options     []string `json:"options" binding:"omitempty,max=6,dive,max=300"`
+	AnswerIndex int      `json:"answer_index" binding:"min=-1,max=5"`
+	Accepted    []string `json:"accepted" binding:"omitempty,max=8,dive,max=200"`
+	Hint        string   `json:"hint" binding:"omitempty,max=120"`
 	Explanation string   `json:"explanation" binding:"omitempty,max=800"`
 	TargetRule  string   `json:"target_rule" binding:"omitempty,max=200"`
+}
+
+// practice turns what the owner saved into a question, or says what is missing from it.
+func (q levelQuestionInput) practice(n int) (ai.GeneratedPractice, error) {
+	out := ai.GeneratedPractice{
+		Type: q.Type, Prompt: q.Prompt, Options: q.Options, AnswerIndex: q.AnswerIndex,
+		Accepted: q.Accepted, Hint: q.Hint, Explanation: q.Explanation, TargetRule: q.TargetRule,
+	}
+	if out.Type == "" {
+		out.Type = ai.PracticeMultipleChoice
+	}
+	if kept := ai.UsablePractice([]ai.GeneratedPractice{out}); len(kept) == 1 {
+		return kept[0], nil
+	}
+	field, message := "answer_index", fmt.Sprintf("Question %d: the correct answer must be one of at least two options", n)
+	if out.IsFillBlank() {
+		field, message = "accepted", fmt.Sprintf("Question %d: a gap-fill needs exactly one ___ in the sentence and at least one accepted answer", n)
+	}
+	return out, apperr.Validation(map[string]any{
+		"reason": "question_unmarkable", "fields": map[string]any{field: message},
+	})
 }
 
 // saveGrammarLevel stores an owner's edit as a new draft version.
@@ -387,36 +431,34 @@ func (m *Module) saveGrammarLevel(c *gin.Context) {
 // draft edit is not a publication. They are replaced when the topic is published, by the
 // same rule that replaces the text.
 func (m *Module) replaceLevelQuestions(ctx context.Context, topicID uuid.UUID, level cefr.Level, questions []levelQuestionInput) error {
+	practice := make([]ai.GeneratedPractice, 0, len(questions))
+	for i, q := range questions {
+		p, err := q.practice(i + 1)
+		if err != nil {
+			return err
+		}
+		practice = append(practice, p)
+	}
 	return database.WithTx(ctx, m.pool, func(tx pgx.Tx) error {
-		// Scoped to multiple choice: the builder shows that type and only that type, and a
-		// save must not delete a gap-fill or a rewrite task it never put on the screen.
+		// Scoped to the types the builder shows: a save must not delete an ordering or a
+		// rewrite task it never put on the screen.
 		if _, err := tx.Exec(ctx, `
 			DELETE FROM grammar_questions
-			WHERE grammar_topic_id = $1 AND status <> 'published' AND type = 'multiple_choice'
+			WHERE grammar_topic_id = $1 AND status <> 'published' AND type IN ('multiple_choice', 'fill_blank')
 			  AND level_id = (SELECT id FROM levels WHERE code = $2)`, topicID, level.BaseCode()); err != nil {
 			return err
 		}
-		for _, q := range questions {
-			if q.AnswerIndex < 0 || q.AnswerIndex >= len(q.Options) {
-				return apperr.Validation(map[string]any{
-					"reason": "answer_out_of_range",
-					"fields": map[string]any{"answer_index": "the correct answer must be one of the options"},
-				})
-			}
-			payload, err := json.Marshal(map[string]any{"options": q.Options})
-			if err != nil {
-				return err
-			}
-			answer, err := json.Marshal(map[string]any{"correct_index": q.AnswerIndex})
+		for _, q := range practice {
+			kind, payload, answer, err := questionColumns(q)
 			if err != nil {
 				return err
 			}
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO grammar_questions (grammar_topic_id, type, level_id, prompt, payload, answer,
 				                               explanation, target_rule, source, status)
-				VALUES ($1, 'multiple_choice', (SELECT id FROM levels WHERE code = $2), $3, $4, $5, $6, $7,
+				VALUES ($1, $2, (SELECT id FROM levels WHERE code = $3), $4, $5, $6, $7, $8,
 				        'curated', 'draft')`,
-				topicID, level.BaseCode(), q.Prompt, payload, answer, q.Explanation, q.TargetRule); err != nil {
+				topicID, kind, level.BaseCode(), q.Prompt, payload, answer, q.Explanation, q.TargetRule); err != nil {
 				return err
 			}
 		}
@@ -522,13 +564,17 @@ func (m *Module) checkTopic(ctx context.Context, slug, language string, only []c
 	// it checked every question type for options, so a gap-fill — which correctly has none —
 	// was reported as broken on every topic that had one.
 	rows, err := m.pool.Query(ctx, `
-		SELECT COALESCE(l.code, ''), q.prompt,
+		SELECT COALESCE(l.code, ''), q.type, q.prompt,
 		       COALESCE(jsonb_array_length(q.payload -> 'options'), 0),
-		       COALESCE((q.answer ->> 'correct_index')::int, (q.answer ->> 'index')::int, -1)
+		       COALESCE((q.answer ->> 'correct_index')::int, (q.answer ->> 'index')::int, -1),
+		       COALESCE((SELECT count(*) FROM jsonb_array_elements_text(
+		                   CASE WHEN jsonb_typeof(q.answer -> 'accepted') = 'array' THEN q.answer -> 'accepted' ELSE '[]'::jsonb END) a
+		                 WHERE btrim(a) <> ''), 0)
 		FROM grammar_questions q
 		LEFT JOIN levels l ON l.id = q.level_id
 		WHERE q.grammar_topic_id = $1 AND q.status <> 'archived'
-		  AND q.type IN ('multiple_choice', 'contextual')`, content.Topic.ID)
+		  AND q.type IN ('multiple_choice', 'contextual', 'fill_blank')
+		ORDER BY q.created_at, q.id`, content.Topic.ID)
 	if err != nil {
 		return out, content, err
 	}
@@ -536,26 +582,28 @@ func (m *Module) checkTopic(ctx context.Context, slug, language string, only []c
 	index := 0
 	for rows.Next() {
 		index++
-		var code, prompt string
-		var options, answer int
-		if err := rows.Scan(&code, &prompt, &options, &answer); err != nil {
+		var code, kind, prompt string
+		var options, answer, accepted int
+		if err := rows.Scan(&code, &kind, &prompt, &options, &answer, &accepted); err != nil {
 			return out, content, err
 		}
 		if len(wanted) > 0 && code != "" && !wanted[code] {
 			continue
 		}
-		if options < 2 {
-			out.Issues = append(out.Issues, Issue{
-				Level: code, Field: "practice",
-				Message: fmt.Sprintf("Question %d has fewer than two options", index),
-			})
-			continue
+		problem := ""
+		switch {
+		case kind == ai.PracticeFillBlank && strings.Count(prompt, ai.BlankMarker) != 1:
+			problem = fmt.Sprintf("Question %d needs exactly one ___ gap", index)
+		case kind == ai.PracticeFillBlank && accepted == 0:
+			problem = fmt.Sprintf("Question %d has no accepted answer", index)
+		case kind == ai.PracticeFillBlank:
+		case options < 2:
+			problem = fmt.Sprintf("Question %d has fewer than two options", index)
+		case answer < 0 || answer >= options:
+			problem = fmt.Sprintf("Question %d has no correct answer", index)
 		}
-		if answer < 0 || answer >= options {
-			out.Issues = append(out.Issues, Issue{
-				Level: code, Field: "practice",
-				Message: fmt.Sprintf("Question %d has no correct answer", index),
-			})
+		if problem != "" {
+			out.Issues = append(out.Issues, Issue{Level: code, Field: "practice", Message: problem})
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -735,6 +783,18 @@ func publishLanguage(ctx context.Context, tx pgx.Tx, topicID uuid.UUID, language
 			                  WHERE grammar_topic_id = $1 AND language = $2
 			                    AND level_code = $3::cefr_code AND status = 'published')`,
 			topicID, language, code); err != nil {
+			return nil, err
+		}
+		// A level with a new test replaces its old one, the way new text replaces old text.
+		// Without this, every regenerate-and-publish added fifteen questions to the fifteen
+		// already live. Archived, not deleted: past attempts still point at them.
+		if _, err := tx.Exec(ctx, `
+			UPDATE grammar_questions SET status = 'archived'
+			WHERE grammar_topic_id = $1 AND status = 'published'
+			  AND level_id = (SELECT id FROM levels WHERE code = $2)
+			  AND EXISTS (SELECT 1 FROM grammar_questions d
+			              WHERE d.grammar_topic_id = $1 AND d.status = 'draft'
+			                AND d.level_id = (SELECT id FROM levels WHERE code = $2))`, topicID, code); err != nil {
 			return nil, err
 		}
 		if _, err := tx.Exec(ctx, `

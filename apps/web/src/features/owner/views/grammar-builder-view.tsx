@@ -6,6 +6,7 @@ import {
   Check,
   Eye,
   Languages,
+  ListChecks,
   Pencil,
   Plus,
   RefreshCw,
@@ -49,6 +50,7 @@ import type {
   GrammarBody,
   LevelContent,
   LevelStatus,
+  PracticeKind,
   PracticeQuestion,
   ProposedLevel,
   RefineAction,
@@ -296,6 +298,13 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
             <Pencil className="size-4" aria-hidden />
             Editor
           </TabsTrigger>
+          <TabsTrigger value="test" className={activeTab}>
+            <ListChecks className="size-4" aria-hidden />
+            Test
+            <span className="rounded bg-surface-active px-1 text-caption tabular-nums text-fg-muted">
+              {current.questions?.length ?? 0}
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="preview" className={activeTab}>
             <Eye className="size-4" aria-hidden />
             Preview
@@ -307,6 +316,14 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
             <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
             <LevelEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="test">
+          {isWriting(writing, current.level, language) ? (
+            <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
+          ) : (
+            <TestEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
           )}
         </TabsContent>
 
@@ -414,7 +431,6 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
   const [formulas, setFormulas] = useState(body.formulas ?? []);
   const [examples, setExamples] = useState(body.examples ?? []);
   const [mistakes, setMistakes] = useState(body.common_mistakes ?? []);
-  const [questions, setQuestions] = useState<PracticeQuestion[]>(content.questions ?? []);
   /** Which section is waiting on the model, so only that card shows it is busy. */
   const [pending, setPending] = useState<string | null>(null);
   /** The one item being rewritten, as "section:index", so only that row shows it. */
@@ -454,9 +470,6 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
       case "common_mistakes":
         setMistakes(next.common_mistakes ?? []);
         break;
-      case "practice":
-        setQuestions(proposed.practice ?? []);
-        break;
       default:
         // No section named: the whole level was rewritten (Improve, Adapt, Translate).
         setTitle(proposed.title);
@@ -468,7 +481,6 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         setFormulas(next.formulas ?? []);
         setExamples(next.examples ?? []);
         setMistakes(next.common_mistakes ?? []);
-        setQuestions(proposed.practice ?? []);
     }
   }
 
@@ -498,9 +510,6 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         break;
       case "common_mistakes":
         setMistakes((list) => replace(list, pick(next.common_mistakes)));
-        break;
-      case "practice":
-        setQuestions((list) => replace(list, pick(proposed.practice)));
         break;
     }
   }
@@ -596,7 +605,8 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
       common_mistakes: mistakes,
     };
     save.mutate(
-      { level: content.level, input: { language, title, summary, body: next, status, questions } },
+      // The test is saved from its own tab. Leaving questions out leaves them as they are.
+      { level: content.level, input: { language, title, summary, body: next, status } },
       {
         onSuccess: () => toast({ title: "Saved as a draft", variant: "success" }),
         onError: (error) =>
@@ -873,10 +883,133 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         />
       </SectionCard>
 
+    </div>
+  );
+}
+
+/** The size of a generated test; the owner can add as many more by hand as they like. */
+const testSize = 15;
+
+const kindLabels: Record<PracticeKind, string> = {
+  multiple_choice: "Multiple choice",
+  fill_blank: "Fill in the blank",
+};
+
+const kindOf = (q: PracticeQuestion): PracticeKind => q.type ?? "multiple_choice";
+
+function blankQuestion(kind: PracticeKind): PracticeQuestion {
+  return kind === "fill_blank"
+    ? { type: kind, prompt: "", options: [], answer_index: -1, accepted: [""], hint: "", explanation: "", target_rule: "" }
+    : { type: kind, prompt: "", options: ["", ""], answer_index: 0, accepted: [], hint: "", explanation: "", target_rule: "" };
+}
+
+/** What is wrong with a question that would stop it being marked, or null. */
+function questionProblem(q: PracticeQuestion): string | null {
+  if (!q.prompt.trim()) return "The question has no text yet.";
+  if (kindOf(q) === "fill_blank") {
+    const gaps = q.prompt.split("___").length - 1;
+    if (gaps !== 1) return "Put exactly one ___ in the sentence, where the answer goes.";
+    if (!(q.accepted ?? []).some((a) => a.trim())) return "Add at least one accepted answer.";
+    return null;
+  }
+  if (q.options.length < 2) return "A multiple choice needs at least two options.";
+  if (q.answer_index < 0 || q.answer_index >= q.options.length) return "Pick which option is correct.";
+  return null;
+}
+
+/**
+ * A level's test, on its own tab.
+ *
+ * Generate writes fifteen questions per level — most of them picked from options, some typed
+ * into a gap — and this is where they are read, fixed, regenerated one at a time, or added
+ * to by hand. Questions belong to the level, not to a language: the same test follows the
+ * lesson in English, Uzbek and Russian, so editing it here edits it for all three.
+ */
+function TestEditor({ slug, language, content }: { slug: string; language: ContentLanguage; content: LevelContent }) {
+  const save = useSaveGrammarLevel(slug);
+  const refine = useRefineGrammarLevel(slug);
+  const [questions, setQuestions] = useState<PracticeQuestion[]>(content.questions ?? []);
+  const [pending, setPending] = useState<string | null>(null);
+  const [pendingItem, setPendingItem] = useState<number | null>(null);
+  const busy = pending ?? (pendingItem !== null ? "item" : null);
+
+  const gaps = questions.filter((q) => kindOf(q) === "fill_blank").length;
+  const problems = questions.map(questionProblem).filter(Boolean).length;
+
+  const failed = (title: string) => (error: unknown) =>
+    toast({ title, description: isApiError(error) ? error.message : undefined, variant: "error" });
+
+  function runRefine(_: string, action: RefineAction) {
+    setPending("practice");
+    refine.mutate(
+      { level: content.level, input: { language, action, section: "practice" } },
+      {
+        onSuccess: (proposed) => {
+          setQuestions(proposed.practice ?? []);
+          toast({ title: "Proposed — review it and save", description: "Nothing is saved until you press Save test." });
+        },
+        onError: failed("The model could not do that"),
+        onSettled: () => setPending(null),
+      },
+    );
+  }
+
+  function runItem(index: number) {
+    setPendingItem(index);
+    refine.mutate(
+      { level: content.level, input: { language, action: "regenerate_item", section: "practice", index } },
+      {
+        onSuccess: (proposed) => {
+          const list = proposed.practice ?? [];
+          const item = list[index] ?? list[list.length - 1];
+          if (item) setQuestions((all) => all.map((old, i) => (i === index ? item : old)));
+          toast({ title: "Replaced — review it and save", description: "Nothing is saved until you press Save test." });
+        },
+        onError: failed("The model could not do that"),
+        onSettled: () => setPendingItem(null),
+      },
+    );
+  }
+
+  function persist() {
+    if (problems > 0) {
+      toast({
+        title: `${problems} ${problems === 1 ? "question needs" : "questions need"} fixing first`,
+        description: "Each one says what is missing.",
+        variant: "error",
+      });
+      return;
+    }
+    save.mutate(
+      { level: content.level, input: { language, questions } },
+      {
+        onSuccess: () => toast({ title: "Test saved as a draft", description: "Learners get it when you publish.", variant: "success" }),
+        onError: failed("The test could not be saved"),
+      },
+    );
+  }
+
+  if (content.status === "not_applicable" || content.status === "not_created") {
+    return (
       <SectionCard
-        title="Practice"
-        description={`${questions.length} ${questions.length === 1 ? "question" : "questions"} · multiple choice`}
-        action={
+        title={`${content.level} test`}
+        description={content.status === "not_applicable" ? "This level is marked not applicable" : "Nothing written yet"}
+      >
+        <p className="text-body-sm text-fg-secondary">
+          {content.status === "not_applicable"
+            ? "A level that is not taught has no test."
+            : `Generate this level and its ${testSize}-question test is written with it.`}
+        </p>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard
+      title={`${content.level} test`}
+      description={`${questions.length} ${questions.length === 1 ? "question" : "questions"} · ${questions.length - gaps} multiple choice · ${gaps} fill in the blank · shared by every language`}
+      action={
+        <span className="flex flex-wrap items-center gap-1">
           <SectionAI
             section="practice"
             busy={busy}
@@ -886,21 +1019,34 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
               { action: "regenerate", label: "Regenerate all" },
             ]}
           />
-        }
-      >
-        <PracticeEditor questions={questions} onChange={setQuestions} {...itemAI("practice")} />
-      </SectionCard>
-    </div>
+          <Button size="sm" loading={save.isPending} disabled={busy !== null} onClick={persist}>
+            Save test
+          </Button>
+        </span>
+      }
+    >
+      {questions.length > 0 && questions.length < testSize && (
+        <p className="mb-3 rounded-lg border border-warning/40 bg-warning-subtle/40 px-3 py-2 text-caption">
+          A full test is {testSize} questions; this one has {questions.length}. Generate more or add them by hand.
+        </p>
+      )}
+      <PracticeEditor
+        questions={questions}
+        onChange={setQuestions}
+        busy={busy !== null}
+        regenerating={pendingItem}
+        onRegenerate={runItem}
+      />
+    </SectionCard>
   );
 }
 
 /**
- * The questions, edited next to the text they test.
+ * The questions of a test, each readable at a glance and editable in place.
  *
- * They used to be reachable only from the Question Bank, which meant writing a lesson and
- * writing its practice were two visits to two pages — and the second one was easy to forget.
- * Published questions are not shown here: learners may be part-way through them, and a draft
- * edit is not a publication. They are replaced when the topic is published.
+ * Two kinds. A multiple choice shows its options with the right one ticked; a fill in the
+ * blank shows its sentence with the gap and the answers that count as right. Rows read as
+ * text until Edit is pressed, the same as every other list in the builder.
  */
 function PracticeEditor({
   questions,
@@ -915,20 +1061,25 @@ function PracticeEditor({
   const editing = useEditingRows();
   const update = (index: number, next: PracticeQuestion) =>
     onChange(questions.map((q, i) => (i === index ? next : q)));
+  const add = (kind: PracticeKind) => {
+    editing.add(questions.length);
+    onChange([...questions, blankQuestion(kind)]);
+  };
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-3">
       {questions.length === 0 && (
         <p className="rounded-lg border border-dashed py-6 text-center text-body-sm text-fg-muted">
-          No practice yet. Ask the model for some, or write one.
+          No test yet. Ask the model for one, or write the questions yourself.
         </p>
       )}
 
       {questions.map((raw, index) => {
         // Defended rather than assumed: this list arrives from the API, and a question that
         // lost its options should be fixable here, not a blank page.
-        const question: PracticeQuestion = { ...raw, options: raw.options ?? [] };
-        const answerOutOfRange = question.answer_index < 0 || question.answer_index >= question.options.length;
+        const question: PracticeQuestion = { ...raw, options: raw.options ?? [], accepted: raw.accepted ?? [] };
+        const kind = kindOf(question);
+        const problem = questionProblem(question);
         const open = editing.isOpen(index);
         const actions = (
           <ItemActions
@@ -954,26 +1105,42 @@ function PracticeEditor({
                   <RowShimmer />
                 ) : (
                   <div className="grid gap-1.5">
-                    <p className="text-body-sm">{question.prompt || emptyRow}</p>
+                    <p className="flex flex-wrap items-baseline gap-x-2 text-body-sm">
+                      <span>{question.prompt || emptyRow}</span>
+                      <Badge variant="outline" className="text-[0.625rem]">
+                        {kindLabels[kind]}
+                      </Badge>
+                    </p>
                     <ul className="flex flex-wrap gap-1.5">
-                      {question.options.map((option, optionIndex) => (
-                        <li
-                          key={optionIndex}
-                          className={cn(
-                            "rounded-md border px-2 py-0.5 text-caption",
-                            optionIndex === question.answer_index
-                              ? "border-success/50 bg-success/10 text-success"
-                              : "text-fg-secondary",
-                          )}
-                        >
-                          {optionIndex === question.answer_index && <Check className="mr-1 inline size-3" aria-hidden />}
-                          {option || "—"}
-                        </li>
-                      ))}
+                      {kind === "fill_blank"
+                        ? question.accepted!.map((answer, i) => (
+                            <li
+                              key={i}
+                              className="rounded-md border border-success/50 bg-success/10 px-2 py-0.5 text-caption text-success"
+                            >
+                              <Check className="mr-1 inline size-3" aria-hidden />
+                              {answer || "—"}
+                            </li>
+                          ))
+                        : question.options.map((option, optionIndex) => (
+                            <li
+                              key={optionIndex}
+                              className={cn(
+                                "rounded-md border px-2 py-0.5 text-caption",
+                                optionIndex === question.answer_index
+                                  ? "border-success/50 bg-success/10 text-success"
+                                  : "text-fg-secondary",
+                              )}
+                            >
+                              {optionIndex === question.answer_index && <Check className="mr-1 inline size-3" aria-hidden />}
+                              {option || "—"}
+                            </li>
+                          ))}
+                      {kind === "fill_blank" && question.hint && (
+                        <li className="px-1 text-caption text-fg-muted">hint: {question.hint}</li>
+                      )}
                     </ul>
-                    {answerOutOfRange && (
-                      <p className="text-caption text-error">No correct option is selected — press edit to pick one.</p>
-                    )}
+                    {problem && <p className="text-caption text-error">{problem} Press edit to fix it.</p>}
                     {question.explanation && <p className="text-caption text-fg-muted">{question.explanation}</p>}
                   </div>
                 )}
@@ -987,75 +1154,144 @@ function PracticeEditor({
           <div key={index} className="grid gap-3 rounded-lg border bg-surface p-3">
             <div className="flex items-start gap-2">
               <span className="mt-2 text-caption text-fg-muted tabular-nums">{index + 1}</span>
-              <Textarea
-                aria-label={`Question ${index + 1}`}
-                rows={2}
-                value={question.prompt}
-                placeholder="She ___ in London since 2019."
-                onChange={(event) => update(index, { ...question, prompt: event.target.value })}
-              />
+              <div className="grid flex-1 gap-2">
+                <div role="group" aria-label="Question type" className="flex flex-wrap gap-1">
+                  {(["multiple_choice", "fill_blank"] as const).map((k) => (
+                    <ToggleChip
+                      key={k}
+                      pressed={kind === k}
+                      onToggle={() => {
+                        if (k === kind) return;
+                        // The prompt and explanation carry over; the answer fields are the new kind's.
+                        const fresh = blankQuestion(k);
+                        update(index, { ...fresh, prompt: question.prompt, explanation: question.explanation, target_rule: question.target_rule });
+                      }}
+                    >
+                      {kindLabels[k]}
+                    </ToggleChip>
+                  ))}
+                </div>
+                <Textarea
+                  aria-label={`Question ${index + 1}`}
+                  rows={2}
+                  value={question.prompt}
+                  placeholder={kind === "fill_blank" ? "She ___ in London since 2019." : "Which sentence is correct?"}
+                  onChange={(event) => update(index, { ...question, prompt: event.target.value })}
+                />
+              </div>
               {actions}
             </div>
 
-            <fieldset className="grid gap-1.5">
-              <legend className="mb-1 text-caption text-fg-muted">Options — select the correct one</legend>
-              {question.options.map((option, optionIndex) => (
-                <div key={optionIndex} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`answer-${index}`}
-                    aria-label={`Option ${optionIndex + 1} is correct`}
-                    checked={question.answer_index === optionIndex}
-                    onChange={() => update(index, { ...question, answer_index: optionIndex })}
-                    className="size-4 accent-[var(--primary)]"
-                  />
-                  <Input
-                    aria-label={`Option ${optionIndex + 1}`}
-                    value={option}
-                    onChange={(event) =>
-                      update(index, {
-                        ...question,
-                        options: question.options.map((o, i) => (i === optionIndex ? event.target.value : o)),
-                      })
-                    }
-                  />
+            {kind === "fill_blank" ? (
+              <fieldset className="grid gap-1.5">
+                <legend className="mb-1 text-caption text-fg-muted">
+                  Accepted answers — anything typed that matches one of these is right (case and final punctuation are ignored)
+                </legend>
+                {question.accepted!.map((answer, answerIndex) => (
+                  <div key={answerIndex} className="flex items-center gap-2">
+                    <Check className="size-4 shrink-0 text-success" aria-hidden />
+                    <Input
+                      aria-label={`Accepted answer ${answerIndex + 1}`}
+                      value={answer}
+                      placeholder="has lived"
+                      onChange={(event) =>
+                        update(index, {
+                          ...question,
+                          accepted: question.accepted!.map((a, i) => (i === answerIndex ? event.target.value : a)),
+                        })
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove accepted answer ${answerIndex + 1}`}
+                      disabled={question.accepted!.length <= 1}
+                      onClick={() =>
+                        update(index, { ...question, accepted: question.accepted!.filter((_, i) => i !== answerIndex) })
+                      }
+                    >
+                      <X aria-hidden />
+                    </Button>
+                  </div>
+                ))}
+                {question.accepted!.length < 8 && (
                   <Button
                     variant="ghost"
-                    size="icon"
-                    aria-label={`Remove option ${optionIndex + 1}`}
-                    disabled={question.options.length <= 2}
-                    onClick={() => {
-                      const options = question.options.filter((_, i) => i !== optionIndex);
-                      // The correct answer follows its option rather than staying on an index
-                      // that now points at a different one.
-                      let answer = question.answer_index;
-                      if (optionIndex < answer) answer -= 1;
-                      else if (optionIndex === answer) answer = 0;
-                      update(index, { ...question, options, answer_index: answer });
-                    }}
+                    size="sm"
+                    className="justify-self-start"
+                    onClick={() => update(index, { ...question, accepted: [...question.accepted!, ""] })}
                   >
-                    <X aria-hidden />
+                    <Plus aria-hidden /> Add another accepted answer
                   </Button>
-                </div>
-              ))}
-              {question.options.length < 6 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="justify-self-start"
-                  onClick={() => update(index, { ...question, options: [...question.options, ""] })}
-                >
-                  <Plus aria-hidden /> Add an option
-                </Button>
-              )}
-              {answerOutOfRange && (
-                <p className="text-caption text-error">Pick which option is correct — none is selected.</p>
-              )}
-            </fieldset>
+                )}
+                <Input
+                  aria-label={`Hint, question ${index + 1}`}
+                  placeholder="Hint shown in the box, e.g. (live) — optional"
+                  value={question.hint ?? ""}
+                  onChange={(event) => update(index, { ...question, hint: event.target.value })}
+                />
+              </fieldset>
+            ) : (
+              <fieldset className="grid gap-1.5">
+                <legend className="mb-1 text-caption text-fg-muted">Options — select the correct one</legend>
+                {question.options.map((option, optionIndex) => (
+                  <div key={optionIndex} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`answer-${index}`}
+                      aria-label={`Option ${optionIndex + 1} is correct`}
+                      checked={question.answer_index === optionIndex}
+                      onChange={() => update(index, { ...question, answer_index: optionIndex })}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    <Input
+                      aria-label={`Option ${optionIndex + 1}`}
+                      value={option}
+                      onChange={(event) =>
+                        update(index, {
+                          ...question,
+                          options: question.options.map((o, i) => (i === optionIndex ? event.target.value : o)),
+                        })
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove option ${optionIndex + 1}`}
+                      disabled={question.options.length <= 2}
+                      onClick={() => {
+                        const options = question.options.filter((_, i) => i !== optionIndex);
+                        // The correct answer follows its option rather than staying on an index
+                        // that now points at a different one.
+                        let answer = question.answer_index;
+                        if (optionIndex < answer) answer -= 1;
+                        else if (optionIndex === answer) answer = 0;
+                        update(index, { ...question, options, answer_index: answer });
+                      }}
+                    >
+                      <X aria-hidden />
+                    </Button>
+                  </div>
+                ))}
+                {question.options.length < 6 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-self-start"
+                    onClick={() => update(index, { ...question, options: [...question.options, ""] })}
+                  >
+                    <Plus aria-hidden /> Add an option
+                  </Button>
+                )}
+              </fieldset>
+            )}
 
-            <Input
-              aria-label={`Why option is correct, question ${index + 1}`}
-              placeholder="Why the answer is right"
+            {problem && <p className="text-caption text-error">{problem}</p>}
+
+            <Textarea
+              aria-label={`Explanation, question ${index + 1}`}
+              rows={2}
+              placeholder="Why the right answer is right — and why the tempting wrong one is wrong. Learners see this after they answer."
               value={question.explanation ?? ""}
               onChange={(event) => update(index, { ...question, explanation: event.target.value })}
             />
@@ -1063,16 +1299,14 @@ function PracticeEditor({
         );
       })}
 
-      <Button
-        variant="outline"
-        className="justify-self-start"
-        onClick={() => {
-          editing.add(questions.length);
-          onChange([...questions, { prompt: "", options: ["", ""], answer_index: 0, explanation: "", target_rule: "" }]);
-        }}
-      >
-        <Plus aria-hidden /> Add a question
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => add("multiple_choice")}>
+          <Plus aria-hidden /> Add multiple choice
+        </Button>
+        <Button variant="outline" onClick={() => add("fill_blank")}>
+          <Plus aria-hidden /> Add fill in the blank
+        </Button>
+      </div>
     </div>
   );
 }

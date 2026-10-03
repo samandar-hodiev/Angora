@@ -124,26 +124,111 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 	if meta != nil && meta.AIRequestID != uuid.Nil {
 		aiRequestID = &meta.AIRequestID
 	}
-	if err := m.storeGenerated(ctx, current.Topic.ID, plan.Source, actor, aiRequestID, generated); err != nil {
-		return nil, err
-	}
 
-	written := []string{plan.Source}
-	failed := []string{}
+	// The tests are written while the translations run: both need only the English, and
+	// one after the other would double the wait for nothing.
+	type testResult struct {
+		practice [][]ai.GeneratedPractice
+		failed   []string
+	}
+	tests := make(chan testResult, 1)
+	go func() {
+		practice, failed := m.writeTests(ctx, current, category, actor, generated.Levels)
+		tests <- testResult{practice, failed}
+	}()
+
+	type translation struct {
+		target  string
+		levels  []ai.GeneratedGrammarLevel
+		missing []string
+	}
+	var translations []translation
 	if len(plan.Targets) > 0 && m.refiner != nil {
 		for _, target := range plan.Targets {
-			translated, missing := m.translateAll(ctx, current, category, plan.Source, target, actor, generated.Levels)
-			if err := m.storeTranslated(ctx, current.Topic.ID, target, actor, translated); err != nil {
-				return nil, err
-			}
-			if len(translated) > 0 {
-				written = append(written, target)
-			}
-			failed = append(failed, missing...)
+			done, missing := m.translateAll(ctx, current, category, plan.Source, target, actor, generated.Levels)
+			translations = append(translations, translation{target, done, missing})
+		}
+	}
+	written := <-tests
+	failed := written.failed
+	for i, practice := range written.practice {
+		if practice != nil {
+			generated.Levels[i].Practice = practice
 		}
 	}
 
-	return map[string]any{"slug": plan.Slug, "languages": written, "levels": plan.Levels, "failed": failed}, nil
+	if err := m.storeGenerated(ctx, current.Topic.ID, plan.Source, actor, aiRequestID, generated); err != nil {
+		return nil, err
+	}
+	languages := []string{plan.Source}
+	for _, t := range translations {
+		if err := m.storeTranslated(ctx, current.Topic.ID, t.target, actor, t.levels); err != nil {
+			return nil, err
+		}
+		if len(t.levels) > 0 {
+			languages = append(languages, t.target)
+		}
+		failed = append(failed, t.missing...)
+	}
+
+	return map[string]any{"slug": plan.Slug, "languages": languages, "levels": plan.Levels, "failed": failed}, nil
+}
+
+// PracticeWriter writes a level's test. The content author implements it; an author that
+// does not keeps the few questions the lesson call wrote.
+type PracticeWriter interface {
+	WriteGrammarPractice(ctx context.Context, req ai.GrammarPracticeRequest) ([]ai.GeneratedPractice, *ai.EvaluationMeta, error)
+}
+
+// writeTests writes a full test for each applicable level, a few levels at a time, and
+// returns them by level index. It only reads levels — the translations read them at the same
+// time — and the caller swaps the tests in once both are done. A level whose test could not
+// be written gets nil, keeps the lesson's questions, and is named in the second result
+// ("test:B1"), so the owner knows to add more by hand.
+func (m *Module) writeTests(
+	ctx context.Context, topic TopicContent, category string, actor uuid.UUID, levels []ai.GeneratedGrammarLevel,
+) ([][]ai.GeneratedPractice, []string) {
+	writer, ok := m.author.(PracticeWriter)
+	if !ok {
+		return nil, nil
+	}
+	written := make([][]ai.GeneratedPractice, len(levels))
+	failed := make([]bool, len(levels))
+	sem := make(chan struct{}, translationConcurrency)
+	var wg sync.WaitGroup
+	for i := range levels {
+		if !levels[i].Applicable {
+			continue
+		}
+		parsed, err := cefr.Parse(levels[i].Level)
+		if err != nil {
+			continue
+		}
+		wg.Add(1)
+		go func(i int, parsed cefr.Level) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			questions, _, err := writer.WriteGrammarPractice(ctx, ai.GrammarPracticeRequest{
+				Topic: topic.Topic.Name, Slug: topic.Topic.Slug, Category: category,
+				Description: topic.Topic.Description, Level: parsed, Lesson: levels[i], ActorID: &actor,
+			})
+			if err != nil {
+				failed[i] = true
+				return
+			}
+			written[i] = questions
+		}(i, parsed)
+	}
+	wg.Wait()
+
+	var out []string
+	for i, f := range failed {
+		if f {
+			out = append(out, "test:"+levels[i].Level)
+		}
+	}
+	return written, out
 }
 
 // translateAll translates every applicable level into one language, a few at a time.
@@ -172,10 +257,19 @@ func (m *Module) translateAll(
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			translated, _, err := m.refiner.TranslateGrammarLevel(ctx, ai.GrammarTranslateRequest{
+			// Questions are not translated: they belong to the level, not to a language, and
+			// storeTranslated would drop them anyway. Leaving them out keeps the call short.
+			level.Practice = nil
+			req := ai.GrammarTranslateRequest{
 				Topic: topic.Topic.Name, Slug: topic.Topic.Slug, Category: category, Level: parsed,
 				From: from, To: to, Source: level, ActorID: &actor,
-			})
+			}
+			// One more try: a single level failing is usually one bad response, and a gap
+			// in one language is work the owner would otherwise have to notice and redo.
+			translated, _, err := m.refiner.TranslateGrammarLevel(ctx, req)
+			if err != nil && ctx.Err() == nil {
+				translated, _, err = m.refiner.TranslateGrammarLevel(ctx, req)
+			}
 			if err != nil {
 				return
 			}

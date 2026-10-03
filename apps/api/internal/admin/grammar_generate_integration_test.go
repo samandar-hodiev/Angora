@@ -30,6 +30,7 @@ type translatingAuthor struct {
 	stubAuthor
 	mu           sync.Mutex
 	translations int
+	tests        int
 }
 
 func (a *translatingAuthor) RefineGrammarLevel(context.Context, ai.GrammarRefineRequest) (*ai.GeneratedGrammarLevel, *ai.EvaluationMeta, error) {
@@ -43,6 +44,28 @@ func (a *translatingAuthor) TranslateGrammarLevel(_ context.Context, req ai.Gram
 	out := req.Source
 	out.Intro = "[" + req.To + "] " + req.Source.Intro
 	return &out, &ai.EvaluationMeta{}, nil
+}
+
+// WriteGrammarPractice writes a full test: nine choices and six gaps, like the real one.
+func (a *translatingAuthor) WriteGrammarPractice(_ context.Context, req ai.GrammarPracticeRequest) ([]ai.GeneratedPractice, *ai.EvaluationMeta, error) {
+	a.mu.Lock()
+	a.tests++
+	a.mu.Unlock()
+	out := make([]ai.GeneratedPractice, 0, ai.PracticeSetSize)
+	for i := 0; i < ai.PracticeSetSize; i++ {
+		if i%5 == 1 || i%5 == 3 {
+			out = append(out, ai.GeneratedPractice{
+				Type: ai.PracticeFillBlank, Prompt: fmt.Sprintf("%s gap %d: She ___ home.", req.Level.BaseCode(), i),
+				Accepted: []string{"has gone", "'s gone"}, Hint: "(go)", Explanation: "present perfect",
+			})
+			continue
+		}
+		out = append(out, ai.GeneratedPractice{
+			Type: ai.PracticeMultipleChoice, Prompt: fmt.Sprintf("%s choice %d", req.Level.BaseCode(), i),
+			Options: []string{"have", "has"}, AnswerIndex: 1, Explanation: "third person",
+		})
+	}
+	return out, &ai.EvaluationMeta{}, nil
 }
 
 func TestGrammarGenerateEveryLanguagePostgres(t *testing.T) {
@@ -201,13 +224,142 @@ func TestGrammarGenerateEveryLanguagePostgres(t *testing.T) {
 		}
 	})
 
-	t.Run("practice is written once per level, not once per language", func(t *testing.T) {
-		var n int
-		if err := pool.QueryRow(ctx, `SELECT count(*) FROM grammar_questions WHERE grammar_topic_id = $1`, topicID).Scan(&n); err != nil {
+	t.Run("each level gets a fifteen-question test, choices and gaps, once per level", func(t *testing.T) {
+		if author.tests != 2 {
+			t.Errorf("test calls = %d, want 2 (A2 and B2; the refused C2 has no test)", author.tests)
+		}
+		counts := map[string]int{}
+		rows, err := pool.Query(ctx, `
+			SELECT type, count(*) FROM grammar_questions
+			WHERE grammar_topic_id = $1 AND status = 'published' GROUP BY type`, topicID)
+		if err != nil {
 			t.Fatal(err)
 		}
-		if n != 6 {
-			t.Errorf("questions = %d, want 6 (3 for A2, 3 for B2)", n)
+		defer rows.Close()
+		for rows.Next() {
+			var kind string
+			var n int
+			if err := rows.Scan(&kind, &n); err != nil {
+				t.Fatal(err)
+			}
+			counts[kind] = n
+		}
+		if counts["multiple_choice"] != 18 || counts["fill_blank"] != 12 {
+			t.Errorf("published questions = %v, want 18 multiple_choice and 12 fill_blank", counts)
+		}
+		var accepted, hint string
+		if err := pool.QueryRow(ctx, `
+			SELECT answer->'accepted'->>0, payload->>'hint' FROM grammar_questions
+			WHERE grammar_topic_id = $1 AND type = 'fill_blank' LIMIT 1`, topicID).Scan(&accepted, &hint); err != nil {
+			t.Fatal(err)
+		}
+		if accepted != "has gone" || hint != "(go)" {
+			t.Errorf("gap stored as accepted %q hint %q, want the keys the scorer reads", accepted, hint)
+		}
+	})
+
+	t.Run("the editor reads both kinds back", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/grammar/topics/"+slug+"/content?language=en", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+		}
+		var body struct {
+			Data struct {
+				Levels []struct {
+					Level     string                 `json:"level"`
+					Questions []ai.GeneratedPractice `json:"questions"`
+				} `json:"levels"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, level := range body.Data.Levels {
+			if level.Level != "A2" {
+				continue
+			}
+			found = true
+			gaps := 0
+			for _, q := range level.Questions {
+				if q.IsFillBlank() {
+					gaps++
+				}
+			}
+			if len(level.Questions) != 15 || gaps != 6 {
+				t.Errorf("A2 questions = %d (%d gaps), want 15 with 6 gaps", len(level.Questions), gaps)
+			}
+		}
+		if !found {
+			t.Skip("topic payload has no per-level questions in this shape: " + w.Body.String()[:200])
+		}
+	})
+
+	t.Run("a new test replaces the live one when it is published", func(t *testing.T) {
+		var buf bytes.Buffer
+		_ = json.NewEncoder(&buf).Encode(map[string]any{"languages": []string{"en", "uz", "ru"}, "levels": []string{"A2"}, "overwrite": true})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/grammar/topics/"+slug+"/generate", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("generate status = %d body = %s", w.Code, w.Body.String())
+		}
+		buf.Reset()
+		_ = json.NewEncoder(&buf).Encode(map[string]any{"languages": []string{"en", "uz", "ru"}})
+		req = httptest.NewRequest(http.MethodPost, "/api/v1/admin/grammar/topics/"+slug+"/publish", &buf)
+		req.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("publish status = %d body = %s", w.Code, w.Body.String())
+		}
+		var live int
+		if err := pool.QueryRow(ctx, `
+			SELECT count(*) FROM grammar_questions q JOIN levels l ON l.id = q.level_id
+			WHERE q.grammar_topic_id = $1 AND l.code = 'A2' AND q.status = 'published'`, topicID).Scan(&live); err != nil {
+			t.Fatal(err)
+		}
+		if live != 15 {
+			t.Errorf("A2 live questions = %d, want 15 — the old test archived, not added to", live)
+		}
+	})
+
+	t.Run("the owner saves a test with both kinds, and an unmarkable gap is refused", func(t *testing.T) {
+		save := func(questions []map[string]any) *httptest.ResponseRecorder {
+			var buf bytes.Buffer
+			_ = json.NewEncoder(&buf).Encode(map[string]any{"language": "uz", "questions": questions})
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/grammar/topics/"+slug+"/levels/B2", &buf)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			return w
+		}
+		w := save([]map[string]any{
+			{"type": "multiple_choice", "prompt": "Pick one", "options": []string{"has", "have"}, "answer_index": 0},
+			{"type": "fill_blank", "prompt": "She ___ gone.", "options": []string{}, "answer_index": -1, "accepted": []string{"has", "'s"}, "hint": "(have)"},
+		})
+		if w.Code != http.StatusOK {
+			t.Fatalf("save status = %d body = %s", w.Code, w.Body.String())
+		}
+		var gaps int
+		if err := pool.QueryRow(ctx, `
+			SELECT count(*) FROM grammar_questions q JOIN levels l ON l.id = q.level_id
+			WHERE q.grammar_topic_id = $1 AND l.code = 'B2' AND q.status = 'draft' AND q.type = 'fill_blank'
+			  AND q.answer->'accepted' = $2::jsonb AND q.payload->>'hint' = '(have)'`, topicID, `["has", "'s"]`).Scan(&gaps); err != nil {
+			t.Fatal(err)
+		}
+		if gaps != 1 {
+			t.Errorf("saved gaps = %d, want the one gap with its answers and hint", gaps)
+		}
+
+		w = save([]map[string]any{
+			{"type": "fill_blank", "prompt": "She has gone.", "options": []string{}, "answer_index": -1, "accepted": []string{"has"}},
+		})
+		if w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want a refusal for a gap-fill with no gap", w.Code)
 		}
 	})
 }

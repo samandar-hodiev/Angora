@@ -89,18 +89,24 @@ function Session({
   attempt: GrammarAttempt;
   onComplete: (result: GrammarResult) => void;
 }) {
+  const questions = attempt.questions;
   const [index, setIndex] = useState(0);
-  const [response, setResponse] = useState<GrammarResponse>({});
-  const [feedback, setFeedback] = useState<GrammarFeedback | null>(null);
+  // Kept per question, so moving away from a half-typed answer and back does not lose it.
+  const [responses, setResponses] = useState<Record<string, GrammarResponse>>({});
+  const [feedbacks, setFeedbacks] = useState<Record<string, GrammarFeedback>>({});
   const shownAt = useRef(0);
 
   const answer = useAnswerQuestion(attempt.id);
   const complete = useCompletePractice(attempt.id, slug);
 
-  const question = attempt.questions[index]!;
-  const last = index === attempt.questions.length - 1;
-  const canSubmit = hasAnswer(question, response);
+  const question = questions[index]!;
+  const response = responses[question.id] ?? {};
+  const feedback = feedbacks[question.id] ?? null;
   const marked = feedback !== null;
+  const canSubmit = hasAnswer(question, response);
+  const answeredCount = Object.keys(feedbacks).length;
+  const unanswered = questions.length - answeredCount;
+  const allDone = unanswered === 0;
 
   // How long the learner spent on this question, started when it is shown rather than at
   // render: reading time is part of what the practice engine records.
@@ -108,23 +114,45 @@ function Session({
     shownAt.current = Date.now();
   }, [index]);
 
+  const finish = () => complete.mutate(undefined, { onSuccess: onComplete });
+
   const submit = () => {
-    if (!canSubmit || answer.isPending) return;
+    if (marked || !canSubmit || answer.isPending) return;
+    const id = question.id;
     answer.mutate(
-      { question_id: question.id, response, response_ms: Date.now() - shownAt.current },
-      { onSuccess: setFeedback },
+      { question_id: id, response, response_ms: Date.now() - shownAt.current },
+      { onSuccess: (f) => setFeedbacks((all) => ({ ...all, [id]: f })) },
     );
   };
 
+  /**
+   * The next question still to do, after this one and wrapping round; null when every one
+   * is answered. Skipping is moving on, so it lands on the same place as "Next".
+   */
+  const nextOpen = (from: number): number | null => {
+    for (let step = 1; step <= questions.length; step++) {
+      const i = (from + step) % questions.length;
+      if (!feedbacks[questions[i]!.id] && i !== from) return i;
+    }
+    return null;
+  };
+
   const next = () => {
-    if (last) {
-      complete.mutate(undefined, { onSuccess: onComplete });
+    if (allDone) {
+      finish();
       return;
     }
-    setIndex((i) => i + 1);
-    setResponse({});
-    setFeedback(null);
+    // After the last question, go back to the first one left. Skipping the only question
+    // left is finishing without it.
+    const target = index < questions.length - 1 ? index + 1 : nextOpen(index);
+    if (target === null) {
+      finish();
+      return;
+    }
+    setIndex(target);
   };
+
+  const nextLabel = allDone ? "See results" : index === questions.length - 1 ? "Next unanswered" : "Next question";
 
   return (
     <div className="mx-auto grid max-w-2xl gap-5 pb-40 md:pb-0">
@@ -140,15 +168,26 @@ function Session({
           <span className="flex items-center gap-2">
             {attempt.mode === "test" && <Badge variant="secondary">Test mode</Badge>}
             <span className="text-label text-fg-muted tabular-nums">
-              {index + 1} / {attempt.questions.length}
+              {answeredCount} / {questions.length} answered
             </span>
           </span>
         </div>
-        <Progress value={((index + (marked ? 1 : 0)) / attempt.questions.length) * 100} />
+        <Progress value={(answeredCount / questions.length) * 100} />
+        <QuestionNavigator
+          questions={questions}
+          current={index}
+          feedbacks={feedbacks}
+          drafts={responses}
+          onSelect={setIndex}
+        />
       </header>
 
       <section aria-labelledby="question-prompt" className="grid gap-4">
         <div className="grid gap-1.5">
+          <p className="text-caption text-fg-muted tabular-nums">
+            Question {index + 1} of {questions.length}
+            {question.type === "fill_blank" && " · type the missing word(s)"}
+          </p>
           <h1 id="question-prompt" className="text-h3">
             {question.prompt}
           </h1>
@@ -161,7 +200,7 @@ function Session({
           key={question.id}
           question={question}
           value={response}
-          onChange={(r) => !marked && setResponse(r)}
+          onChange={(r) => !marked && setResponses((all) => ({ ...all, [question.id]: r }))}
           onSubmit={submit}
           disabled={marked || answer.isPending}
           expected={feedback?.expected}
@@ -177,30 +216,128 @@ function Session({
             <p className="text-body-sm text-fg-secondary">Your answer could not be saved. Try again.</p>
           </div>
         )}
+        {complete.isError && (
+          <div role="alert" className="flex items-start gap-2 rounded-lg border border-dashed px-4 py-3">
+            <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <p className="text-body-sm text-fg-secondary">The results could not be loaded. Try again.</p>
+          </div>
+        )}
 
         {marked && <FeedbackPanel feedback={feedback} explanation={question.explanation} />}
       </section>
 
       {/* Pinned on a phone so the action is always in reach without scrolling back, and
           lifted clear of the app's floating bottom navigation, which sits at bottom-3 and
-          would otherwise cover it. On desktop it is an ordinary button in the flow. */}
+          would otherwise cover it. On desktop it is an ordinary row in the flow. */}
       <div
         style={{ bottom: "calc(4.75rem + env(safe-area-inset-bottom))" }}
         className="fixed inset-x-3 z-30 rounded-xl border bg-background/95 p-3 backdrop-blur-sm md:static md:inset-x-auto md:rounded-none md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
       >
-        <div className="mx-auto flex max-w-2xl gap-2">
-          {!marked ? (
-            <Button className="flex-1" disabled={!canSubmit} loading={answer.isPending} onClick={submit}>
-              Check
-            </Button>
-          ) : (
-            <Button className="flex-1" loading={complete.isPending} onClick={next}>
-              {last ? "See results" : "Next question"} <ArrowRight aria-hidden />
+        <div className="mx-auto grid max-w-2xl gap-2">
+          <div className="flex gap-2">
+            {!marked ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={answer.isPending || complete.isPending}
+                  onClick={next}
+                  title="Leave this one for now — you can come back to it"
+                >
+                  Skip
+                </Button>
+                <Button className="flex-1" disabled={!canSubmit} loading={answer.isPending} onClick={submit}>
+                  Check
+                </Button>
+              </>
+            ) : (
+              <Button className="flex-1" loading={complete.isPending} onClick={next}>
+                {nextLabel} <ArrowRight aria-hidden />
+              </Button>
+            )}
+          </div>
+          {!allDone && answeredCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-self-center text-fg-muted"
+              disabled={complete.isPending || answer.isPending}
+              onClick={finish}
+            >
+              Finish now · {unanswered} unanswered count as wrong
             </Button>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Every question of the run as a box: ticked once answered, outlined where the learner is,
+ * and in learning mode green or red once marked. Any box can be opened, so a skipped
+ * question is one tap away rather than at the end of a queue.
+ */
+function QuestionNavigator({
+  questions,
+  current,
+  feedbacks,
+  drafts,
+  onSelect,
+}: {
+  questions: GrammarAttempt["questions"];
+  current: number;
+  feedbacks: Record<string, GrammarFeedback>;
+  drafts: Record<string, GrammarResponse>;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <nav aria-label="Questions">
+      <ol className="flex flex-wrap gap-1.5">
+        {questions.map((q, i) => {
+          const f = feedbacks[q.id];
+          const answered = f !== undefined;
+          const drafted = !answered && hasAnswer(q, drafts[q.id] ?? {});
+          const here = i === current;
+          return (
+            <li key={q.id}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={answered}
+                aria-current={here ? "step" : undefined}
+                aria-label={`Question ${i + 1}${answered ? ", answered" : drafted ? ", started" : ", not answered"}`}
+                onClick={() => onSelect(i)}
+                className={cn(
+                  // Font size as a length, not text-caption: cn() reads text-caption as a colour
+                  // and drops it in favour of the colour classes below.
+                  "relative grid size-8 place-items-center rounded-md border text-[0.75rem] font-medium tabular-nums",
+                  "transition-colors duration-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  !answered && "bg-surface text-fg-muted hover:bg-surface-hover",
+                  drafted && "border-dashed border-primary/60",
+                  answered && f.correct === null && "border-primary bg-primary text-primary-foreground",
+                  answered && f.correct === true && "border-success bg-success text-white",
+                  answered && f.correct === false && "border-error bg-error text-white",
+                  // An outline, not a ring: rings are box-shadows, and the surface's own shadow
+                  // replaces them.
+                  here && "outline-2 outline-offset-2 outline-primary",
+                  here && !answered && "border-primary text-foreground",
+                )}
+              >
+                {answered ? (
+                  f.correct === false ? (
+                    <X className="size-4" aria-hidden />
+                  ) : (
+                    <Check className="size-4" aria-hidden />
+                  )
+                ) : (
+                  i + 1
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
@@ -316,7 +453,10 @@ function ResultView({ slug, result, mode }: { slug: string; result: GrammarResul
           <ul className="grid gap-2">
             {wrong.map((item) => (
               <li key={item.question_id} className="grid gap-1 rounded-xl border-l-2 border-warning bg-surface px-4 py-3">
-                <p className="text-body-sm">{item.prompt}</p>
+                <p className="flex items-start justify-between gap-2 text-body-sm">
+                  {item.prompt}
+                  {item.skipped && <Badge variant="outline">Skipped</Badge>}
+                </p>
                 {item.expected && (
                   <p className="text-body-sm">
                     <span className="text-fg-muted">Correct answer: </span>
