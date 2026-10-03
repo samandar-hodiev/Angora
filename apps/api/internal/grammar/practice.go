@@ -19,7 +19,7 @@ import (
 // Practice modes.
 const (
 	ModeLearning = "learning" // feedback after every answer: this is how people learn
-	ModeTest     = "test"     // feedback withheld until the end: this is how people are measured
+	ModeTest     = "test"     // the whole test as one scored run; each answer is still explained
 )
 
 const (
@@ -222,13 +222,12 @@ type answerRequest struct {
 	ResponseMs int      `json:"response_ms" binding:"omitempty,min=0,max=3600000"`
 }
 
-// Feedback is what the learner gets back after an answer. In test mode only `recorded` is
-// true and the rest is empty until the run is completed.
+// Feedback is what the learner gets back after an answer: whether it was right, the right
+// answer, and why.
 type Feedback struct {
 	Recorded bool `json:"recorded"`
-	// Correct and Score are pointers so that "not marked yet" (test mode, where the answer
-	// is stored but nothing is revealed until the end) is null rather than false. With a
-	// plain bool, a withheld result and a wrong answer would look identical to the client.
+	// Correct and Score are pointers so that "not marked" is null rather than false — the
+	// free-writing check can be unavailable, and that must not read as a wrong answer.
 	Correct     *bool    `json:"correct"`
 	Score       *float64 `json:"score"`
 	Expected    string   `json:"expected,omitempty"`
@@ -341,9 +340,11 @@ func (m *Module) submitAnswer(c *gin.Context) {
 		"topic": attempt.TopicSlug, "type": question.Type, "rule": question.TargetRule, "correct": mark.Correct,
 	})
 
-	// Learning mode explains; test mode only acknowledges. This is the whole difference
-	// between the two modes and it lives here.
-	if attempt.Mode == ModeLearning {
+	// Every answer is marked and explained the moment it is checked, in both modes: a
+	// learner who picks wrong wants to know why straight away, not fifteen questions later.
+	// Test mode differs in what it is (a scored run of the whole test) and in not showing
+	// the explanation before the answer, which publicQuestions takes care of.
+	{
 		feedback.Correct = &mark.Correct
 		feedback.Score = &mark.Score
 		feedback.Expected = mark.Expected

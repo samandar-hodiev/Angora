@@ -22,9 +22,9 @@ import { StateBadge } from "./shared";
  * A practice session.
  *
  * It should feel like a lesson, not an exam: one question at a time, visible progress, and
- * in learning mode an explanation the moment an answer is marked. Test mode is the same
- * screen with the feedback withheld — the server decides that, not this component, so the
- * two modes cannot drift apart.
+ * an explanation the moment an answer is checked — right or wrong, why, and what the right
+ * answer is — in both modes. What the server sends back is what is shown; this component
+ * does not decide what to reveal.
  */
 export function GrammarPracticeView({ slug }: { slug: string }) {
   const params = useSearchParams();
