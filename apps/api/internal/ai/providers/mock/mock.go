@@ -33,9 +33,6 @@ func (*Provider) GenerateText(_ context.Context, req ai.TextRequest) (*ai.TextRe
 		last = req.Messages[n-1].Content
 	}
 	text := fmt.Sprintf("[mock] You said: %s", last)
-	if svg, ok := grammarVisual(req); ok {
-		text = svg
-	}
 	return &ai.TextResponse{
 		Text:         text,
 		Model:        model(req.Model),

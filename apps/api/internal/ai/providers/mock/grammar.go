@@ -19,6 +19,8 @@ func grammarAnalysis(req ai.AnalysisRequest) (json.RawMessage, bool) {
 		return grammarExplanation(req), true
 	case ai.SchemaGrammarWriting:
 		return grammarWritingAnalysis(req), true
+	case ai.SchemaGrammarVisual:
+		return grammarVisualSpec(req), true
 	default:
 		return nil, false
 	}
@@ -105,30 +107,6 @@ func grammarWritingAnalysis(req ai.AnalysisRequest) json.RawMessage {
 	return out
 }
 
-// grammarVisual answers the visual prompt with a real, valid SVG. It has to pass the same
-// ValidateSVG the production path uses, or the mock would hide a bug in that boundary.
-func grammarVisual(req ai.TextRequest) (string, bool) {
-	if !strings.Contains(req.System, "SVG diagram") {
-		return "", false
-	}
-	topic := "Grammar"
-	if len(req.Messages) > 0 {
-		if name := valueAfter(req.Messages[len(req.Messages)-1].Content, "TOPIC:"); name != "" {
-			topic = name
-		}
-	}
-	svg := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">` +
-		`<title>` + escapeXML(topic) + ` on a timeline</title>` +
-		`<line x1="60" y1="220" x2="740" y2="220" stroke="var(--border)" stroke-width="2"/>` +
-		`<circle cx="260" cy="220" r="7" fill="var(--primary)"/>` +
-		`<line x1="600" y1="180" x2="600" y2="260" stroke="var(--fg-muted)" stroke-width="2"/>` +
-		`<text x="260" y="196" text-anchor="middle" font-family="inherit" font-size="15" fill="currentColor">` +
-		escapeXML(topic) + `</text>` +
-		`<text x="600" y="290" text-anchor="middle" font-family="inherit" font-size="13" fill="var(--fg-muted)">now</text>` +
-		`</svg>`
-	return svg + "\nALT: A timeline showing where " + topic + " sits before now.\nCAPTION: " + topic, true
-}
-
 // valueAfter returns the rest of the line following a marker, e.g. "TOPIC: Past Simple".
 func valueAfter(text, marker string) string {
 	i := strings.Index(text, marker)
@@ -151,6 +129,25 @@ func restAfter(text, marker string) string {
 	return strings.TrimSpace(text[i+len(marker):])
 }
 
-func escapeXML(s string) string {
-	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace(s)
+// grammarVisualSpec is a plain two-column diagram about whatever topic was asked for, so the
+// layout and storage paths run without a paid model.
+func grammarVisualSpec(req ai.AnalysisRequest) json.RawMessage {
+	topic := valueAfter(req.Input, "TOPIC:")
+	if topic == "" {
+		topic = "This grammar point"
+	}
+	out, _ := json.Marshal(ai.VisualSpec{
+		Type:  "panels",
+		Title: topic,
+		Rule:  "Use the form on the left; the right shows the common mistake.",
+		Panels: []ai.VisualPanel{
+			{Heading: "Right", Subheading: "how it is used", Items: []ai.VisualItem{{Text: "an **example** of " + topic}}},
+			{Heading: "Wrong", Subheading: "what learners write", Items: []ai.VisualItem{{Text: "a **mistake** to avoid"}}},
+		},
+		Events:  []ai.VisualEvent{},
+		Tags:    []string{topic},
+		AltText: "A two-column diagram of " + topic + ".",
+		Caption: topic,
+	})
+	return out
 }

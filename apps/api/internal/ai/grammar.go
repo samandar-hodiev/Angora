@@ -28,7 +28,7 @@ const (
 	GrammarExplainPrompt      = "grammar-explain.v1"
 	GrammarTutorPrompt        = "grammar-tutor.v1"
 	GrammarWritingPrompt      = "grammar-writing.v1"
-	GrammarVisualPrompt       = "grammar-visual.v2"
+	GrammarVisualPrompt       = "grammar-visual.v3"
 	SchemaGrammarExplain      = "grammar_explanation"
 	SchemaGrammarWriting      = "grammar_writing_analysis"
 	TaskGrammarExplain   Task = "grammar_explanation"
@@ -616,48 +616,68 @@ type GeneratedVisual struct {
 }
 
 // VisualizeGrammar draws one grammar point.
+//
+// The model decides what the diagram says; RenderVisual decides where everything goes. A
+// model asked for coordinates draws arrows through words and titles past their boxes — see
+// grammar_visual_render.go.
 func (s *GrammarTutorService) VisualizeGrammar(ctx context.Context, topic GrammarTopicContext, compare *GrammarTopicContext, kind string, learner GrammarLearner) (*GeneratedVisual, uuid.UUID, error) {
 	var b strings.Builder
-	b.WriteString("Draw one English grammar concept as a single, self-contained SVG diagram.\n\n")
-	fmt.Fprintf(&b, "The diagram explains %s, and only %s. Every label, example and arrow must be about it. Do not draw a tense timeline unless %s is itself about time or tense.\n\n", topic.Name, topic.Name, topic.Name)
-	b.WriteString("Output rules — these are strict:\n")
-	b.WriteString("- Output ONLY the SVG element. No markdown fence, no prose, no XML declaration.\n")
-	b.WriteString("- Root element: <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 400\"> with no width or height.\n")
-	b.WriteString("- No <script>, no <foreignObject>, no <image>, no external URLs, no CSS @import, no event attributes.\n")
-	b.WriteString("- It is shown as an image on a light card. Use only currentColor (dark text) and these CSS variables for colour, which are defined for you: var(--primary) for the point being taught, var(--fg-muted) for secondary text, var(--border) for lines, var(--surface) for shape fills. No other colours, no full-size background.\n")
-	b.WriteString("- Font: font-family=\"inherit\", font-size 15-20 for labels and examples. Keep text short enough not to overflow its shape, and fill the 800×400 frame — a small drawing in the middle of empty space is unreadable at card size.\n")
-	b.WriteString("- Start with a <title> element: it is what a screen reader announces.\n\n")
-	fmt.Fprintf(&b, "Diagram type: %s.\n", visualKindBrief(kind))
-	if compare != nil {
-		fmt.Fprintf(&b, "It contrasts %s with %s. Give each one its own row or column, clearly labelled.\n", topic.Name, compare.Name)
+	fmt.Fprintf(&b, "You design one teaching diagram for an English-learning app. It explains %s, and only %s.\n\n", topic.Name, topic.Name)
+	b.WriteString("You do not draw. You say what the diagram contains, and the app lays it out. Keep every string short — it has to fit in a small box.\n\n")
+	b.WriteString("- title: the rule in under 8 words.\n")
+	b.WriteString("- rule: one plain sentence a learner at the given level understands.\n")
+	if kind == "timeline" {
+		b.WriteString("- type: \"timeline\". events: 2–5 points in time, each with a label under 5 words (an example sentence fragment or the tense name), when (past, now or future) and a note under 10 words. panels: [].\n")
+	} else {
+		b.WriteString("- type: \"panels\". panels: 2 or 3 columns side by side, each with a heading of 1–4 words, a subheading under 8 words and 2–4 items. Each item is a short example (under 7 words) with the part being taught wrapped in **double asterisks**, and a note under 8 words (or empty). events: [].\n")
+		fmt.Fprintf(&b, "  This diagram is %s.\n", visualKindBrief(kind))
 	}
-	b.WriteString("\nReturn the SVG, then on a new line 'ALT:' with one sentence describing it, then 'CAPTION:' with a short caption.")
+	b.WriteString("- tags: up to 6 signal words or key forms, each 1–3 words; [] if there are none.\n")
+	b.WriteString("- footer: one short sentence with the most common trap, or empty.\n")
+	b.WriteString("- alt_text: one sentence describing the diagram for a screen reader. caption: under 14 words.\n")
+	b.WriteString("Write everything in English. Every example must be correct English and about the topic.\n")
+	if compare != nil {
+		fmt.Fprintf(&b, "\nIt contrasts %s with %s: give each its own column.\n", topic.Name, compare.Name)
+	}
 
 	input := topicBrief(topic, learner)
 	if compare != nil {
 		input += "\n\nCOMPARED WITH:\n" + topicBrief(*compare, learner)
 	}
 
-	res, err := s.gateway.GenerateText(ctx, CallMeta{
+	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
 		Task:          TaskGrammarVisual,
 		UserID:        &learner.UserID,
 		PromptVersion: GrammarVisualPrompt,
 		Metadata:      map[string]any{"topic": topic.Slug, "kind": kind},
-	}, TextRequest{
-		Model:           s.mainModel,
-		System:          b.String(),
-		Messages:        []Message{{Role: "user", Content: input}},
-		MaxOutputTokens: 2000,
+	}, AnalysisRequest{
+		Model:        s.mainModel,
+		Instructions: b.String(),
+		Input:        input,
+		SchemaName:   SchemaGrammarVisual,
+		Schema:       visualSpecSchema,
 	})
 	if err != nil {
 		return nil, uuid.Nil, err
 	}
-
-	visual, err := parseVisual(res.Text)
-	if err != nil {
+	var spec VisualSpec
+	if err := json.Unmarshal(res.Output, &spec); err != nil {
+		return nil, res.AIRequestID, fmt.Errorf("grammar visual is not valid JSON: %w", err)
+	}
+	if strings.TrimSpace(spec.Title) == "" || (len(spec.Panels) == 0 && len(spec.Events) == 0) {
+		return nil, res.AIRequestID, fmt.Errorf("grammar visual came back empty")
+	}
+	svg := RenderVisual(spec)
+	// Rendered here from escaped text, so this cannot fail on content — it is the same
+	// trust boundary every stored diagram passes, kept so it stays true if that changes.
+	if err := ValidateSVG(svg); err != nil {
 		return nil, res.AIRequestID, err
 	}
-	return visual, res.AIRequestID, nil
+	return &GeneratedVisual{
+		SVG:     svg,
+		AltText: firstNonEmpty(spec.AltText, spec.Title, "Grammar diagram"),
+		Caption: strings.TrimSpace(spec.Caption),
+	}, res.AIRequestID, nil
 }
 
 func visualKindBrief(kind string) string {
@@ -756,41 +776,6 @@ func ThemeSVG(svg []byte) []byte {
 	out = append(out, '>')
 	out = append(out, visualBackground...)
 	return append(out, svg[closeAt+1:]...)
-}
-
-// parseVisual splits the model's reply into SVG, alt text and caption, and refuses anything
-// that is not a plain SVG document. The result is stored and served to other learners, so
-// this is a trust boundary, not a formatting step.
-func parseVisual(raw string) (*GeneratedVisual, error) {
-	text := strings.TrimSpace(raw)
-	text = strings.TrimPrefix(text, "```svg")
-	text = strings.TrimPrefix(text, "```xml")
-	text = strings.TrimPrefix(text, "```")
-
-	start := strings.Index(text, "<svg")
-	end := strings.LastIndex(text, "</svg>")
-	if start < 0 || end < start {
-		return nil, fmt.Errorf("grammar visual contains no SVG")
-	}
-	svg := text[start : end+len("</svg>")]
-	if err := ValidateSVG(svg); err != nil {
-		return nil, err
-	}
-
-	out := &GeneratedVisual{SVG: svg}
-	for _, line := range strings.Split(text[end:], "\n") {
-		line = strings.TrimSpace(line)
-		switch {
-		case strings.HasPrefix(line, "ALT:"):
-			out.AltText = strings.TrimSpace(strings.TrimPrefix(line, "ALT:"))
-		case strings.HasPrefix(line, "CAPTION:"):
-			out.Caption = strings.TrimSpace(strings.TrimPrefix(line, "CAPTION:"))
-		}
-	}
-	if out.AltText == "" {
-		out.AltText = "Grammar diagram"
-	}
-	return out, nil
 }
 
 // svgForbidden are constructs that turn a diagram into code execution or a request to a

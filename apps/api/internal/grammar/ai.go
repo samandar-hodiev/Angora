@@ -16,6 +16,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 	"github.com/samandar-hodiev/engora/apps/api/internal/storage"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/cefr"
@@ -334,13 +335,27 @@ func (m *Module) aiVisual(c *gin.Context) {
 		return
 	}
 
-	if _, err := m.pool.Exec(ctx, `
-		INSERT INTO grammar_visuals
-			(id, grammar_topic_id, compare_topic_id, kind, storage_provider, storage_key,
-			 mime_type, alt_text, caption, status, ai_request_id)
-		VALUES ($1, $2, $3, $4, $5, $6, 'image/svg+xml', $7, $8, 'ready', $9)`,
-		visualID, subject.topicID, compareID, req.Kind, m.storage.Provider(), key,
-		generated.AltText, generated.Caption, nullUUID(requestID)); err != nil {
+	// One canonical visual per topic, kind and comparison — and the unique index counts the
+	// ones that failed or were retired too. Without clearing them first, a single bad diagram
+	// blocked that kind of diagram for the topic for good.
+	err = database.WithTx(ctx, m.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM grammar_visuals
+			WHERE grammar_topic_id = $1 AND kind = $2 AND compare_topic_id IS NOT DISTINCT FROM $3
+			  AND user_id IS NULL AND status <> 'ready'`,
+			subject.topicID, req.Kind, compareID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `
+			INSERT INTO grammar_visuals
+				(id, grammar_topic_id, compare_topic_id, kind, storage_provider, storage_key,
+				 mime_type, alt_text, caption, status, ai_request_id)
+			VALUES ($1, $2, $3, $4, $5, $6, 'image/svg+xml', $7, $8, 'ready', $9)`,
+			visualID, subject.topicID, compareID, req.Kind, m.storage.Provider(), key,
+			generated.AltText, generated.Caption, nullUUID(requestID))
+		return err
+	})
+	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}

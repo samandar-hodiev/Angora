@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -48,30 +49,79 @@ func TestValidateSVGRejectsOversizedOutput(t *testing.T) {
 	}
 }
 
-func TestParseVisualExtractsTheDiagram(t *testing.T) {
-	raw := "```svg\n" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400"><title>T</title><rect/></svg>` +
-		"\nALT: A timeline showing a finished past action.\nCAPTION: Past Simple\n```"
-	got, err := parseVisual(raw)
-	if err != nil {
-		t.Fatalf("parseVisual: %v", err)
+func TestRenderVisualLaysOutPanels(t *testing.T) {
+	spec := VisualSpec{
+		Type: "panels", Title: "A or An?", Rule: "Choose by the first sound, not the first letter.",
+		Panels: []VisualPanel{
+			{Heading: "A", Subheading: "before consonant sounds", Items: []VisualItem{
+				{Text: "**a** book"}, {Text: "**a** university", Note: "u sounds like 'you'"},
+			}},
+			{Heading: "An", Subheading: "before vowel sounds", Items: []VisualItem{
+				{Text: "**an** apple"}, {Text: "**an** hour", Note: "silent h"},
+			}},
+		},
+		Tags: []string{"one", "a single"}, Footer: "Listen to the sound.", AltText: "A and An side by side.",
 	}
-	if got.AltText != "A timeline showing a finished past action." {
-		t.Errorf("alt = %q", got.AltText)
+	svg := RenderVisual(spec)
+	if err := ValidateSVG(svg); err != nil {
+		t.Fatalf("a rendered diagram must pass validation: %v", err)
 	}
-	if got.Caption != "Past Simple" {
-		t.Errorf("caption = %q", got.Caption)
+	for _, want := range []string{"<title>A and An side by side.</title>", ">A or An?<", "university", "silent h", "one"} {
+		if !strings.Contains(svg, want) {
+			t.Errorf("rendered diagram is missing %q", want)
+		}
 	}
-	if got.SVG[:4] != "<svg" {
-		t.Errorf("svg did not start at the element: %q", got.SVG[:20])
+	if strings.Contains(svg, "**") {
+		t.Error("emphasis markers must become tspans, not be printed")
+	}
+	if strings.Contains(svg, "var(") || strings.Contains(svg, "<style") {
+		t.Error("a diagram shown as an image must carry concrete colours, not variables or a stylesheet")
 	}
 }
 
-func TestParseVisualRejectsProseAndPoisonedSVG(t *testing.T) {
-	if _, err := parseVisual("I cannot draw that, sorry."); err == nil {
-		t.Error("prose with no SVG was accepted")
+func TestRenderVisualEscapesModelText(t *testing.T) {
+	svg := RenderVisual(VisualSpec{
+		Type: "panels", Title: `<script>alert(1)</script>`,
+		Panels: []VisualPanel{{Heading: `"><foreignObject>`, Items: []VisualItem{{Text: "x & y"}}}},
+	})
+	if strings.Contains(svg, "<script") || strings.Contains(svg, "<foreignObject") {
+		t.Fatal("text from the model reached the SVG unescaped")
 	}
-	if _, err := parseVisual(`<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>`); err == nil {
-		t.Error("a poisoned SVG passed parseVisual")
+	if err := ValidateSVG(svg); err != nil {
+		t.Errorf("escaped text must still render a valid diagram: %v", err)
+	}
+}
+
+func TestRenderVisualWrapsLongTextInsteadOfOverflowing(t *testing.T) {
+	long := strings.Repeat("a very long example sentence ", 10)
+	svg := RenderVisual(VisualSpec{Type: "panels", Title: "T", Panels: []VisualPanel{
+		{Heading: "One", Items: []VisualItem{{Text: long}}},
+		{Heading: "Two", Items: []VisualItem{{Text: "short"}}},
+		{Heading: "Three", Items: []VisualItem{{Text: "short"}}},
+	}})
+	// Three lines at most per item, the last one ending in an ellipsis.
+	if !strings.Contains(svg, "…") {
+		t.Error("text longer than its box must be cut with an ellipsis, not run past the edge")
+	}
+}
+
+func TestRenderVisualKeepsShortTagsWhole(t *testing.T) {
+	svg := RenderVisual(VisualSpec{Type: "panels", Title: "T", Panels: []VisualPanel{{Heading: "H"}},
+		Tags: []string{"a", "an", "one", "vowel sound"}})
+	if strings.Contains(svg, "…") {
+		t.Errorf("a tag that fits its chip must not be cut: %s", svg)
+	}
+}
+
+func TestRenderVisualTimeline(t *testing.T) {
+	svg := RenderVisual(VisualSpec{Type: "timeline", Title: "Past Simple", Events: []VisualEvent{
+		{Label: "I visited", When: "past", Note: "finished"}, {Label: "now", When: "now"},
+	}})
+	if !strings.Contains(svg, "NOW") || !strings.Contains(svg, "I visited") {
+		t.Error("a timeline needs its axis and its events")
+	}
+	if err := ValidateSVG(svg); err != nil {
+		t.Errorf("timeline: %v", err)
 	}
 }
 
