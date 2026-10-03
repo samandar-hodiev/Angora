@@ -151,6 +151,9 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 	}
 	written := <-tests
 	failed := written.failed
+	for _, code := range generated.Dropped {
+		failed = append(failed, plan.Source+":"+code)
+	}
 	for i, practice := range written.practice {
 		if practice != nil {
 			generated.Levels[i].Practice = practice

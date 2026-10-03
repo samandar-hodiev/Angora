@@ -233,3 +233,31 @@ func TestUsablePracticeNormalisesTheGap(t *testing.T) {
 		t.Errorf("got %+v, want the long gap drawn as ___", got)
 	}
 }
+
+func TestValidateAuthoredContentDropsOneEmptyLevelAndKeepsTheRest(t *testing.T) {
+	// One sloppy level must not cost the owner the five good ones and their translations.
+	out := &GeneratedGrammarContent{Levels: []GeneratedGrammarLevel{
+		{Level: "B1", Applicable: true, Explanation: "Experience up to now.", Examples: []GeneratedExample{{Text: "I have been there."}}},
+		{Level: "C2", Applicable: true, Title: "Present Perfect"},
+	}}
+	if err := validateAuthoredContent(out, GrammarAuthorRequest{Levels: levels("B1", "C2")}); err != nil {
+		t.Fatalf("validateAuthoredContent: %v", err)
+	}
+	if len(out.Levels) != 1 || out.Levels[0].Level != "B1" {
+		t.Errorf("levels = %+v, want B1 kept", out.Levels)
+	}
+	if len(out.Dropped) != 1 || out.Dropped[0] != "C2" {
+		t.Errorf("dropped = %v, want [C2] named so the owner knows", out.Dropped)
+	}
+}
+
+func TestAgreedPracticeDropsAGapThatAllowsAnUnkeyedAnswer(t *testing.T) {
+	// "Look at ___ picture" takes this or that; keyed to "this" alone, a learner who typed
+	// "that" would be marked wrong for correct English.
+	questions := []GeneratedPractice{{Type: PracticeFillBlank, Prompt: "Look at ___ picture on the wall.", Accepted: []string{"this"}}}
+	var check practiceCheck
+	_ = json.Unmarshal([]byte(`{"answers":[{"index":1,"answer_index":-1,"answer_text":"this","acceptable":["that"],"ambiguous":false}]}`), &check)
+	if got := agreedPractice(questions, check); len(got) != 0 {
+		t.Errorf("kept %+v, want the open gap dropped", got)
+	}
+}

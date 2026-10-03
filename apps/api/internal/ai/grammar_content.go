@@ -116,6 +116,9 @@ type GeneratedGrammarLevel struct {
 
 type GeneratedGrammarContent struct {
 	Levels []GeneratedGrammarLevel `json:"levels"`
+	// Dropped names the levels that came back unusable and were left out, so the caller
+	// can say which ones still need writing.
+	Dropped []string `json:"-"`
 }
 
 // AuthorGrammarContent writes one topic across the requested levels, in one call.
@@ -181,11 +184,15 @@ func validateAuthoredContent(out *GeneratedGrammarContent, req GrammarAuthorRequ
 			kept = append(kept, *level)
 			continue
 		}
+		// One level the model left empty is that level not written, not the whole
+		// generation failed: the other five levels and their translations are still good.
 		if strings.TrimSpace(level.Explanation) == "" && strings.TrimSpace(level.Intro) == "" {
-			return fmt.Errorf("level %s is marked applicable but has no explanation", level.Level)
+			out.Dropped = append(out.Dropped, level.Level)
+			continue
 		}
 		if len(level.Examples) == 0 && len(level.Formulas) == 0 {
-			return fmt.Errorf("level %s has neither examples nor formulas", level.Level)
+			out.Dropped = append(out.Dropped, level.Level)
+			continue
 		}
 		level.Practice = UsablePractice(level.Practice)
 		kept = append(kept, *level)
@@ -193,6 +200,9 @@ func validateAuthoredContent(out *GeneratedGrammarContent, req GrammarAuthorRequ
 	out.Levels = kept
 
 	if len(out.Levels) == 0 {
+		if len(out.Dropped) > 0 {
+			return fmt.Errorf("no usable levels were generated (%s came back empty)", strings.Join(out.Dropped, ", "))
+		}
 		return fmt.Errorf("no usable levels were generated")
 	}
 	return nil

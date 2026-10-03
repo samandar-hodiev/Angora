@@ -37,6 +37,8 @@ const (
 	// minUsablePractice is the fewest usable questions a set may come back with before it
 	// counts as a failed generation rather than a short one.
 	minUsablePractice = 8
+	// practiceRounds is how many batches a test may take to reach PracticeSetSize.
+	practiceRounds = 3
 )
 
 // practiceRules is what every call that writes questions is told about them.
@@ -61,20 +63,74 @@ type generatedPracticeSet struct {
 }
 
 // WriteGrammarPractice writes one level's test: PracticeSetSize questions, mixed.
+//
+// The check drops questions, so one batch can come back short. A short test is topped up
+// with another batch — told what is already in the test, so it does not ask the same thing
+// twice — up to practiceRounds batches in all.
 func (s *GrammarTutorService) WriteGrammarPractice(
 	ctx context.Context, req GrammarPracticeRequest,
 ) ([]GeneratedPractice, *EvaluationMeta, error) {
+	var (
+		kept    []GeneratedPractice
+		meta    *EvaluationMeta
+		written int
+	)
+	seen := map[string]bool{}
+	for round := 0; round < practiceRounds && len(kept) < PracticeSetSize; round++ {
+		batch, res, err := s.writePracticeBatch(ctx, req, kept)
+		if err != nil {
+			if round == 0 {
+				return nil, nil, err
+			}
+			break // a failed top-up still leaves the test the first batch wrote
+		}
+		if meta == nil {
+			meta = &EvaluationMeta{
+				Versions:    Versions{SchemaVersion: GrammarSchemaVersion, ModelVersion: res.Model, PromptVersion: GrammarPracticePrompt},
+				AIRequestID: res.AIRequestID,
+			}
+		}
+		written += len(batch)
+		for _, q := range s.checkPractice(ctx, req, UsablePractice(batch)) {
+			key := normalizeChoice(q.Prompt + "|" + strings.Join(q.Options, "|"))
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			kept = append(kept, q)
+		}
+	}
+	kept = capPractice(kept)
+	if len(kept) < minUsablePractice {
+		return nil, nil, fmt.Errorf("only %d of %d generated questions can be marked", len(kept), written)
+	}
+	return kept, meta, nil
+}
+
+func (s *GrammarTutorService) writePracticeBatch(
+	ctx context.Context, req GrammarPracticeRequest, already []GeneratedPractice,
+) ([]GeneratedPractice, *AnalysisResponse, error) {
+	input := practiceBrief(req)
+	if len(already) > 0 {
+		var b strings.Builder
+		b.WriteString(input)
+		fmt.Fprintf(&b, "\nThe test already has these %d questions. Write new ones that test the same lesson differently — do not repeat or rephrase any of them:\n", len(already))
+		for _, q := range already {
+			fmt.Fprintf(&b, "- %s\n", q.Prompt)
+		}
+		input = b.String()
+	}
 	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
 		Task:          TaskContentGeneration,
 		UserID:        req.ActorID,
 		PromptVersion: GrammarPracticePrompt,
-		Metadata:      map[string]any{"topic": req.Slug, "level": req.Level.BaseCode()},
+		Metadata:      map[string]any{"topic": req.Slug, "level": req.Level.BaseCode(), "already": len(already)},
 	}, AnalysisRequest{
 		// The main model: a question with two right answers marks a correct learner wrong,
 		// and that is the mistake a cheaper model makes.
 		Model:        s.mainModel,
 		Instructions: practiceInstructions(),
-		Input:        practiceBrief(req),
+		Input:        input,
 		SchemaName:   SchemaGrammarPractice,
 		Schema:       grammarPracticeSchema,
 	})
@@ -85,15 +141,7 @@ func (s *GrammarTutorService) WriteGrammarPractice(
 	if err := json.Unmarshal(res.Output, &out); err != nil {
 		return nil, nil, fmt.Errorf("generated practice is not valid JSON: %w", err)
 	}
-	questions := UsablePractice(out.Questions)
-	questions = s.checkPractice(ctx, req, questions)
-	if len(questions) < minUsablePractice {
-		return nil, nil, fmt.Errorf("only %d of %d generated questions can be marked", len(questions), len(out.Questions))
-	}
-	return questions, &EvaluationMeta{
-		Versions:    Versions{SchemaVersion: GrammarSchemaVersion, ModelVersion: res.Model, PromptVersion: GrammarPracticePrompt},
-		AIRequestID: res.AIRequestID,
-	}, nil
+	return out.Questions, res, nil
 }
 
 func practiceInstructions() string {
@@ -238,6 +286,22 @@ func agreedPractice(questions []GeneratedPractice, check practiceCheck) []Genera
 			if !agreed {
 				continue
 			}
+			// The checker found a right answer the key does not accept: the sentence
+			// allows more than the question means to test (this/that with nothing to say
+			// which), and a learner who typed it would be marked wrong.
+			written := map[string]bool{}
+			for _, ans := range q.Accepted {
+				written[normalizeChoice(ans)] = true
+			}
+			open := false
+			for fill := range right {
+				if fill != "" && !written[fill] {
+					open = true
+				}
+			}
+			if open {
+				continue
+			}
 			q.Accepted = accepted
 		} else if a.AnswerIndex != q.AnswerIndex {
 			continue
@@ -262,7 +326,7 @@ func capPractice(questions []GeneratedPractice) []GeneratedPractice {
 
 const practiceCheckInstructions = "You are checking an English grammar test before learners take it. Answer every question yourself, as a careful native-speaker teacher would. " +
 	"For a multiple_choice question give answer_index, the position of the one correct option counting from zero, and leave answer_text empty. " +
-	"For a fill_blank question give answer_text, exactly the word(s) that go in the ___ gap (not the whole sentence), list in acceptable every other fill that is also correct (contracted forms, for example; empty when there are none), and set answer_index to -1. " +
+	"For a fill_blank question give answer_text, exactly the word(s) that go in the ___ gap (not the whole sentence), list in acceptable every other fill that also gives a correct, natural sentence (a contracted form, or a different word the context does not rule out; empty when there are none), and set answer_index to -1. " +
 	"An option counts as correct whenever it gives a grammatical, natural sentence, even if the meaning changes — \"I have the cat\" is correct English. " +
 	"Set ambiguous to true when more than one option is correct, when no option is correct, or when the gap could reasonably be filled in more than one way that changes which grammar is being tested. " +
 	"Use standard modern English as taught to learners; do not mark a question ambiguous only because of a rare dialect. Return one answer per question, with its number as index."

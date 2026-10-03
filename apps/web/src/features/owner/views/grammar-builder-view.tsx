@@ -101,14 +101,22 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const publish = usePublishGrammarContent(slug);
   const generation = useGrammarGeneration(slug, {
     onSucceeded: (job) => {
-      const failed = job.result?.failed ?? [];
+      const failed: string[] = job.result?.failed ?? [];
+      // "test:B1" is a test the model could not write, "en:C2" a level it left empty, and
+      // "uz:B1" a translation that did not come back. Each has its own fix.
+      const tests = failed.filter((f) => f.startsWith("test:")).map((f) => f.slice(5));
+      const empty = failed.filter((f) => f.startsWith("en:")).map((f) => f.slice(3));
+      const translations = failed.filter((f) => !f.startsWith("test:") && !f.startsWith("en:"));
+      const notes = [
+        empty.length > 0 && `${empty.join(", ")} came back empty — generate ${empty.length === 1 ? "it" : "them"} again.`,
+        translations.length > 0 &&
+          `Some translations did not come back (${translations.join(", ")}) — use "Translate from English" there.`,
+        tests.length > 0 && `The test for ${tests.join(", ")} could not be written — use "Generate more" on the Test tab.`,
+      ].filter(Boolean);
       toast({
         title: "Draft written",
-        description:
-          failed.length > 0
-            ? `Some translations did not come back (${failed.join(", ")}). Use "Translate from English" on those levels.`
-            : "Every language is a draft now. Read it before publishing.",
-        variant: failed.length > 0 ? "default" : "success",
+        description: notes.length > 0 ? notes.join(" ") : "Every language and its test is a draft now. Read it before publishing.",
+        variant: notes.length > 0 ? "default" : "success",
       });
     },
     onFailed: () =>
