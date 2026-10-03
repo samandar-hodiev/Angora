@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Columns2, Languages, Mic, PenLine } from "lucide-react";
+import { ArrowLeft, ArrowRight, Columns2, Languages, ListChecks, Mic, PenLine, Timer } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -113,52 +113,8 @@ export function GrammarTopicView({ slug }: { slug: string }) {
           <TutorPanel slug={t.slug} topicName={t.name} />
         </section>
 
-        <section aria-labelledby="practice-title" className="grid gap-3 rounded-xl border bg-surface p-5">
-          <h2 id="practice-title" className="text-h3">
-            Practice
-          </h2>
-          {t.has_practice ? (
-            <>
-              <p className="text-body-sm text-fg-secondary">
-                {t.question_count} questions. Answers are marked instantly and your weak points are tracked.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild>
-                  <Link href={`/app/grammar/${t.slug}/practice`}>
-                    Practise this topic <ArrowRight aria-hidden />
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href={`/app/grammar/${t.slug}/practice?mode=test`}>Test mode</Link>
-                </Button>
-              </div>
-            </>
-          ) : (
-            <p className="text-body-sm text-fg-muted">Practice for this topic is coming soon.</p>
-          )}
-        </section>
+        <PracticeHub topic={t} />
 
-        {/* Grammar only becomes yours when you use it, so the page ends by sending the
-            learner somewhere they have to produce it themselves. */}
-        <section aria-labelledby="apply-title" className="grid gap-3">
-          <h2 id="apply-title" className="text-h3">
-            Use it in real English
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <ApplyCard
-              icon={Mic}
-              href="/app/speaking"
-              title="Speaking"
-              body={`Talk about something that needs ${t.name.toLowerCase()}.`}
-            />
-            <ApplyCard
-              icon={PenLine}
-              href={`/app/writing?topic=${encodeURIComponent(t.slug)}`}
-              title="Writing"
-              body={`Write a few sentences using ${t.name.toLowerCase()}.`}
-            />
-          </div>
-        </section>
         <WhereNext topic={t} />
       </article>
     </div>
@@ -372,27 +328,125 @@ function CompareSection({ topic, initial }: { topic: GrammarTopic; initial: stri
   );
 }
 
-function ApplyCard({
-  icon: Icon,
-  href,
-  title,
-  body,
-}: {
+/**
+ * Every way to practise this topic, in one place.
+ *
+ * Questions, a test, speaking and writing are the same decision — "now use it" — so they sit
+ * together as four equal tiles rather than a practice card and a separate "real English"
+ * section further down. Questions lead: they are the quickest way to find a weak rule. A
+ * topic with no questions yet still offers speaking and writing, which never run out.
+ */
+function PracticeHub({ topic: t }: { topic: GrammarTopic }) {
+  const slug = encodeURIComponent(t.slug);
+  const name = t.name.toLowerCase();
+  const tiles: PracticeTileProps[] = [
+    {
+      icon: ListChecks,
+      title: "Practice",
+      body: t.has_practice
+        ? `${t.question_count} questions, marked as you go. Your weak rules come first.`
+        : "Questions for this topic are on their way.",
+      href: `/app/grammar/${t.slug}/practice`,
+      disabled: !t.has_practice,
+      primary: true,
+    },
+    {
+      icon: Timer,
+      title: "Test mode",
+      body: t.has_practice ? "No hints, a score at the end. See where you really are." : "Available once there are questions.",
+      href: `/app/grammar/${t.slug}/practice?mode=test`,
+      disabled: !t.has_practice,
+    },
+    {
+      icon: Mic,
+      title: "Speaking",
+      body: `Say it out loud: talk about something that needs ${name}.`,
+      href: `/app/speaking?topic=${slug}`,
+    },
+    {
+      icon: PenLine,
+      title: "Writing",
+      body: `A short task built around ${name}, checked with it in mind.`,
+      href: `/app/writing?topic=${slug}`,
+    },
+  ];
+
+  return (
+    <section aria-labelledby="practice-title" className="grid gap-4 rounded-2xl border bg-surface p-4 sm:p-5">
+      <header className="grid gap-1">
+        <h2 id="practice-title" className="text-h3">
+          Practise {t.name}
+        </h2>
+        <p className="text-body-sm text-fg-secondary">
+          Grammar becomes yours when you use it. Pick how — every option here is about this topic.
+        </p>
+      </header>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {tiles.map((tile) => (
+          <li key={tile.title} className="grid">
+            <PracticeTile {...tile} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+interface PracticeTileProps {
   icon: typeof Mic;
-  href: string;
   title: string;
   body: string;
-}) {
+  href: string;
+  disabled?: boolean;
+  primary?: boolean;
+}
+
+function PracticeTile({ icon: Icon, title, body, href, disabled = false, primary = false }: PracticeTileProps) {
+  const inner = (
+    <>
+      <span
+        className={cn(
+          "grid size-9 place-items-center rounded-lg",
+          primary && !disabled ? "bg-primary text-primary-foreground" : "bg-primary-subtle text-primary",
+          disabled && "bg-surface-active text-fg-muted",
+        )}
+      >
+        <Icon className="size-4.5" aria-hidden />
+      </span>
+      <span className="grid gap-1">
+        <span className="flex items-center gap-1.5 text-body font-medium">
+          {title}
+          {!disabled && (
+            <ArrowRight
+              className="size-4 text-fg-muted transition-transform duration-micro group-hover:translate-x-0.5 group-hover:text-primary"
+              aria-hidden
+            />
+          )}
+        </span>
+        <span className="text-caption text-fg-muted">{body}</span>
+      </span>
+    </>
+  );
+  const base = "group flex h-full flex-col gap-3 rounded-xl border p-4 outline-none transition-colors duration-micro";
+  if (disabled) {
+    return (
+      <div aria-disabled className={cn(base, "border-dashed opacity-70")}>
+        {inner}
+      </div>
+    );
+  }
   return (
     <Link
       href={href}
-      className="group grid gap-1 rounded-xl border bg-surface p-4 outline-none transition-colors duration-micro hover:bg-surface-hover focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      className={cn(
+        base,
+        "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+        primary
+          ? "border-primary/40 bg-primary-subtle/50 hover:bg-primary-subtle"
+          : "bg-surface hover:border-primary/30 hover:bg-surface-hover",
+      )}
     >
-      <span className="flex items-center gap-2 text-body-sm font-medium">
-        <Icon className="size-4 text-primary" aria-hidden />
-        {title}
-      </span>
-      <span className="text-caption text-fg-muted">{body}</span>
+      {inner}
     </Link>
   );
 }
