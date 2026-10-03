@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCard, LogOut, Menu, Shield, UserRound } from "lucide-react";
+import { ChevronDown, CreditCard, LogOut, Menu, Shield, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   initials,
@@ -24,7 +25,19 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/overlay";
-import { grammarNav, homeNav, isActivePath, learnNav, mobileNav, primaryNav, secondaryNav, skillHref, type NavItem } from "@/config/navigation";
+import {
+  grammarNav,
+  homeNav,
+  isActivePath,
+  learnNav,
+  learnOverviewNav,
+  mobileNav,
+  primaryNav,
+  secondaryNav,
+  skillHref,
+  skillIcons,
+  type NavItem,
+} from "@/config/navigation";
 import { useIsAdmin } from "@/features/admin/api";
 import { useLogout, useSession } from "@/features/auth/hooks";
 import { useSkills } from "@/features/learning/hooks";
@@ -160,9 +173,22 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
   const skills = useSkills();
   const isAdmin = useIsAdmin();
   const learnSkills = (skills.data ?? []).slice(0, 4);
+  const skillItems: NavItem[] = [
+    learnOverviewNav,
+    ...learnSkills.map((skill) => ({
+      href: skillHref(skill.code),
+      label: skill.name,
+      icon: skillIcons[skill.code] ?? learnNav.icon,
+    })),
+  ];
 
   const link = (item: NavItem, nested = false) => {
-    const active = nested ? pathname === item.href || pathname.startsWith(`${item.href}/`) : isActivePath(pathname, item.href);
+    // The overview's href is the tree's own root, so it is active only on that page exactly,
+    // not on every page underneath it.
+    const active =
+      nested && item.href === learnOverviewNav.href
+        ? pathname === item.href
+        : isActivePath(pathname, item.href);
     const node = (
       <Link
         href={item.href}
@@ -170,13 +196,16 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
         title={collapsed ? item.label : undefined}
         className={cn(
           "relative flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
-          nested && "py-1 pl-9",
+          nested && "py-1 pl-7",
           collapsed && "justify-center px-0",
           // Hover is a wash of the shell's own colour: a white one disappears against the cards.
           active ? "nav-liquid font-medium text-foreground" : "text-(--nav-text) hover:bg-(--nav-hover) hover:text-foreground",
         )}
       >
-        {!nested && <item.icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-fg-muted")} aria-hidden />}
+        <item.icon
+          className={cn(nested ? "size-3.5" : "size-4", "shrink-0", active ? "text-primary" : "text-fg-muted")}
+          aria-hidden
+        />
         {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
       </Link>
     );
@@ -196,17 +225,7 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
       <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
         <li>{link(homeNav)}</li>
         <li>{link(grammarNav)}</li>
-        <li>
-          {link(learnNav)}
-          {/* Icons only, the skills have no icon of their own to show: Learn leads to them. */}
-          {!collapsed && (
-            <ul className="mt-0.5 grid grid-cols-[minmax(0,1fr)] gap-0.5">
-              {learnSkills.map((skill) => (
-                <li key={skill.id}>{link({ href: skillHref(skill.code), label: skill.name, icon: learnNav.icon }, true)}</li>
-              ))}
-            </ul>
-          )}
-        </li>
+        <SkillsTree items={skillItems} link={link} collapsed={collapsed} />
         {primaryNav.map((item) => (
           <li key={item.href}>{link(item)}</li>
         ))}
@@ -218,6 +237,92 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
         ))}
       </div>
     </nav>
+  );
+}
+
+/**
+ * Skills: Overview and the four practice skills, folded under one row.
+ *
+ * Closed until it is wanted, so the sidebar reads as a short list of places; it opens by
+ * itself when the page you are on is inside it, so a link straight to Writing never lands
+ * on a sidebar that hides where you are. Icons only, it becomes a flyout instead — five
+ * indented rows in a 64px column would be unreadable.
+ */
+function SkillsTree({
+  items,
+  link,
+  collapsed,
+}: {
+  items: NavItem[];
+  link: (item: NavItem, nested?: boolean) => ReactNode;
+  collapsed: boolean;
+}) {
+  const pathname = usePathname();
+  const inside = items.some((item) => isActivePath(pathname, item.href));
+  const [open, setOpen] = useState(inside);
+  const [wasInside, setWasInside] = useState(inside);
+  // Adjust during render rather than in an effect: navigating into the tree opens it in the
+  // same paint, not a frame later.
+  if (inside !== wasInside) {
+    setWasInside(inside);
+    if (inside) setOpen(true);
+  }
+
+  const row = cn(
+    "relative flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-body-sm outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+    inside ? "font-medium text-foreground" : "text-(--nav-text) hover:bg-(--nav-hover) hover:text-foreground",
+  );
+
+  if (collapsed) {
+    return (
+      <li>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" title={learnNav.label} aria-label={learnNav.label} className={cn(row, "justify-center px-0")}>
+              <learnNav.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="w-52">
+            <DropdownMenuLabel>{learnNav.label}</DropdownMenuLabel>
+            {items.map((item) => (
+              <DropdownMenuItem key={item.href} asChild>
+                <Link href={item.href}>
+                  <item.icon aria-hidden />
+                  {item.label}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </li>
+    );
+  }
+
+  const panelId = "nav-skills";
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className={row}
+      >
+        <learnNav.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+        <span className="truncate">{learnNav.label}</span>
+        <ChevronDown
+          className={cn("ml-auto size-3.5 shrink-0 transition-transform duration-micro", !open && "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <ul id={panelId} className="mt-0.5 grid grid-cols-[minmax(0,1fr)] gap-0.5">
+          {items.map((item) => (
+            <li key={item.href}>{link(item, true)}</li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 

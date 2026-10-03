@@ -1,6 +1,11 @@
 import {
   BookOpen,
   BookOpenCheck,
+  BookOpenText,
+  Headphones,
+  LayoutGrid,
+  Mic,
+  PenLine,
   ChartLine,
   GraduationCap,
   House,
@@ -13,7 +18,7 @@ import {
 } from "lucide-react";
 
 /**
- * App structure (not content). Skills under "Learn" come from GET /api/v1/learning/skills,
+ * App structure (not content). The skills under "Skills" come from GET /api/v1/learning/skills,
  * so a skill added in the database appears without a frontend release.
  */
 
@@ -26,7 +31,20 @@ export interface NavItem {
 export const homeNav: NavItem = { href: "/app/dashboard", label: "Home", icon: House };
 /** Its own section rather than a skill under Learn: grammar is a library, not a practice queue. */
 export const grammarNav: NavItem = { href: "/app/grammar", label: "Grammar", icon: BookOpenCheck };
-export const learnNav: NavItem = { href: "/app/learn", label: "Learn", icon: BookOpen };
+/**
+ * The four practice skills, grouped: in the sidebar a tree that opens on demand, its first
+ * row the overview page that used to be "Learn".
+ */
+export const learnNav: NavItem = { href: "/app/learn", label: "Skills", icon: BookOpen };
+export const learnOverviewNav: NavItem = { href: "/app/learn", label: "Overview", icon: LayoutGrid };
+
+/** Each skill's own icon in the sidebar, by skill code; anything else uses the Skills icon. */
+export const skillIcons: Record<string, LucideIcon> = {
+  speaking: Mic,
+  writing: PenLine,
+  reading: BookOpenText,
+  listening: Headphones,
+};
 
 export const primaryNav: NavItem[] = [
   { href: "/app/ielts", label: "IELTS", icon: GraduationCap },

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { LearnView } from "@/features/practice/learn-view";
 
-export const metadata: Metadata = { title: "Learn" };
+export const metadata: Metadata = { title: "Skills" };
 
 export default function LearnPage() {
   return <LearnView />;
