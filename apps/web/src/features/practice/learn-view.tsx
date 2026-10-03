@@ -20,7 +20,7 @@ export function LearnView() {
 
   return (
     <>
-      <PageHeader title="Skills" description="Choose a skill, or pick up where your plan suggests." />
+      <PageHeader pinned={false} compact title="Skills" description="Choose a skill, or pick up where your plan suggests." />
 
       {recommendations.data && recommendations.data.length > 0 && (
         <section aria-labelledby="next-title" className="mb-10">
@@ -74,7 +74,7 @@ export function UnknownSkillView({ code }: { code: string }) {
   const skill = skills.data?.find((s) => s.code === code);
   return (
     <>
-      <PageHeader title={skill?.name ?? "Skill not found"} description={skill?.description} />
+      <PageHeader pinned={false} compact title={skill?.name ?? "Skill not found"} description={skill?.description} />
       <EmptyState
         icon={Compass}
         title={skill ? "Practice for this skill is coming" : "This skill doesn't exist"}

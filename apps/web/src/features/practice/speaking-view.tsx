@@ -55,7 +55,7 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
   if (tasks.isPending) {
     return (
       <>
-        <PageHeader title="Speaking practice" description="Record an answer and get feedback on how you said it." />
+        <PageHeader pinned={false} compact title="Speaking practice" description="Record an answer and get feedback on how you said it." />
         <div className="grid gap-4">
           <Skeleton className="h-10 w-72" />
           <Skeleton className="h-64 w-full" />
@@ -67,7 +67,7 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
   if (tasks.isError) {
     return (
       <>
-        <PageHeader title="Speaking practice" description="Record an answer and get feedback on how you said it." />
+        <PageHeader pinned={false} compact title="Speaking practice" description="Record an answer and get feedback on how you said it." />
         <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} />
       </>
     );
@@ -76,7 +76,7 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
   if (items.length === 0) {
     return (
       <>
-        <PageHeader title="Speaking practice" description="Record an answer and get feedback on how you said it." />
+        <PageHeader pinned={false} compact title="Speaking practice" description="Record an answer and get feedback on how you said it." />
         <EmptyState title="No speaking tasks yet" description="Tasks appear here as soon as they are published." />
       </>
     );
@@ -84,7 +84,7 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
 
   return (
     <>
-      <PageHeader
+      <PageHeader pinned={false} compact
         title="Speaking practice"
         description="Record an answer. You get the transcript back with feedback on fluency, grammar, vocabulary and relevance."
         actions={liveCoach ? <LiveCoachLink /> : undefined}

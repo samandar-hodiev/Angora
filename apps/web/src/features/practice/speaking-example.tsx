@@ -52,7 +52,7 @@ export function SpeakingExampleReport() {
           <ArrowLeft aria-hidden /> Back to speaking
         </Link>
       </Button>
-      <PageHeader
+      <PageHeader pinned={false} compact
         title="Your Speaking Analysis"
         description="Topic: Describe your hometown"
         actions={

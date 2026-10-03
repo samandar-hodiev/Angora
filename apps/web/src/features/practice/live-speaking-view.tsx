@@ -36,7 +36,7 @@ const MAX_TURN_MS = 90_000;
 export function LiveSpeakingView() {
   return (
     <>
-      <PageHeader
+      <PageHeader pinned={false} compact
         title="Live coach"
         description="Speak a turn, hear what to fix, answer the next question. The whole conversation is saved as one practice session."
       />

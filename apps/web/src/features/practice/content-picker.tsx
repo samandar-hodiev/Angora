@@ -68,7 +68,7 @@ export function PracticeFrame({
 }) {
   return (
     <>
-      <PageHeader
+      <PageHeader pinned={false} compact
         eyebrow={
           <span className="flex items-center gap-2">
             <SkillIcon code={skill} className="size-4 text-primary" />

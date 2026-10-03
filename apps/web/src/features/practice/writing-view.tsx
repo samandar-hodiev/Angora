@@ -102,7 +102,7 @@ export function WritingView({ initialContentId, grammarTopic }: { initialContent
   const feedback = submit.data?.feedback;
 
   const header = (
-    <PageHeader title="Writing practice" description="Write, submit, and get rubric scores and corrections back." />
+    <PageHeader pinned={false} compact title="Writing practice" description="Write, submit, and get rubric scores and corrections back." />
   );
 
   // The topic task is what the learner came for: wait for it rather than flashing the library.

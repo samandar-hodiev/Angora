@@ -3,17 +3,31 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { WallpaperMask } from "@/features/profile/components/wallpaper-layer";
+import { cn } from "@/lib/utils";
 
+/**
+ * A page's title card.
+ *
+ * `pinned` (the default) keeps it under the shell header while the page scrolls, with the
+ * wallpaper band that content vanishes into. Pages that are mostly one long task — the skill
+ * practice pages — pass `pinned={false}`: there the title is read once on arrival, and a card
+ * holding a fifth of the screen for the whole task is in the way. `compact` is the smaller
+ * size those pages use.
+ */
 export function PageHeader({
   title,
   description,
   actions,
   eyebrow,
+  pinned = true,
+  compact = false,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   eyebrow?: ReactNode;
+  pinned?: boolean;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -23,7 +37,8 @@ export function PageHeader({
   useEffect(() => {
     const element = ref.current;
     const main = element?.closest("main");
-    if (!element || !main) return;
+    // Nothing pins under a title that scrolls away, so it has no height to publish.
+    if (!pinned || !element || !main) return;
 
     const publish = () => main.style.setProperty("--page-title-h", `${Math.round(element.getBoundingClientRect().height)}px`);
     publish();
@@ -33,25 +48,31 @@ export function PageHeader({
       observer.disconnect();
       main.style.removeProperty("--page-title-h");
     };
-  }, []);
+  }, [pinned]);
 
   return (
     <>
       {/* Covers the band this title sits in, painted over the content: cards scrolling up vanish
           into it 12px before they would reach the title. It repeats the wallpaper exactly, so the
           band still shows the picture rather than a flat bar. */}
-      <WallpaperMask />
+      {pinned && <WallpaperMask />}
       <div
         ref={ref}
         // Pinned at its own natural position — the shell header plus the area's top padding — so
         // it does not travel before it sticks, and content never reaches it.
-        style={{ top: "calc(var(--app-header-h, 3.5rem) + var(--main-pt, 1.5rem))" }}
-        className="sticky z-20 mb-6 flex flex-col gap-4 rounded-xl border bg-surface px-5 py-3.5 sm:flex-row sm:items-end sm:justify-between"
+        style={pinned ? { top: "calc(var(--app-header-h, 3.5rem) + var(--main-pt, 1.5rem))" } : undefined}
+        className={cn(
+          "flex flex-col gap-4 rounded-xl border bg-surface sm:flex-row sm:items-end sm:justify-between",
+          pinned && "sticky z-20",
+          compact ? "mb-5 px-5 py-3" : "mb-6 px-5 py-3.5",
+        )}
       >
-        <div className="grid gap-1.5">
+        <div className={cn("grid", compact ? "gap-1" : "gap-1.5")}>
           {eyebrow && <div className="text-label text-fg-muted">{eyebrow}</div>}
-          <h1 className="text-h1">{title}</h1>
-          {description && <p className="max-w-2xl text-body text-fg-secondary">{description}</p>}
+          <h1 className={compact ? "text-h2" : "text-h1"}>{title}</h1>
+          {description && (
+            <p className={cn("max-w-2xl text-fg-secondary", compact ? "text-body-sm" : "text-body")}>{description}</p>
+          )}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>

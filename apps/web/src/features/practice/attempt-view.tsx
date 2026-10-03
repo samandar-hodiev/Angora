@@ -94,7 +94,7 @@ export function AttemptView({
   if (sets.isPending) {
     return (
       <>
-        <PageHeader title={title} description={description} />
+        <PageHeader pinned={false} compact title={title} description={description} />
         <div className="grid gap-4">
           <Skeleton className="h-10 w-72" />
           <Skeleton className="h-64 w-full" />
@@ -106,7 +106,7 @@ export function AttemptView({
   if (sets.isError) {
     return (
       <>
-        <PageHeader title={title} description={description} />
+        <PageHeader pinned={false} compact title={title} description={description} />
         <ErrorState error={sets.error} onRetry={() => void sets.refetch()} />
       </>
     );
@@ -115,7 +115,7 @@ export function AttemptView({
   if (items.length === 0) {
     return (
       <>
-        <PageHeader title={title} description={description} />
+        <PageHeader pinned={false} compact title={title} description={description} />
         <EmptyState
           title={`No ${skill} practice yet`}
           description="Sets appear here as soon as they are published with their questions."
@@ -126,7 +126,7 @@ export function AttemptView({
 
   return (
     <>
-      <PageHeader title={title} description={description} />
+      <PageHeader pinned={false} compact title={title} description={description} />
 
       {items.length > 1 && (
         <div className="mb-6 grid max-w-md gap-2">
