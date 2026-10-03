@@ -147,9 +147,19 @@ func scoreText(q Question, r Response) Mark {
 		if normalizeAnswer(accepted) == got {
 			return Mark{Correct: true, Score: 1, Expected: expected}
 		}
+		// A gap-fill also accepts the whole sentence with the gap filled in, since that is
+		// what many learners type. It has to be that sentence exactly — nothing else changed
+		// — so a mistake elsewhere in it is still a mistake.
+		if q.Type == TypeFillBlank && strings.Count(q.Prompt, gapMarker) == 1 &&
+			normalizeAnswer(strings.Replace(q.Prompt, gapMarker, accepted, 1)) == got {
+			return Mark{Correct: true, Score: 1, Expected: expected}
+		}
 	}
 	return Mark{Expected: expected}
 }
+
+// gapMarker is where a gap-fill prompt's answer goes.
+const gapMarker = "___"
 
 func scoreOrdering(q Question, r Response) Mark {
 	expected := strings.Join(q.answer.Order, " ")

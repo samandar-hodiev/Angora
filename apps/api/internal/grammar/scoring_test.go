@@ -113,3 +113,20 @@ func TestNormalizeAnswerKeepsWordsIntact(t *testing.T) {
 		}
 	}
 }
+
+func TestScoreGapAcceptsTheWholeSentence(t *testing.T) {
+	q := Question{Type: TypeFillBlank, Prompt: "I have ___ apple in my bag.", answer: Answer{Accepted: []string{"an"}}}
+	cases := map[string]bool{
+		"an":                         true,
+		"I have an apple in my bag":  true,
+		"i have an apple in my bag.": true,
+		"I have a apple in my bag.":  false,
+		"I have an apple in my box.": false, // the rest of the sentence must be the same
+		"I have an apple":            false,
+	}
+	for text, want := range cases {
+		if got := Score(q, Response{Text: text}).Correct; got != want {
+			t.Errorf("%q: correct = %v, want %v", text, got, want)
+		}
+	}
+}

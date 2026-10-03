@@ -186,12 +186,14 @@ function Session({
         <div className="grid gap-1.5">
           <p className="text-caption text-fg-muted tabular-nums">
             Question {index + 1} of {questions.length}
-            {question.type === "fill_blank" && " · type the missing word(s)"}
+            {question.type === "fill_blank" && " · type the missing word(s) or the whole sentence"}
           </p>
           <h1 id="question-prompt" className="text-h3">
             {question.prompt}
           </h1>
-          {question.target_rule && (
+          {/* The rule names the answer ("Use an before vowel"), so it is shown once the
+              question is marked, as part of the explanation — not before, as a hint. */}
+          {marked && question.target_rule && (
             <p className="text-caption text-fg-muted">{humanizeRule(question.target_rule)}</p>
           )}
         </div>

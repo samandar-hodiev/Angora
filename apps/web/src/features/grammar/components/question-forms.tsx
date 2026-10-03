@@ -110,7 +110,13 @@ function TextForm({ question, value, onChange, onSubmit, disabled, expected, cor
           value={value.text ?? ""}
           onChange={(e) => onChange({ text: e.target.value })}
           disabled={disabled}
-          placeholder={hint ? `${hint} →` : "Your answer"}
+          placeholder={
+            question.type === "fill_blank"
+              ? `${hint ? `${hint} → ` : ""}the missing word, or the whole sentence`
+              : hint
+                ? `${hint} →`
+                : "Your answer"
+          }
           aria-label="Your answer"
           className={cn(
             "h-12 text-body",
