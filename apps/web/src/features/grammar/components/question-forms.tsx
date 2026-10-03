@@ -52,6 +52,8 @@ function ChoiceForm({ question, value, onChange, disabled, expected, correct }: 
         const picked = value.index === i;
         const isExpected = disabled && expected === option;
         const wrongPick = disabled && picked && correct === false;
+        // Recorded but not marked (test mode): the learner still needs to see what they chose.
+        const heldPick = disabled && picked && correct !== true && correct !== false;
         return (
           <button
             key={i}
@@ -64,7 +66,7 @@ function ChoiceForm({ question, value, onChange, disabled, expected, correct }: 
               "flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-body transition-colors duration-micro outline-none",
               "focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-default",
               !disabled && "hover:bg-surface-hover",
-              picked && !disabled && "border-primary bg-primary-subtle text-primary-subtle-foreground",
+              (picked && !disabled) || heldPick ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : null,
               isExpected && "border-success bg-success/10",
               wrongPick && "border-error bg-error/10",
               !picked && !isExpected && "bg-surface",

@@ -314,7 +314,9 @@ function QuestionNavigator({
                   "transition-colors duration-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                   !answered && "bg-surface text-fg-muted hover:bg-surface-hover",
                   drafted && "border-dashed border-primary/60",
-                  answered && f.correct === null && "border-primary bg-primary text-primary-foreground",
+                  // Test mode: answered, result withheld. Neutral, not green — green would
+                  // read as "correct" before the run says so.
+                  answered && f.correct === null && "border-foreground/40 bg-foreground/15 text-foreground",
                   answered && f.correct === true && "border-success bg-success text-white",
                   answered && f.correct === false && "border-error bg-error text-white",
                   // An outline, not a ring: rings are box-shadows, and the surface's own shadow
