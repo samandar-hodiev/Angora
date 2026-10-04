@@ -191,6 +191,24 @@ func RequireAuthenticated() gin.HandlerFunc {
 	}
 }
 
+// RequireStaff admits anyone who runs the platform — every role but a learner's. It guards
+// the console's own settings: personal to each operator, but not something a learner's
+// account should be able to write to, or upload files through.
+func RequireStaff() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		p, ok := PrincipalFrom(c)
+		if !ok {
+			httpx.WriteError(c, apperr.Unauthorized("Authentication required"))
+			return
+		}
+		if p.Role == RoleUser || !p.Role.Valid() {
+			httpx.WriteError(c, apperr.Forbidden("This is for the people who run the platform"))
+			return
+		}
+		c.Next()
+	}
+}
+
 // RequirePermission rejects callers lacking any of the given permissions.
 func RequirePermission(perms ...Permission) gin.HandlerFunc {
 	return func(c *gin.Context) {

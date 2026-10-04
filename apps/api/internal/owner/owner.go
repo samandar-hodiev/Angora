@@ -75,11 +75,12 @@ func NewModule(d Deps) *Module {
 
 // RegisterRoutes mounts the console's own settings.
 //
-// These are personal preferences holding no privileged data, so authentication is the only
+// These are personal preferences holding no privileged data, so being staff is the only
 // gate: a content manager and an analyst both need to be able to set their own console
-// language, and neither holds the permissions the rest of /admin requires.
+// language, and neither holds the permissions the rest of /admin requires. A learner's
+// account has no console, and must not be able to upload a console background through it.
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
-	g := v1.Group("/admin/owner", authz.RequireAuthenticated())
+	g := v1.Group("/admin/owner", authz.RequireStaff())
 	g.GET("/preferences", m.preferences)
 	g.PATCH("/preferences", m.updatePreferences)
 	g.POST("/wallpaper", m.uploadWallpaper)

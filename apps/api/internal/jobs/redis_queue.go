@@ -60,13 +60,37 @@ func (q *RedisQueue) Enqueue(ctx context.Context, job Job) error {
 	return nil
 }
 
+// reservePoll is how often Reserve looks for a job while it waits.
+const reservePoll = 500 * time.Millisecond
+
+// Reserve takes the next job, waiting up to wait for one to arrive.
+//
+// It polls with LMOVE rather than blocking with BLMOVE. A blocked call needs the server to
+// time it out on schedule, and a Redis whose timers are coalesced — a background service on
+// a laptop — answers seconds late; the client's read deadline fires first, the worker logs
+// an i/o timeout every few seconds, and a job the server moved after the client gave up sits
+// in the processing list with nobody working on it. A poll cannot strand a job that way.
 func (q *RedisQueue) Reserve(ctx context.Context, wait time.Duration) (*Job, error) {
-	raw, err := q.client.BLMove(ctx, q.queue, q.processing, "RIGHT", "LEFT", wait).Result()
-	if errors.Is(err, redis.Nil) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
+	deadline := time.Now().Add(wait)
+	var raw string
+	for {
+		var err error
+		raw, err = q.client.LMove(ctx, q.queue, q.processing, "RIGHT", "LEFT").Result()
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, redis.Nil) {
+			return nil, err
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		case <-time.After(min(reservePoll, remaining)):
+		}
 	}
 	var job Job
 	if err := json.Unmarshal([]byte(raw), &job); err != nil {

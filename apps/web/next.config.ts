@@ -21,6 +21,17 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Microphone stays available to this origin for speaking practice.
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
+  // The parts of a Content-Security-Policy that cannot break the app: no framing, no plugins,
+  // no <base> hijack, forms post only here. Scripts are left alone — Next.js inlines its own,
+  // and a script policy without nonces would block the page rather than an attacker.
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+  },
+  // HTTPS only, once deployed; a local http:// dev server must not be told to upgrade.
+  ...(process.env.NODE_ENV === "production"
+    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+    : []),
 ];
 
 const nextConfig: NextConfig = {

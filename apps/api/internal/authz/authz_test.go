@@ -131,3 +131,18 @@ func TestRolesAreAllValidAndListed(t *testing.T) {
 		t.Error("an unknown role must grant nothing")
 	}
 }
+
+func TestRequireStaffTurnsLearnersAway(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for role, want := range map[Role]int{RoleUser: http.StatusForbidden, RoleAnalyst: http.StatusOK, RoleOwner: http.StatusOK} {
+		r := gin.New()
+		r.GET("/", func(c *gin.Context) { SetPrincipal(c, Principal{Role: role}); c.Next() }, RequireStaff(), func(c *gin.Context) {
+			c.Status(http.StatusOK)
+		})
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+		if w.Code != want {
+			t.Errorf("%s: status = %d, want %d", role, w.Code, want)
+		}
+	}
+}
