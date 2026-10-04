@@ -481,17 +481,17 @@ func TestForgotPasswordDoesNotRevealAccounts(t *testing.T) {
 func TestForgotPasswordByRole(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("owner gets no reset", func(t *testing.T) {
+	t.Run("owner gets a reset link back to the console", func(t *testing.T) {
 		svc, us, _, mailer := newTestServiceWithMailer(t)
 		session := register(t, svc)
 		if err := us.SetRole(ctx, session.User.ID, authz.RoleOwner); err != nil {
 			t.Fatal(err)
 		}
 		if err := svc.ForgotPassword(ctx, ForgotPasswordInput{Email: "learner@example.com"}, client); err != nil {
-			t.Fatalf("owner must be refused silently, got %v", err)
+			t.Fatal(err)
 		}
-		if len(mailer.sent) != 0 {
-			t.Errorf("the owner signs in with a code and must never get a password link, sent %d", len(mailer.sent))
+		if len(mailer.sent) != 1 {
+			t.Fatalf("the owner signs in with a password too and must be able to reset it, sent %d", len(mailer.sent))
 		}
 	})
 

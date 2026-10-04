@@ -26,8 +26,8 @@ import type { EmailChallenge } from "@engora/types";
  * Two ways in, because there are two kinds of people here and they should not share a
  * mechanism:
  *
- *   the owner   one configured address, and a code emailed to it. There is no password to
- *               guess, to reuse, or to be talked out of someone over the phone.
+ *   the owner   one configured address: a password, or a code emailed to it when the
+ *               password is not to hand. A forgotten password is reset through that mailbox.
  *   staff       email and a password the owner set for them and handed over directly.
  *
  * Neither is the learner sign-in. A console that accepts learner credentials is a console
@@ -76,7 +76,7 @@ export function ConsoleLogin() {
             ))}
           </div>
 
-          {mode === "owner" ? <OwnerCodeForm /> : <StaffPasswordForm />}
+          {mode === "owner" ? <OwnerSignIn /> : <StaffPasswordForm />}
         </div>
       </div>
     </main>
@@ -215,7 +215,25 @@ function OwnerCodeForm() {
   );
 }
 
-function StaffPasswordForm() {
+/** The owner signs in with a password; a code to the owner's mailbox is the other way in. */
+function OwnerSignIn() {
+  const [byCode, setByCode] = useState(false);
+  return (
+    <div className="grid gap-4">
+      {byCode ? <OwnerCodeForm /> : <StaffPasswordForm owner />}
+      <button
+        type="button"
+        onClick={() => setByCode(!byCode)}
+        className="justify-self-center text-caption text-fg-secondary underline-offset-4 outline-none hover:text-primary-text hover:underline focus-visible:underline"
+      >
+        {byCode ? "Sign in with your password instead" : "Email me a code instead"}
+      </button>
+    </div>
+  );
+}
+
+function StaffPasswordForm({ owner = false }: { owner?: boolean }) {
+  const idPrefix = owner ? "owner" : "staff";
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -239,9 +257,9 @@ function StaffPasswordForm() {
       }}
     >
       <div className="grid gap-1.5">
-        <Label htmlFor="staff-email">Email</Label>
+        <Label htmlFor={`${idPrefix}-email`}>{owner ? "Owner email" : "Email"}</Label>
         <Input
-          id="staff-email"
+          id={`${idPrefix}-email`}
           type="email"
           required
           autoComplete="email"
@@ -250,9 +268,9 @@ function StaffPasswordForm() {
         />
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="staff-password">Password</Label>
+        <Label htmlFor={`${idPrefix}-password`}>Password</Label>
         <Input
-          id="staff-password"
+          id={`${idPrefix}-password`}
           type="password"
           required
           autoComplete="current-password"
@@ -260,7 +278,9 @@ function StaffPasswordForm() {
           onChange={(event) => setPassword(event.target.value)}
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-caption text-fg-muted">The owner sets this for you. Change it once you are in.</p>
+          <p className="text-caption text-fg-muted">
+            {owner ? "A reset link goes to the owner's mailbox." : "The owner sets this for you. Change it once you are in."}
+          </p>
           <Link href="/forgot-password?for=console" className="text-caption text-fg-secondary underline-offset-4 hover:text-primary-text hover:underline">
             Forgot password?
           </Link>

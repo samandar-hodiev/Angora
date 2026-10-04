@@ -17,9 +17,11 @@ import (
 //
 // Two doors, and they are deliberately different:
 //
-//	the owner   signs in with a code to one configured address. No password exists to be
-//	            guessed, reused or handed to anybody, and the address is set in the
-//	            environment rather than in a table the platform itself can edit.
+//	the owner   signs in with a password, or with a code to one configured address when the
+//	            password is not to hand. The address is set in the environment rather than in a
+//	            table the platform itself can edit, and a forgotten password is reset by a
+//	            link to that same mailbox. (It used to be code only; signing in by email every
+//	            time was more friction than the owner wanted, and the login is rate limited.)
 //	staff       sign in with the ordinary email-and-password login. The owner creates the
 //	            account and chooses the first password out of band; the account is told to
 //	            replace it.
