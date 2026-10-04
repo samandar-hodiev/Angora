@@ -83,6 +83,32 @@ export interface MistakeSummary {
 // ---- Vocabulary ----------------------------------------------------------------------
 // Grammar has its own module: see ./grammar.
 
+/** A published word as the learner browses the whole library. */
+export interface LibraryWord {
+  id: UUID;
+  term: string;
+  part_of_speech: string;
+  pronunciation_ipa: string;
+  /** How hard the word itself is. */
+  level: string | null;
+  tags: string[];
+  translations: { uz?: string; ru?: string };
+  level_content: Partial<Record<string, VocabularyLevelText>>;
+  in_deck: boolean;
+}
+
+export interface VocabularyLibrary {
+  items: LibraryWord[];
+  /** The learner's level: the explanation the page opens on. */
+  learner_level: string;
+}
+
+/** A word explained for one CEFR level. */
+export interface VocabularyLevelText {
+  definition: string;
+  examples: string[];
+}
+
 export interface VocabularyCard {
   id: UUID;
   term: string;
@@ -90,6 +116,10 @@ export interface VocabularyCard {
   definition: string;
   examples: string[];
   pronunciation_ipa: string;
+  /** The word in the learner's own language. */
+  translations?: { uz?: string; ru?: string };
+  /** The word explained per CEFR level; empty for words written before levels existed. */
+  level_content?: Partial<Record<string, VocabularyLevelText>>;
   level: string | null;
   tags: string[];
   status: "new" | "learning" | "reviewing" | "mastered";

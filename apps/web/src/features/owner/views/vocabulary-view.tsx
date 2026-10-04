@@ -48,10 +48,17 @@ interface Word {
   level: CEFRLevel | null;
   tags: string[];
   translations: { uz?: string; ru?: string };
+  /** The word explained per CEFR level. */
+  level_content: Partial<Record<CEFRLevel, LevelText>>;
   status: "draft" | "review" | "published" | "archived";
   source: "ai" | "curated";
   learners: number;
   updated_at: string;
+}
+
+interface LevelText {
+  definition: string;
+  examples: string[];
 }
 
 interface VocabularyPage {
@@ -87,20 +94,23 @@ const vocabularyApi = {
   status: (id: string, status: Word["status"]) => apiClient.post<Word>(`/admin/vocabulary/${id}/status`, { status }),
   publish: (input: { level?: string; ids?: string[] }) =>
     apiClient.post<{ published: number }>("/admin/vocabulary/publish", input),
-  generate: (input: { levels: string[]; count: number; theme?: string }) =>
-    apiClient.post<{ job_id?: string; added?: Record<string, number> }>("/admin/vocabulary/generate", input),
-  job: (id: string) => apiClient.get<JobState & { result?: { added?: Record<string, number>; failed?: string[] } }>(`/jobs/${id}`),
+  generate: (input: { count: number; levels: string[]; theme?: string }) =>
+    apiClient.post<{ job_id?: string; added?: number }>("/admin/vocabulary/generate", input),
+  job: (id: string) =>
+    apiClient.get<
+      JobState & { result?: { added?: number; requested?: number; skipped_duplicates?: number; failed_batches?: number } }
+    >(`/jobs/${id}`),
 };
 
 interface WordInput {
   term: string;
   part_of_speech: string;
-  definition: string;
-  examples: string[];
   pronunciation_ipa: string;
+  /** How hard the word itself is. */
   level: CEFRLevel;
   tags: string[];
   translations: { uz: string; ru: string };
+  level_content: Partial<Record<CEFRLevel, LevelText>>;
 }
 
 function readJob(): string | null {
@@ -161,15 +171,15 @@ export function VocabularyView() {
     if (!jobId || !(jobStatus === "succeeded" || jobStatus === "failed" || job.isError)) return;
     writeJob(null);
     if (jobStatus === "succeeded") {
-      const added = Object.entries(job.data?.result?.added ?? {});
-      const total = added.reduce((sum, [, n]) => sum + n, 0);
-      const failed = job.data?.result?.failed ?? [];
+      const r = job.data?.result ?? {};
+      const total = r.added ?? 0;
+      const short = (r.requested ?? total) - total;
       toast({
         title: `${total} new ${total === 1 ? "word" : "words"} written as drafts`,
         description:
-          (added.length > 0 ? added.map(([code, n]) => `${code}: ${n}`).join(" · ") : "") +
-          (failed.length > 0 ? ` — ${failed.join(", ")} could not be written, try again.` : " Read them, then publish."),
-        variant: failed.length > 0 ? "default" : "success",
+          (r.skipped_duplicates ? `${r.skipped_duplicates} already in the library were skipped. ` : "") +
+          (short > 0 ? `${short} fewer than asked — generate again for the rest.` : "Read them, then publish."),
+        variant: short > 0 ? "default" : "success",
       });
       // Shows the new drafts: the reason to look at the list now.
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -234,6 +244,11 @@ export function VocabularyView() {
       cell: (w) => (
         <div className="grid max-w-md gap-0.5">
           <span className="line-clamp-2 text-body-sm">{w.definition}</span>
+          {Object.keys(w.level_content).length > 1 && (
+            <span className="text-caption text-fg-muted">
+              Explained for {cefrLevels.filter((c) => w.level_content[c]).join(" · ")}
+            </span>
+          )}
           {(w.translations.uz || w.translations.ru) && (
             <span className="text-caption text-fg-muted">
               {[w.translations.uz && `uz: ${w.translations.uz}`, w.translations.ru && `ru: ${w.translations.ru}`]
@@ -434,7 +449,7 @@ export function VocabularyView() {
         key={generating ? "open" : "closed"}
         open={generating}
         onOpenChange={setGenerating}
-        byLevel={summary?.by_level ?? {}}
+        libraryTotal={summary?.total ?? 0}
         onGenerate={(input) => {
           setGenerating(false);
           generate.mutate(input);
@@ -461,20 +476,33 @@ function SummaryTile({ label, value, tone }: { label: string; value?: number; to
 
 /** Adding a word by hand, or correcting one. Saving a word does not publish it. */
 function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState<WordInput>({
-    term: word?.term ?? "",
-    part_of_speech: word?.part_of_speech ?? "noun",
-    definition: word?.definition ?? "",
-    examples: word?.examples.length ? word.examples : [""],
-    pronunciation_ipa: word?.pronunciation_ipa ?? "",
-    level: word?.level ?? "B1",
-    tags: word?.tags ?? [],
-    translations: { uz: word?.translations.uz ?? "", ru: word?.translations.ru ?? "" },
+  const [form, setForm] = useState<WordInput>(() => {
+    const content: Partial<Record<CEFRLevel, LevelText>> = { ...(word?.level_content ?? {}) };
+    if (Object.keys(content).length === 0) content[word?.level ?? "B1"] = { definition: word?.definition ?? "", examples: [""] };
+    return {
+      term: word?.term ?? "",
+      part_of_speech: word?.part_of_speech ?? "noun",
+      pronunciation_ipa: word?.pronunciation_ipa ?? "",
+      level: word?.level ?? "B1",
+      tags: word?.tags ?? [],
+      translations: { uz: word?.translations.uz ?? "", ru: word?.translations.ru ?? "" },
+      level_content: content,
+    };
   });
+  const [tab, setTab] = useState<CEFRLevel>(() => (word?.level && form.level_content[word.level] ? word.level : (Object.keys(form.level_content)[0] as CEFRLevel) ?? "B1"));
   const set = (patch: Partial<WordInput>) => setForm((f) => ({ ...f, ...patch }));
+  const current = form.level_content[tab] ?? { definition: "", examples: [""] };
+  const setLevelText = (patch: Partial<LevelText>) =>
+    set({ level_content: { ...form.level_content, [tab]: { ...current, ...patch } } });
+
   const save = useMutation({
     mutationFn: () => {
-      const input = { ...form, examples: form.examples.filter((e) => e.trim()) };
+      const content: Partial<Record<CEFRLevel, LevelText>> = {};
+      for (const code of cefrLevels) {
+        const t = form.level_content[code];
+        if (t && t.definition.trim()) content[code] = { definition: t.definition.trim(), examples: t.examples.filter((e) => e.trim()) };
+      }
+      const input = { ...form, level_content: content };
       return word ? vocabularyApi.update(word.id, input) : vocabularyApi.create(input);
     },
     onSuccess: () => {
@@ -484,26 +512,28 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
     onError: (error) =>
       toast({ title: "It could not be saved", description: isApiError(error) ? error.message : undefined, variant: "error" }),
   });
-  const ready = form.term.trim().length > 0 && form.definition.trim().length > 1;
+  const explained = cefrLevels.filter((c) => form.level_content[c]?.definition.trim());
+  const ready = form.term.trim().length > 0 && explained.length > 0;
 
   return (
     <ConfirmDialog
       open
       onOpenChange={(open) => !open && onClose()}
-      className="sm:max-w-xl"
+      className="sm:max-w-2xl"
       title={word ? `Edit “${word.term}”` : "Add a word"}
       description={
         word
           ? "Changes to a live word reach learners straight away."
-          : "It is saved as a draft; learners get it when you publish it."
+          : "Explain it for as many levels as you like — at least one. It is saved as a draft until you publish it."
       }
       confirmLabel={word ? "Save" : "Add word"}
       loading={save.isPending}
       disabled={!ready}
       onConfirm={() => save.mutate()}
+      footerStart={`Explained for ${explained.length} of 6 levels`}
     >
-      <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1">
-        <div className="grid gap-3 sm:grid-cols-[1fr_10rem_6rem]">
+      <div className="grid max-h-[62vh] gap-4 overflow-y-auto pr-1">
+        <div className="grid gap-3 sm:grid-cols-[1fr_10rem_7rem]">
           <div className="grid gap-1.5">
             <Label htmlFor="word-term">Word or phrase</Label>
             <Input id="word-term" value={form.term} autoFocus onChange={(e) => set({ term: e.target.value })} />
@@ -519,7 +549,7 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
             </NativeSelect>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="word-level">Level</Label>
+            <Label htmlFor="word-level">Word level</Label>
             <NativeSelect id="word-level" value={form.level} onChange={(e) => set({ level: e.target.value as CEFRLevel })}>
               {cefrLevels.map((code) => (
                 <option key={code} value={code}>
@@ -528,10 +558,6 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
               ))}
             </NativeSelect>
           </div>
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="word-definition">Definition — in English the learner can read</Label>
-          <Textarea id="word-definition" rows={2} value={form.definition} onChange={(e) => set({ definition: e.target.value })} />
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="grid gap-1.5">
@@ -560,33 +586,72 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
             />
           </div>
         </div>
-        <fieldset className="grid gap-1.5">
-          <legend className="mb-1 text-label">Examples</legend>
-          {form.examples.map((example, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                aria-label={`Example ${i + 1}`}
-                value={example}
-                placeholder="A sentence somebody would actually say."
-                onChange={(e) => set({ examples: form.examples.map((x, j) => (j === i ? e.target.value : x)) })}
-              />
+
+        <section className="grid gap-3 rounded-xl border p-3">
+          <div className="grid gap-1">
+            <h3 className="text-label">Explanation by level</h3>
+            <p className="text-caption text-fg-muted">A learner sees the one for their own level — simpler at A1, fuller at C1.</p>
+          </div>
+          <div role="tablist" aria-label="Level" className="grid grid-cols-6 gap-1.5">
+            {cefrLevels.map((code) => {
+              const has = Boolean(form.level_content[code]?.definition.trim());
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === code}
+                  onClick={() => setTab(code)}
+                  className={cn(
+                    "grid justify-items-center rounded-lg border px-1 py-1.5 text-body-sm font-semibold outline-none transition-colors duration-micro",
+                    "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+                    tab === code ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
+                  )}
+                >
+                  {code}
+                  <span className={cn("text-[0.625rem] font-normal", has ? "text-success" : "text-fg-muted")}>{has ? "written" : "empty"}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="word-definition">{tab} definition — in English a {tab} learner can read</Label>
+            <Textarea id="word-definition" rows={2} value={current.definition} onChange={(e) => setLevelText({ definition: e.target.value })} />
+          </div>
+          <fieldset className="grid gap-1.5">
+            <legend className="mb-1 text-label">{tab} examples</legend>
+            {(current.examples.length ? current.examples : [""]).map((example, i, list) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  aria-label={`${tab} example ${i + 1}`}
+                  value={example}
+                  placeholder="A sentence somebody would actually say."
+                  onChange={(e) => setLevelText({ examples: list.map((x, j) => (j === i ? e.target.value : x)) })}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${tab} example ${i + 1}`}
+                  disabled={list.length <= 1}
+                  onClick={() => setLevelText({ examples: list.filter((_, j) => j !== i) })}
+                >
+                  <X aria-hidden />
+                </Button>
+              </div>
+            ))}
+            {current.examples.length < 5 && (
               <Button
                 variant="ghost"
-                size="icon"
-                aria-label={`Remove example ${i + 1}`}
-                disabled={form.examples.length <= 1}
-                onClick={() => set({ examples: form.examples.filter((_, j) => j !== i) })}
+                size="sm"
+                className="justify-self-start"
+                onClick={() => setLevelText({ examples: [...(current.examples.length ? current.examples : [""]), ""] })}
               >
-                <X aria-hidden />
+                <Plus aria-hidden /> Add an example
               </Button>
-            </div>
-          ))}
-          {form.examples.length < 5 && (
-            <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => set({ examples: [...form.examples, ""] })}>
-              <Plus aria-hidden /> Add an example
-            </Button>
-          )}
-        </fieldset>
+            )}
+          </fieldset>
+        </section>
+
         <div className="grid gap-1.5">
           <Label htmlFor="word-tags">Topics</Label>
           <Input
@@ -609,24 +674,29 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
   );
 }
 
-const countOptions = [10, 20, 30] as const;
+const countPresets = [10, 25, 50, 100] as const;
 
-/** One Generate writes a batch of new words for each level picked — every level by default. */
+/**
+ * One Generate writes new words — as many as asked, 10 to 100 — and explains each one for
+ * every level picked: every level by default. A word already in the library is never written
+ * again.
+ */
 function GenerateWordsDialog({
   open,
   onOpenChange,
-  byLevel,
+  libraryTotal,
   onGenerate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  byLevel: Record<string, number>;
-  onGenerate: (input: { levels: string[]; count: number; theme?: string }) => void;
+  libraryTotal: number;
+  onGenerate: (input: { count: number; levels: string[]; theme?: string }) => void;
 }) {
   const [levels, setLevels] = useState<CEFRLevel[]>([...cefrLevels]);
   const [count, setCount] = useState<number>(20);
   const [theme, setTheme] = useState("");
   const toggle = (code: CEFRLevel) => setLevels(levels.includes(code) ? levels.filter((l) => l !== code) : [...levels, code]);
+  const valid = levels.length > 0 && count >= 10 && count <= 100;
 
   return (
     <ConfirmDialog
@@ -634,16 +704,58 @@ function GenerateWordsDialog({
       onOpenChange={onOpenChange}
       className="sm:max-w-2xl"
       title="Generate vocabulary with AI"
-      description="New words for each level you pick, never one already in the library. Each comes with a definition at its level, examples, pronunciation, and the word in Uzbek and Russian — as a draft for you to read."
+      description="New words, each explained separately for every level you pick, with examples, pronunciation and the word in Uzbek and Russian — as drafts for you to read."
       confirmLabel="Generate"
-      disabled={levels.length === 0}
-      onConfirm={() => onGenerate({ levels, count, theme: theme.trim() || undefined })}
-      footerStart={levels.length === 0 ? "Pick at least one level" : `About ${levels.length * count} new words`}
+      disabled={!valid}
+      onConfirm={() => onGenerate({ count, levels, theme: theme.trim() || undefined })}
+      footerStart={
+        valid
+          ? `${count} new words × ${levels.length} ${levels.length === 1 ? "level" : "levels"} of explanation`
+          : "Pick at least one level and 10–100 words"
+      }
     >
       <div className="grid gap-5">
         <section className="grid gap-2">
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-label">Levels</h3>
+            <Label htmlFor="vocab-count">How many new words</Label>
+            <span className="text-caption text-fg-muted">10 – 100</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {countPresets.map((n) => (
+              <button
+                key={n}
+                type="button"
+                aria-pressed={count === n}
+                onClick={() => setCount(n)}
+                className={cn(
+                  "min-w-14 rounded-lg border px-3 py-2 text-body-sm font-medium tabular-nums outline-none transition-colors duration-micro",
+                  "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+                  count === n ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
+                )}
+              >
+                {n}
+              </button>
+            ))}
+            <Input
+              id="vocab-count"
+              type="number"
+              min={10}
+              max={100}
+              step={1}
+              value={count}
+              onChange={(e) => setCount(Math.round(Number(e.target.value) || 0))}
+              className="w-24 tabular-nums"
+              aria-describedby="vocab-count-hint"
+            />
+          </div>
+          <p id="vocab-count-hint" className={cn("text-caption", valid || levels.length === 0 ? "text-fg-muted" : "text-error")}>
+            {count < 10 || count > 100 ? "Choose between 10 and 100 words." : "Each word is one entry, with its own explanation for every level below."}
+          </p>
+        </section>
+
+        <section className="grid gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="text-label">Explain each word for</h3>
             <button
               type="button"
               className="text-caption font-medium text-primary hover:underline"
@@ -662,41 +774,15 @@ function GenerateWordsDialog({
                   aria-pressed={on}
                   onClick={() => toggle(code)}
                   className={cn(
-                    "grid justify-items-center gap-0.5 rounded-lg border px-2 py-2 outline-none transition-colors duration-micro",
+                    "rounded-lg border px-2 py-2 text-body font-semibold outline-none transition-colors duration-micro",
                     "focus-visible:ring-[3px] focus-visible:ring-ring/40",
                     on ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
                   )}
                 >
-                  <span className="text-body font-semibold">{code}</span>
-                  <span className={cn("text-[0.6875rem]", on ? "opacity-80" : "text-fg-muted")}>
-                    {byLevel[code] ?? 0} words
-                  </span>
+                  {code}
                 </button>
               );
             })}
-          </div>
-        </section>
-
-        <section className="grid gap-2">
-          <h3 className="text-label">Words per level</h3>
-          <div role="radiogroup" aria-label="Words per level" className="flex gap-2">
-            {countOptions.map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={count === n}
-                onClick={() => setCount(n)}
-                className={cn(
-                  "flex-1 rounded-lg border px-3 py-2 text-body-sm font-medium outline-none transition-colors duration-micro",
-                  "focus-visible:ring-[3px] focus-visible:ring-ring/40",
-                  count === n ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
-                )}
-              >
-                {count === n && <Check className="mr-1 inline size-3.5" aria-hidden />}
-                {n}
-              </button>
-            ))}
           </div>
         </section>
 
@@ -708,10 +794,12 @@ function GenerateWordsDialog({
             value={theme}
             onChange={(e) => setTheme(e.target.value)}
           />
-          <p className="text-caption text-fg-muted">
-            Uzbek and Russian translations, examples and pronunciation are always included.
-          </p>
         </section>
+
+        <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary-subtle/40 px-3 py-2 text-caption">
+          <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+          Never repeats a word: all {libraryTotal} words already in the library are left out, and no word appears twice in one run.
+        </p>
       </div>
     </ConfirmDialog>
   );

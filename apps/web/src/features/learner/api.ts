@@ -7,6 +7,7 @@ import type {
   ProgressOverview,
   Recommendation,
   VocabularyDeck,
+  VocabularyLibrary,
 } from "@engora/types";
 
 import { apiClient } from "@/lib/api";
@@ -25,6 +26,9 @@ export const learnerApi = {
     apiClient.getPage<Mistake>("/mistakes", { query: { group, page, page_size: 20 } }),
   vocabularyDeck: (page: number) =>
     apiClient.request<VocabularyDeck>("/vocabulary/deck", { query: { page, page_size: 24 } }),
+  vocabularyLibrary: (query: { page: number; q: string; level: string }) =>
+    apiClient.request<VocabularyLibrary>("/vocabulary/library", { query: { ...query, page_size: 24 } }),
+  addToDeck: (id: string) => apiClient.post<{ added: boolean }>(`/vocabulary/deck/${id}`),
   recommendations: () => apiClient.get<Recommendation[]>("/recommendations"),
   learningPlan: () => apiClient.get<{ plan: LearningPlan | null }>("/learning-plan").then((r) => r.plan),
 };

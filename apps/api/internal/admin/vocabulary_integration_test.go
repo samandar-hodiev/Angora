@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,20 +24,32 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
 )
 
-// wordAuthor writes a fixed batch per level, with one word that is already in the library.
+// wordAuthor writes the batch it is asked for, each word explained for every requested
+// level — and slips in one word that is already in the library, to be skipped.
 type wordAuthor struct {
 	stubAuthor
 	stamp string
+	mu    sync.Mutex
+	n     int
 }
 
 func (a *wordAuthor) WriteVocabulary(_ context.Context, req ai.VocabularyRequest) ([]ai.GeneratedWord, *ai.EvaluationMeta, error) {
-	code := req.Level.BaseCode()
-	return []ai.GeneratedWord{
-		{Term: "zz" + a.stamp + code + "one", PartOfSpeech: "noun", Definition: "a thing", Examples: []string{"One."},
-			Translations: map[string]string{"uz": "narsa", "ru": "вещь"}},
-		{Term: "zz" + a.stamp + code + "two", PartOfSpeech: "verb", Definition: "to do", Translations: map[string]string{}},
-		{Term: "zz" + a.stamp + "manual", PartOfSpeech: "noun", Definition: "already there", Translations: map[string]string{}},
-	}, &ai.EvaluationMeta{}, nil
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := []ai.GeneratedWord{{Term: "zz" + a.stamp + "manual", PartOfSpeech: "noun",
+		LevelContent: map[string]ai.LevelText{"A1": {Definition: "already there"}}}}
+	for i := 0; i < req.Count; i++ {
+		a.n++
+		content := map[string]ai.LevelText{}
+		for _, l := range req.Levels {
+			content[l.BaseCode()] = ai.LevelText{Definition: "meaning at " + l.BaseCode(), Examples: []string{"An example."}}
+		}
+		out = append(out, ai.GeneratedWord{
+			Term: fmt.Sprintf("zz%sword%d", a.stamp, a.n), PartOfSpeech: "noun", Level: "B1",
+			Translations: map[string]string{"uz": "so'z"}, LevelContent: content,
+		})
+	}
+	return ai.UsableWords(out, map[string]bool{}), &ai.EvaluationMeta{}, nil
 }
 
 func TestVocabularyAuthoringPostgres(t *testing.T) {
@@ -88,8 +101,12 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 
 	t.Run("a word added by hand is a curated draft, and the same word twice is refused", func(t *testing.T) {
 		input := map[string]any{
-			"term": "zz" + stamp + "manual", "part_of_speech": "noun", "definition": "something added by hand",
-			"level": "A2", "examples": []string{"Here it is.", " "}, "translations": map[string]string{"uz": "qo'lda"},
+			"term": "zz" + stamp + "manual", "part_of_speech": "noun", "level": "A2",
+			"level_content": map[string]any{
+				"A1": map[string]any{"definition": "something added by hand", "examples": []string{"Here it is.", " "}},
+				"C1": map[string]any{"definition": "a term entered manually by an editor", "examples": []string{}},
+			},
+			"translations": map[string]string{"uz": "qo'lda"},
 		}
 		w := call(http.MethodPost, "/vocabulary", input)
 		if w.Code != http.StatusOK {
@@ -97,7 +114,8 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		}
 		var got struct{ Data Word }
 		_ = json.Unmarshal(w.Body.Bytes(), &got)
-		if got.Data.Status != "draft" || got.Data.Source != "curated" || got.Data.Translations["uz"] != "qo'lda" || len(got.Data.Examples) != 1 {
+		if got.Data.Status != "draft" || got.Data.Source != "curated" || got.Data.Translations["uz"] != "qo'lda" ||
+			len(got.Data.LevelContent) != 2 || len(got.Data.LevelContent["A1"].Examples) != 1 {
 			t.Errorf("created %+v", got.Data)
 		}
 		if w := call(http.MethodPost, "/vocabulary", input); w.Code != http.StatusConflict {
@@ -105,38 +123,44 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		}
 	})
 
-	t.Run("generate writes each level's batch as drafts and skips words already there", func(t *testing.T) {
-		w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"levels": []string{"A1", "B2"}, "count": 10})
+	t.Run("generate writes the count asked for, each word explained per level, never a word twice", func(t *testing.T) {
+		w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"count": 12, "levels": []string{"A1", "B2", "C2"}})
 		if w.Code != http.StatusOK {
 			t.Fatalf("generate status = %d body = %s", w.Code, w.Body.String())
 		}
-		var n int
-		_ = pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary WHERE term LIKE $1 AND source = 'ai' AND status = 'draft'`,
-			"zz"+stamp+"%").Scan(&n)
-		if n != 4 {
-			t.Errorf("generated drafts = %d, want 4 (two per level, the existing word skipped)", n)
+		var res struct {
+			Data struct {
+				Added   int `json:"added"`
+				Skipped int `json:"skipped_duplicates"`
+			}
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &res)
+		if res.Data.Added != 12 || res.Data.Skipped == 0 {
+			t.Errorf("added %d skipped %d, want 12 added and the existing word skipped", res.Data.Added, res.Data.Skipped)
+		}
+		var levels int
+		_ = pool.QueryRow(ctx, `
+			SELECT count(*) FROM vocabulary
+			WHERE term LIKE $1 AND source = 'ai' AND level_content ?& array['A1','B2','C2']`, "zz"+stamp+"word%").Scan(&levels)
+		if levels != 12 {
+			t.Errorf("words explained for A1, B2 and C2 = %d, want all 12", levels)
+		}
+		if w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"count": 5, "levels": []string{"A1"}}); w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
+			t.Errorf("count 5 status = %d, want refused (10 is the least)", w.Code)
 		}
 	})
 
 	t.Run("publishing a level publishes only that level's drafts", func(t *testing.T) {
-		w := call(http.MethodPost, "/vocabulary/publish", map[string]any{"level": "A1"})
+		w := call(http.MethodPost, "/vocabulary/publish", map[string]any{"level": "B1"})
 		if w.Code != http.StatusOK {
 			t.Fatalf("publish status = %d body = %s", w.Code, w.Body.String())
 		}
-		var live int
+		var live, draft int
 		_ = pool.QueryRow(ctx, `
-			SELECT count(*) FROM vocabulary v JOIN levels l ON l.id = v.level_id
-			WHERE v.term LIKE $1 AND v.status = 'published' AND l.code = 'A1'`, "zz"+stamp+"%").Scan(&live)
-		if live != 2 {
-			t.Errorf("A1 live = %d, want 2", live)
-		}
-		w = call(http.MethodGet, "/vocabulary?status=draft&q=zz"+stamp, nil)
-		var page struct {
-			Data vocabularyPage
-		}
-		_ = json.Unmarshal(w.Body.Bytes(), &page)
-		if len(page.Data.Items) != 3 {
-			t.Errorf("drafts listed = %d, want 3 (B2 pair and the manual word)", len(page.Data.Items))
+			SELECT count(*) FILTER (WHERE status = 'published'), count(*) FILTER (WHERE status = 'draft')
+			FROM vocabulary WHERE term LIKE $1`, "zz"+stamp+"%").Scan(&live, &draft)
+		if live != 12 || draft != 1 {
+			t.Errorf("live/draft = %d/%d, want the 12 B1 words live and the A2 word still a draft", live, draft)
 		}
 	})
 }

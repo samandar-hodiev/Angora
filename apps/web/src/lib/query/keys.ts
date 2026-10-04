@@ -46,6 +46,7 @@ export const queryKeys = {
   },
   vocabulary: {
     deck: (page: number) => ["vocabulary", "deck", page] as const,
+    library: (page: number, q: string, level: string) => ["vocabulary", "library", page, q, level] as const,
   },
   practice: {
     all: ["practice"] as const,

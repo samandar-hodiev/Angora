@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useSession } from "@/features/auth/hooks";
 import { queryKeys } from "@/lib/query/keys";
@@ -44,6 +44,23 @@ export function useMistakes(group = "", page = 1) {
     queryFn: () => learnerApi.mistakes(group, page),
     enabled: useAuthed(),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useVocabularyLibrary(page: number, q: string, level: string) {
+  return useQuery({
+    queryKey: queryKeys.vocabulary.library(page, q, level),
+    queryFn: () => learnerApi.vocabularyLibrary({ page, q, level }),
+    enabled: useAuthed(),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAddToDeck() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: learnerApi.addToDeck,
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["vocabulary"] }),
   });
 }
 

@@ -267,18 +267,30 @@ func TestAgreedPracticeDropsAGapThatAllowsAnUnkeyedAnswer(t *testing.T) {
 }
 
 func TestVocabularySchemaIsStrictModeSafe(t *testing.T) {
-	assertStrictSchema(t, vocabularySchema)
+	assertStrictSchema(t, vocabularySchema([]string{"A1", "B2", "C2"}))
 }
 
 func TestUsableWordsDropsDuplicatesAndExcluded(t *testing.T) {
 	got := UsableWords([]GeneratedWord{
-		{Term: " Travel ", PartOfSpeech: "verb", Definition: "go somewhere", Examples: []string{"I travel.", " "}},
-		{Term: "travel", PartOfSpeech: "noun", Definition: "a trip"},
-		{Term: "journey", PartOfSpeech: "noun", Definition: "a trip"},
-		{Term: "go", PartOfSpeech: "thing", Definition: "move"},
-		{Term: "ticket", PartOfSpeech: "noun", Definition: ""},
+		{Term: " Travel ", PartOfSpeech: "verb", Level: "a2", LevelContent: map[string]LevelText{
+			"A1": {Definition: "go to a place", Examples: []string{"I travel.", " "}},
+			"C1": {Definition: "journey, especially far", Examples: []string{"She travels widely."}},
+			"B1": {Definition: "  "},
+		}},
+		{Term: "travel", PartOfSpeech: "noun", LevelContent: map[string]LevelText{"A1": {Definition: "a trip"}}},
+		{Term: "journey", PartOfSpeech: "noun", LevelContent: map[string]LevelText{"A1": {Definition: "a trip"}}},
+		{Term: "go", PartOfSpeech: "thing", LevelContent: map[string]LevelText{"A1": {Definition: "move"}}},
+		{Term: "ticket", PartOfSpeech: "noun"},
 	}, map[string]bool{"journey": true})
-	if len(got) != 1 || got[0].Term != "Travel" || len(got[0].Examples) != 1 {
-		t.Errorf("got %+v, want only Travel with its one real example", got)
+	if len(got) != 1 || got[0].Term != "Travel" {
+		t.Fatalf("got %+v, want only Travel", got)
+	}
+	w := got[0]
+	if len(w.LevelContent) != 2 || len(w.LevelContent["A1"].Examples) != 1 {
+		t.Errorf("level content = %+v, want A1 and C1 with blank lines dropped", w.LevelContent)
+	}
+	// Its own level is A2, which has no explanation: the nearest one, A1, stands in.
+	if w.Level != "A2" || w.Definition != "go to a place" {
+		t.Errorf("level %q definition %q, want A2 explained by its A1 text", w.Level, w.Definition)
 	}
 }
