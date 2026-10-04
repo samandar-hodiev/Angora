@@ -121,3 +121,16 @@
     }
   }
 }
+
+/* The full-page loader's progress line: a short gradient bar sweeping back and forth. */
+@keyframes loader-sweep {
+  0% { left: -35%; }
+  50% { left: 100%; }
+  100% { left: -35%; }
+}
+.loader-sweep {
+  animation: loader-sweep 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader-sweep { animation: none; left: 33%; }
+}
