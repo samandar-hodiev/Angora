@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, BookA, Check, Pencil, Plus, Send, Sparkles, Undo2, X } from "lucide-react";
+import { Archive, BookA, Check, ChevronRight, Pencil, Plus, Send, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,6 @@ import {
   LevelBadge,
   OwnerPageHeader,
   SearchInput,
-  SectionCard,
   StatusBadge,
 } from "../components/primitives";
 import { cefrLevels } from "../types";
@@ -63,7 +62,13 @@ interface LevelText {
 
 interface VocabularyPage {
   items: Word[];
-  summary: { total: number; draft: number; published: number; by_level: Record<string, number> };
+  summary: {
+    total: number;
+    draft: number;
+    published: number;
+    by_level: Record<string, number>;
+    drafts_by_level: Record<string, number>;
+  };
 }
 
 type StatusFilter = "all" | "draft" | "published" | "archived";
@@ -135,7 +140,6 @@ export function VocabularyView() {
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState<LevelFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Word | "new" | null>(null);
   const [generating, setGenerating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -146,16 +150,10 @@ export function VocabularyView() {
     setJobId(readJob());
   }, []);
 
-  const query = {
-    q: search,
-    level: level === "all" ? "" : level,
-    status: status === "all" ? "" : status,
-    page,
-    page_size: PAGE_SIZE,
-  };
+  // The library at a glance: the counts the header, the tiles and each level's section show.
   const list = useQuery({
-    queryKey: ["owner", "vocabulary", query],
-    queryFn: () => vocabularyApi.list(query),
+    queryKey: ["owner", "vocabulary", "summary"],
+    queryFn: () => vocabularyApi.list({ page: 1, page_size: 1 }),
     placeholderData: (previous) => previous,
   });
   const refresh = () => void client.invalidateQueries({ queryKey: ["owner", "vocabulary"] });
@@ -217,9 +215,9 @@ export function VocabularyView() {
     },
   });
 
-  const data = list.data?.data;
-  const total = list.data?.meta?.total ?? 0;
-  const summary = data?.summary;
+  const summary = list.data?.data.summary;
+  const filters = { q: search, status: status === "all" ? "" : status };
+  const shownLevels = level === "all" ? cefrLevels : [level];
   const busy = Boolean(jobId) || generate.isPending;
 
   const columns: Column<Word>[] = [
@@ -236,7 +234,6 @@ export function VocabularyView() {
         </div>
       ),
     },
-    { key: "level", header: "Level", cell: (w) => (w.level ? <LevelBadge level={w.level} /> : "—"), width: "5rem" },
     {
       key: "meaning",
       header: "Meaning",
@@ -345,31 +342,24 @@ export function VocabularyView() {
       </div>
 
       <FilterBar
-        resultLabel={`${total} ${total === 1 ? "word" : "words"}`}
+        resultLabel={summary ? `${summary.total} ${summary.total === 1 ? "word" : "words"}` : undefined}
         onReset={() => {
           setSearch("");
           setLevel("all");
           setStatus("all");
-          setPage(1);
         }}
       >
         <SearchInput
           label="Search words"
           placeholder="Search a word or its meaning"
           value={search}
-          onChange={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
+          onChange={setSearch}
           className="min-w-56 flex-1"
         />
         <FilterSelect
           label="Level"
           value={level}
-          onChange={(v) => {
-            setLevel(v);
-            setPage(1);
-          }}
+          onChange={setLevel}
           options={[
             { value: "all", label: "All levels" },
             ...cefrLevels.map((code) => ({
@@ -381,10 +371,7 @@ export function VocabularyView() {
         <FilterSelect
           label="Status"
           value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setPage(1);
-          }}
+          onChange={setStatus}
           options={[
             { value: "all", label: "Drafts and live" },
             { value: "draft", label: "Drafts" },
@@ -394,45 +381,27 @@ export function VocabularyView() {
         />
       </FilterBar>
 
-      <SectionCard title="Words" description="Drafts first, then by level" className="mt-4" bodyClassName="p-0">
-        <DataTable
-          caption="Vocabulary"
-          columns={columns}
-          rows={data?.items ?? []}
-          rowKey={(w) => w.id}
-          isLoading={list.isPending}
-          isError={list.isError}
-          error={list.error}
-          onRetry={() => void list.refetch()}
-          onRowClick={(w) => setEditing(w)}
-          empty={
-            <div className="grid justify-items-center gap-3 py-10 text-center">
-              <BookA className="size-8 text-fg-muted" aria-hidden />
-              <p className="text-body-sm text-fg-secondary">No words here yet.</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
-                  <Plus aria-hidden /> Add one by hand
-                </Button>
-                <Button size="sm" disabled={busy} onClick={() => setGenerating(true)}>
-                  <Sparkles aria-hidden /> Generate with AI
-                </Button>
-              </div>
-            </div>
-          }
-        />
-        {total > PAGE_SIZE && (
-          <div className="border-t px-4 py-3">
-            <Pagination
-              page={page}
-              totalPages={Math.ceil(total / PAGE_SIZE)}
-              total={total}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-              label="words"
-            />
-          </div>
-        )}
-      </SectionCard>
+      <div className="mt-4 grid gap-3">
+        {shownLevels.map((code, i) => (
+          <LevelSection
+            key={code}
+            level={code}
+            filters={filters}
+            count={summary?.by_level[code] ?? 0}
+            drafts={summary?.drafts_by_level?.[code] ?? 0}
+            columns={columns}
+            // A single chosen level, or a search, opens straight away; otherwise the first
+            // level with drafts waiting does — that is where the work is.
+            defaultOpen={
+              level !== "all" ||
+              Boolean(search) ||
+              code === (cefrLevels.find((c) => (summary?.drafts_by_level?.[c] ?? 0) > 0) ?? (i === 0 ? code : ""))
+            }
+            onEdit={setEditing}
+            onAdd={() => setEditing("new")}
+          />
+        ))}
+      </div>
 
       {editing && (
         <WordDialog
@@ -456,6 +425,106 @@ export function VocabularyView() {
         }}
       />
     </>
+  );
+}
+
+/**
+ * One level's words, in a section of their own that opens and closes. The words are only
+ * fetched once it is open: six levels of a few hundred words each is not one page.
+ */
+function LevelSection({
+  level,
+  filters,
+  count,
+  drafts,
+  columns,
+  defaultOpen,
+  onEdit,
+  onAdd,
+}: {
+  level: CEFRLevel;
+  filters: { q: string; status: string };
+  count: number;
+  drafts: number;
+  columns: Column<Word>[];
+  defaultOpen: boolean;
+  onEdit: (word: Word) => void;
+  onAdd: () => void;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [page, setPage] = useState(1);
+  // A new search or status starts the section from its first page, and opens it when searching.
+  const [seen, setSeen] = useState(filters);
+  if (seen.q !== filters.q || seen.status !== filters.status) {
+    setSeen(filters);
+    setPage(1);
+    if (filters.q) setOpen(true);
+  }
+  const query = { ...filters, level, page, page_size: PAGE_SIZE };
+  const list = useQuery({
+    queryKey: ["owner", "vocabulary", "level", query],
+    queryFn: () => vocabularyApi.list(query),
+    enabled: open,
+    placeholderData: (previous) => previous,
+  });
+  const total = list.data?.meta?.total ?? count;
+  const searching = Boolean(filters.q || filters.status);
+  // While searching, a level with nothing matching gets out of the way.
+  if (searching && open && list.data && total === 0) return null;
+
+  return (
+    <section className="overflow-hidden rounded-xl border bg-surface">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors duration-micro hover:bg-surface-hover focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      >
+        <ChevronRight className={cn("size-4 shrink-0 text-fg-muted transition-transform duration-micro", open && "rotate-90")} aria-hidden />
+        <LevelBadge level={level} />
+        <span className="text-body-sm text-fg-secondary tabular-nums">
+          {searching && list.data ? `${total} matching` : `${count} ${count === 1 ? "word" : "words"}`}
+        </span>
+        {drafts > 0 && <Badge variant="warning">{drafts} waiting to publish</Badge>}
+      </button>
+      {open && (
+        <div className="border-t">
+          <DataTable
+            caption={`${level} vocabulary`}
+            columns={columns}
+            rows={list.data?.data.items ?? []}
+            rowKey={(w) => w.id}
+            isLoading={list.isPending}
+            isError={list.isError}
+            error={list.error}
+            onRetry={() => void list.refetch()}
+            onRowClick={onEdit}
+            skeletonRows={4}
+            empty={
+              <div className="grid justify-items-center gap-2 py-8 text-center">
+                <BookA className="size-7 text-fg-muted" aria-hidden />
+                <p className="text-body-sm text-fg-secondary">No {level} words yet.</p>
+                <Button variant="outline" size="sm" onClick={onAdd}>
+                  <Plus aria-hidden /> Add one by hand
+                </Button>
+              </div>
+            }
+          />
+          {total > PAGE_SIZE && (
+            <div className="border-t px-4 py-3">
+              <Pagination
+                page={page}
+                totalPages={Math.ceil(total / PAGE_SIZE)}
+                total={total}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                label="words"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -61,6 +61,8 @@ type VocabularySummary struct {
 	Draft     int            `json:"draft"`
 	Published int            `json:"published"`
 	ByLevel   map[string]int `json:"by_level"`
+	/** Drafts per level, so each level's section can say what waits in it. */
+	DraftsByLevel map[string]int `json:"drafts_by_level"`
 }
 
 type vocabularyPage struct {
@@ -161,7 +163,7 @@ func (m *Module) vocabularyList(c *gin.Context) {
 }
 
 func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, error) {
-	s := VocabularySummary{ByLevel: map[string]int{}}
+	s := VocabularySummary{ByLevel: map[string]int{}, DraftsByLevel: map[string]int{}}
 	rows, err := m.pool.Query(ctx, `
 		SELECT COALESCE(l.code, ''), v.status, count(*)::int
 		FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id
@@ -185,6 +187,9 @@ func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, erro
 		}
 		if level != "" {
 			s.ByLevel[level] += n
+			if status != "published" {
+				s.DraftsByLevel[level] += n
+			}
 		}
 	}
 	return s, rows.Err()

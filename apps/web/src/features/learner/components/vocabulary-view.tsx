@@ -1,12 +1,11 @@
 "use client";
 
-import { BookMarked, CalendarClock, Check, CheckCheck, Plus, Search, SpellCheck, X } from "lucide-react";
+import { BookMarked, CalendarClock, Check, CheckCheck, ChevronRight, Plus, Search, SpellCheck, X } from "lucide-react";
 import { useState } from "react";
 
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState, ErrorState } from "@/components/common/states";
 import { VocabularyCard } from "@/components/learning/cards";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Stat } from "@/components/ui/data-display";
 import { Input } from "@/components/ui/input";
@@ -71,17 +70,17 @@ function Library() {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [wordLevel, setWordLevel] = useState<string>("");
-  // The level whose explanation every card shows; empty means the learner's own.
-  const [explainAt, setExplainAt] = useState<string>("");
+  const [openId, setOpenId] = useState<string | null>(null);
   const library = useVocabularyLibrary(page, query.trim(), wordLevel);
   const data = library.data?.data;
   const total = library.data?.meta?.total ?? 0;
-  const shownLevel = explainAt || data?.learner_level || "B1";
+  const myLevel = data?.learner_level || "B1";
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-56 flex-1">
+      <div className="grid gap-3">
+        <LevelTabs value={wordLevel} onChange={(v) => (setWordLevel(v), setPage(1), setOpenId(null))} />
+        <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
           <Input
             type="search"
@@ -105,23 +104,12 @@ function Library() {
             </button>
           )}
         </div>
-        <LevelChips label="Word level" value={wordLevel} onChange={(v) => (setWordLevel(v), setPage(1))} allLabel="All levels" />
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-caption text-fg-muted">
-        <span>Explain for</span>
-        <LevelChips
-          label="Explain for"
-          value={explainAt}
-          onChange={setExplainAt}
-          allLabel={`My level${data?.learner_level ? ` · ${data.learner_level}` : ""}`}
-          small
-        />
       </div>
 
       {library.isPending ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-56 rounded-xl" />
+        <div className="grid gap-2">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
       ) : library.isError ? (
@@ -134,12 +122,21 @@ function Library() {
         />
       ) : (
         <>
-          <p className="text-caption text-fg-muted tabular-nums">{total} words</p>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <p className="text-caption text-fg-muted">
+            <span className="tabular-nums">{total}</span> {wordLevel ? `${wordLevel} ` : ""}words · explained for your level ({myLevel}) —
+            open a word to see it at every level
+          </p>
+          <ul className="overflow-hidden rounded-xl border bg-surface">
             {data.items.map((word) => (
-              <WordCard key={word.id} word={word} level={shownLevel} />
+              <WordRow
+                key={word.id}
+                word={word}
+                level={myLevel}
+                open={openId === word.id}
+                onToggle={() => setOpenId(openId === word.id ? null : word.id)}
+              />
             ))}
-          </div>
+          </ul>
           <Pagination page={page} pageSize={24} total={total} onPage={setPage} />
         </>
       )}
@@ -147,36 +144,24 @@ function Library() {
   );
 }
 
-function LevelChips({
-  label,
-  value,
-  onChange,
-  allLabel,
-  small = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  allLabel: string;
-  small?: boolean;
-}) {
+/** The word-level filter: every level together, or one level at a time. */
+function LevelTabs({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1">
+    <div role="tablist" aria-label="Word level" className="flex gap-1 overflow-x-auto rounded-xl border bg-surface p-1">
       {["", ...LEVELS].map((code) => (
         <button
           key={code || "all"}
           type="button"
-          aria-pressed={value === code}
+          role="tab"
+          aria-selected={value === code}
           onClick={() => onChange(code)}
           className={cn(
-            "rounded-lg border outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
-            small ? "px-2 py-0.5 text-caption" : "px-3 py-1.5 text-label",
-            value === code
-              ? "border-primary bg-primary-subtle text-primary-subtle-foreground"
-              : "bg-surface text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+            "min-w-12 flex-1 shrink-0 rounded-lg px-3 py-1.5 text-label outline-none transition-colors duration-micro",
+            "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+            value === code ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-secondary hover:text-foreground",
           )}
         >
-          {code || allLabel}
+          {code || "All"}
         </button>
       ))}
     </div>
@@ -196,59 +181,103 @@ function explanationAt(content: LibraryWord["level_content"], level: string): { 
   return null;
 }
 
-function WordCard({ word, level }: { word: LibraryWord; level: string }) {
+/**
+ * One word, one line: the word, its meaning in the learner's language, and its explanation
+ * at their level. Opened, the same row shows the word explained at every level side by side.
+ */
+function WordRow({ word, level, open, onToggle }: { word: LibraryWord; level: string; open: boolean; onToggle: () => void }) {
   const add = useAddToDeck();
   const shown = explanationAt(word.level_content, level);
   const inDeck = word.in_deck || add.data?.added === true;
+  const translation = [word.translations.uz, word.translations.ru].filter(Boolean).join(" · ");
 
   return (
-    <article className="grid content-start gap-3 rounded-xl border bg-surface p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="grid min-w-0 gap-0.5">
-          <h3 className="text-h4">{word.term}</h3>
-          <p className="text-caption text-fg-muted">
-            {word.part_of_speech}
-            {word.pronunciation_ipa && ` · ${word.pronunciation_ipa}`}
-          </p>
-        </div>
-        {word.level && <Badge variant="outline">{word.level}</Badge>}
-      </div>
-      {(word.translations.uz || word.translations.ru) && (
-        <p className="text-body-sm">
-          {word.translations.uz && <span className="font-medium">{word.translations.uz}</span>}
-          {word.translations.uz && word.translations.ru && <span className="text-fg-muted"> · </span>}
-          {word.translations.ru && <span className="text-fg-secondary">{word.translations.ru}</span>}
-        </p>
-      )}
-      {shown && (
-        <div className="grid gap-1.5 border-t pt-3">
-          <p className="text-body-sm">
-            <span className="mr-1.5 rounded bg-surface-active px-1 text-[0.6875rem] font-semibold text-fg-muted">{shown.level}</span>
-            {shown.text.definition}
-          </p>
-          {shown.text.examples.length > 0 && (
-            <ul className="grid gap-1">
-              {shown.text.examples.slice(0, 2).map((example) => (
-                <li key={example} className="text-caption text-fg-secondary italic">
-                  “{example}”
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-      <div className="pt-1">
+    <li className="border-b last:border-b-0">
+      <div className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="grid min-w-0 flex-1 grid-cols-1 items-baseline gap-x-4 gap-y-0.5 rounded text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)]"
+        >
+          <span className="flex min-w-0 items-baseline gap-2">
+            <ChevronRight
+              className={cn("size-3.5 shrink-0 self-center text-fg-muted transition-transform duration-micro", open && "rotate-90")}
+              aria-hidden
+            />
+            <span className="truncate font-medium">{word.term}</span>
+            {word.level && <span className="shrink-0 text-[0.6875rem] font-semibold text-fg-muted">{word.level}</span>}
+          </span>
+          <span className="min-w-0 truncate pl-5 text-body-sm text-fg-secondary sm:pl-0">
+            {translation && <span className="font-medium text-foreground">{translation}</span>}
+            {translation && shown && <span className="text-fg-muted"> — </span>}
+            {shown?.text.definition}
+          </span>
+        </button>
         {inDeck ? (
-          <span className="inline-flex items-center gap-1.5 text-caption text-success">
-            <Check className="size-3.5" aria-hidden /> In my words
+          <span className="flex shrink-0 items-center gap-1 text-caption text-success" title="In my words">
+            <Check className="size-4" aria-hidden />
+            <span className="hidden sm:inline">Added</span>
           </span>
         ) : (
-          <Button size="sm" variant="outline" loading={add.isPending} onClick={() => add.mutate(word.id)}>
-            <Plus aria-hidden /> Add to my words
+          <Button
+            size="sm"
+            variant="ghost"
+            className="shrink-0"
+            loading={add.isPending}
+            onClick={() => add.mutate(word.id)}
+            aria-label={`Add ${word.term} to my words`}
+          >
+            <Plus aria-hidden />
+            <span className="hidden sm:inline">Add</span>
           </Button>
         )}
       </div>
-    </article>
+      {open && (
+        <div className="grid gap-3 border-t bg-surface-hover/40 px-3 py-3 sm:px-4">
+          <p className="text-caption text-fg-muted">
+            {word.part_of_speech}
+            {word.pronunciation_ipa && ` · ${word.pronunciation_ipa}`}
+            {word.tags.length > 0 && ` · ${word.tags.join(", ")}`}
+          </p>
+          <div className="-mx-1 overflow-x-auto px-1 pb-1">
+            <div className="grid min-w-max grid-flow-col auto-cols-[minmax(13rem,1fr)] gap-2">
+              {LEVELS.map((code) => {
+                const text = word.level_content[code];
+                const mine = code === level;
+                return (
+                  <div
+                    key={code}
+                    className={cn(
+                      "grid content-start gap-1.5 rounded-lg border bg-surface p-3",
+                      mine && "border-primary/60",
+                      !text && "opacity-50",
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold">
+                      {code}
+                      {mine && <span className="font-normal text-primary">your level</span>}
+                    </span>
+                    {text ? (
+                      <>
+                        <p className="text-body-sm">{text.definition}</p>
+                        {text.examples.slice(0, 2).map((example) => (
+                          <p key={example} className="text-caption text-fg-secondary italic">
+                            “{example}”
+                          </p>
+                        ))}
+                      </>
+                    ) : (
+                      <p className="text-caption text-fg-muted">Not explained at this level yet.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
 
