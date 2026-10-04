@@ -14,7 +14,11 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 
 import { PageHeader, SectionTitle } from "@/components/common/page-header";
-import { EmptyState, ErrorState, InlineLoader } from "@/components/common/states";
+import {
+  EmptyState,
+  ErrorState,
+  InlineLoader,
+} from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +27,12 @@ import { cn } from "@/lib/utils";
 import type { GrammarCategory, GrammarTopicSummary } from "@engora/types";
 
 import type { GrammarLevelFilter } from "../api";
-import { useGrammarCategories, useGrammarOverview, useGrammarSearch, useGrammarTopics } from "../hooks";
+import {
+  useGrammarCategories,
+  useGrammarOverview,
+  useGrammarSearch,
+  useGrammarTopics,
+} from "../hooks";
 import { MasteryBar, TopicRow } from "./shared";
 
 const LEVELS: { value: GrammarLevelFilter; label: string }[] = [
@@ -57,51 +66,66 @@ export function GrammarLibraryView() {
 
   return (
     <>
+      {/* The title is read once on arrival and scrolls away; what stays is the search, which
+          is what this page is used for. */}
       <PageHeader
+        pinned={false}
+        compact
         title="Grammar"
         description="Every rule, with practice that knows what you keep getting wrong."
-        actions={
-          <Button variant="outline" asChild>
-            <Link href="/app/grammar/map">
-              <MapIcon aria-hidden />
-              Grammar map
-            </Link>
-          </Button>
-        }
       />
 
       <div className="grid gap-6">
         <div className="grid gap-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-            <Input
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setQuery("");
-              }}
-              placeholder="Search grammar topics..."
-              aria-label="Search grammar topics"
-              className="h-11 pr-10 pl-9"
-            />
-            {searching && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery("");
-                  searchRef.current?.focus();
+          {/* Sticks 12px under the shell header once it gets there, with the map beside it. */}
+          <div
+            style={{ top: "calc(var(--app-header-h, 3.5rem) + 12px)" }}
+            className="sticky z-20 flex items-center gap-2"
+          >
+            <div className="relative min-w-0 flex-1">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted"
+                aria-hidden
+              />
+              <Input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setQuery("");
                 }}
-                aria-label="Clear search"
-                className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-fg-muted outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            )}
+                placeholder="Search grammar topics..."
+                aria-label="Search grammar topics"
+                className="h-11 pr-10 pl-9"
+              />
+              {searching && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    searchRef.current?.focus();
+                  }}
+                  aria-label="Clear search"
+                  className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-fg-muted outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              )}
+            </div>
+            <Button variant="outline" className="h-11 shrink-0" asChild>
+              <Link href="/app/grammar/map">
+                <MapIcon aria-hidden />
+                <span className="hidden sm:inline">Grammar map</span>
+              </Link>
+            </Button>
           </div>
 
-          <div role="group" aria-label="Filter by level" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+          <div
+            role="group"
+            aria-label="Filter by level"
+            className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+          >
             {LEVELS.map((option) => (
               <button
                 key={option.value}
@@ -143,7 +167,10 @@ export function GrammarLibraryView() {
                   ))}
                 </div>
               ) : categories.isError ? (
-                <ErrorState error={categories.error} onRetry={() => void categories.refetch()} />
+                <ErrorState
+                  error={categories.error}
+                  onRetry={() => void categories.refetch()}
+                />
               ) : (
                 <ul className="grid gap-2">
                   {(categories.data ?? []).map((category) => (
@@ -161,13 +188,18 @@ export function GrammarLibraryView() {
   );
 }
 
-function ForYou({ overview }: { overview: ReturnType<typeof useGrammarOverview> }) {
+function ForYou({
+  overview,
+}: {
+  overview: ReturnType<typeof useGrammarOverview>;
+}) {
   if (overview.isPending) return <Skeleton className="h-40 rounded-xl" />;
   // A failed recommendation must not take the library down: the whole curriculum is below.
   if (overview.isError || !overview.data) return null;
 
   const { recommended, continue: inProgress, weak, summary } = overview.data;
-  if (recommended.length === 0 && inProgress.length === 0 && weak.length === 0) return null;
+  if (recommended.length === 0 && inProgress.length === 0 && weak.length === 0)
+    return null;
 
   return (
     <div className="grid gap-6">
@@ -187,10 +219,15 @@ function ForYou({ overview }: { overview: ReturnType<typeof useGrammarOverview> 
               <li key={`${item.kind}-${item.topic}-${item.rule ?? ""}`}>
                 <div className="flex h-full flex-col gap-3 rounded-xl border bg-surface p-4">
                   <div className="flex items-start gap-2">
-                    <Target className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                    <Target
+                      className="mt-0.5 size-4 shrink-0 text-primary"
+                      aria-hidden
+                    />
                     <div className="min-w-0">
                       <p className="text-body-sm font-medium">{item.label}</p>
-                      <p className="mt-0.5 text-caption text-fg-muted">{item.reason}</p>
+                      <p className="mt-0.5 text-caption text-fg-muted">
+                        {item.reason}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-auto">
@@ -204,7 +241,11 @@ function ForYou({ overview }: { overview: ReturnType<typeof useGrammarOverview> 
                               : `/app/grammar/${item.topic}`
                         }
                       >
-                        {item.kind === "practice_rule" ? "Start practice" : item.kind === "compare" ? "Compare" : "Open"}
+                        {item.kind === "practice_rule"
+                          ? "Start practice"
+                          : item.kind === "compare"
+                            ? "Compare"
+                            : "Open"}
                         <ArrowRight aria-hidden />
                       </Link>
                     </Button>
@@ -217,14 +258,22 @@ function ForYou({ overview }: { overview: ReturnType<typeof useGrammarOverview> 
       )}
 
       <div className="grid gap-6 sm:grid-cols-2">
-        {inProgress.length > 0 && <TopicStrip title="Continue learning" topics={inProgress} />}
+        {inProgress.length > 0 && (
+          <TopicStrip title="Continue learning" topics={inProgress} />
+        )}
         {weak.length > 0 && <TopicStrip title="Weak grammar" topics={weak} />}
       </div>
     </div>
   );
 }
 
-function TopicStrip({ title, topics }: { title: string; topics: GrammarTopicSummary[] }) {
+function TopicStrip({
+  title,
+  topics,
+}: {
+  title: string;
+  topics: GrammarTopicSummary[];
+}) {
   return (
     <section aria-label={title}>
       <SectionTitle title={title} />
@@ -244,7 +293,13 @@ function TopicStrip({ title, topics }: { title: string; topics: GrammarTopicSumm
  * their band (Present / Past / Future) when the category has one — the hierarchy stops
  * there deliberately: category → group → topic, never deeper.
  */
-function CategoryFolder({ category, level }: { category: GrammarCategory; level: GrammarLevelFilter }) {
+function CategoryFolder({
+  category,
+  level,
+}: {
+  category: GrammarCategory;
+  level: GrammarLevelFilter;
+}) {
   const [open, setOpen] = useState(false);
   const topics = useGrammarTopics(open ? category.slug : null, level);
   const panelId = `category-${category.slug}`;
@@ -260,19 +315,35 @@ function CategoryFolder({ category, level }: { category: GrammarCategory; level:
         aria-controls={panelId}
         className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors duration-micro hover:bg-surface-hover focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:ring-inset"
       >
-        <ChevronRight className={cn("size-4 shrink-0 text-fg-muted transition-transform duration-micro", open && "rotate-90")} aria-hidden />
-        {open ? <FolderOpen className="size-4 shrink-0 text-primary" aria-hidden /> : <Folder className="size-4 shrink-0 text-fg-muted" aria-hidden />}
+        <ChevronRight
+          className={cn(
+            "size-4 shrink-0 text-fg-muted transition-transform duration-micro",
+            open && "rotate-90",
+          )}
+          aria-hidden
+        />
+        {open ? (
+          <FolderOpen className="size-4 shrink-0 text-primary" aria-hidden />
+        ) : (
+          <Folder className="size-4 shrink-0 text-fg-muted" aria-hidden />
+        )}
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-body-sm font-medium">{category.name}</span>
-            <span className="text-caption text-fg-muted">{category.topic_count}</span>
+            <span className="text-caption text-fg-muted">
+              {category.topic_count}
+            </span>
           </span>
-          <span className="mt-0.5 block truncate text-caption text-fg-muted">{category.description}</span>
+          <span className="mt-0.5 block truncate text-caption text-fg-muted">
+            {category.description}
+          </span>
         </span>
         {category.mastery > 0 && (
           <span className="hidden w-24 shrink-0 items-center gap-2 sm:flex">
             <MasteryBar value={category.mastery} />
-            <span className="text-caption text-fg-muted tabular-nums">{Math.round(category.mastery)}%</span>
+            <span className="text-caption text-fg-muted tabular-nums">
+              {Math.round(category.mastery)}%
+            </span>
           </span>
         )}
       </button>
@@ -285,15 +356,23 @@ function CategoryFolder({ category, level }: { category: GrammarCategory; level:
             </div>
           ) : topics.isError ? (
             <div className="p-3">
-              <ErrorState error={topics.error} onRetry={() => void topics.refetch()} className="py-6" />
+              <ErrorState
+                error={topics.error}
+                onRetry={() => void topics.refetch()}
+                className="py-6"
+              />
             </div>
           ) : groups.length === 0 ? (
-            <p className="px-4 py-4 text-body-sm text-fg-muted">No topics at this level. Switch to All to see the rest.</p>
+            <p className="px-4 py-4 text-body-sm text-fg-muted">
+              No topics at this level. Switch to All to see the rest.
+            </p>
           ) : (
             groups.map((group) => (
               <div key={group.label || "_"}>
                 {group.label && (
-                  <p className="px-4 pt-3 pb-1 text-label tracking-wide text-fg-muted uppercase">{group.label}</p>
+                  <p className="px-4 pt-3 pb-1 text-label tracking-wide text-fg-muted uppercase">
+                    {group.label}
+                  </p>
                 )}
                 <ul>
                   {group.topics.map((topic) => (
@@ -311,7 +390,9 @@ function CategoryFolder({ category, level }: { category: GrammarCategory; level:
   );
 }
 
-function groupTopics(topics: GrammarTopicSummary[]): { label: string; topics: GrammarTopicSummary[] }[] {
+function groupTopics(
+  topics: GrammarTopicSummary[],
+): { label: string; topics: GrammarTopicSummary[] }[] {
   const out: { label: string; topics: GrammarTopicSummary[] }[] = [];
   for (const topic of topics) {
     const existing = out.find((g) => g.label === topic.group);
@@ -343,7 +424,10 @@ function SearchResults({
       </div>
     );
   }
-  if (state.isError) return <ErrorState error={state.error} onRetry={() => void state.refetch()} />;
+  if (state.isError)
+    return (
+      <ErrorState error={state.error} onRetry={() => void state.refetch()} />
+    );
   if (!state.data) return null;
 
   const { results, related, suggestions } = state.data;
@@ -358,7 +442,12 @@ function SearchResults({
           suggestions.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-2">
               {suggestions.map((s) => (
-                <Button key={s} variant="outline" size="sm" onClick={() => onSuggestion(s)}>
+                <Button
+                  key={s}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSuggestion(s)}
+                >
                   {s}
                 </Button>
               ))}
@@ -374,7 +463,9 @@ function SearchResults({
       <section aria-live="polite">
         <SectionTitle
           title={`${results.length} result${results.length === 1 ? "" : "s"}`}
-          action={state.isFetching ? <InlineLoader label="Updating" /> : undefined}
+          action={
+            state.isFetching ? <InlineLoader label="Updating" /> : undefined
+          }
         />
         <ul className="divide-y rounded-xl border bg-surface">
           {results.map((result) => (
