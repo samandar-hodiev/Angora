@@ -126,7 +126,7 @@ func (m *Module) vocabularyList(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	where := `WHERE ($1 = '' OR v.term ILIKE '%' || $1 || '%' OR v.definition ILIKE '%' || $1 || '%')
-	            AND ($2 = '' OR l.code = $2)
+	            AND ($2 = '' OR l.code = $2 OR jsonb_exists(v.level_content, $2))
 	            AND (CASE WHEN $3 = '' THEN v.status <> 'archived' ELSE v.status = $3 END)`
 	var total int64
 	if err := m.pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id `+where,
@@ -164,9 +164,21 @@ func (m *Module) vocabularyList(c *gin.Context) {
 
 func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, error) {
 	s := VocabularySummary{ByLevel: map[string]int{}, DraftsByLevel: map[string]int{}}
+	if err := m.pool.QueryRow(ctx, `
+		SELECT count(*)::int, count(*) FILTER (WHERE status = 'published')::int
+		FROM vocabulary WHERE status <> 'archived'`).Scan(&s.Total, &s.Published); err != nil {
+		return s, err
+	}
+	s.Draft = s.Total - s.Published
+	// A word counts under every level it is explained for — a word written for A1 to C2 is in
+	// all six — and under its own level, for a word written before explanations had levels.
 	rows, err := m.pool.Query(ctx, `
-		SELECT COALESCE(l.code, ''), v.status, count(*)::int
+		SELECT k.code, v.status, count(DISTINCT v.id)::int
 		FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id
+		CROSS JOIN LATERAL (
+			SELECT jsonb_object_keys(v.level_content) AS code
+			UNION SELECT l.code WHERE l.code IS NOT NULL
+		) k
 		WHERE v.status <> 'archived' GROUP BY 1, 2`)
 	if err != nil {
 		return s, err
@@ -178,18 +190,9 @@ func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, erro
 		if err := rows.Scan(&level, &status, &n); err != nil {
 			return s, err
 		}
-		s.Total += n
-		switch status {
-		case "published":
-			s.Published += n
-		default:
-			s.Draft += n
-		}
-		if level != "" {
-			s.ByLevel[level] += n
-			if status != "published" {
-				s.DraftsByLevel[level] += n
-			}
+		s.ByLevel[level] += n
+		if status != "published" {
+			s.DraftsByLevel[level] += n
 		}
 	}
 	return s, rows.Err()
@@ -225,7 +228,7 @@ func (in wordInput) clean() (ai.GeneratedWord, error) {
 		PronunciationIPA: strings.TrimSpace(in.PronunciationIPA), Tags: in.Tags,
 		Translations: map[string]string{}, LevelContent: content,
 	}
-	for _, lang := range []string{"uz", "ru"} {
+	for _, lang := range []string{"uz", "ru", "ru_pron"} {
 		if t := strings.TrimSpace(in.Translations[lang]); t != "" {
 			w.Translations[lang] = t
 		}
@@ -369,7 +372,7 @@ func (m *Module) publishWords(c *gin.Context) {
 		UPDATE vocabulary v SET status = 'published', published_at = COALESCE(v.published_at, now())
 		WHERE v.status IN ('draft', 'review')
 		  AND ($1::uuid[] IS NULL OR cardinality($1::uuid[]) = 0 OR v.id = ANY ($1))
-		  AND ($2 = '' OR v.level_id = (SELECT id FROM levels WHERE code = $2))`, in.IDs, in.Level)
+		  AND ($2 = '' OR v.level_id = (SELECT id FROM levels WHERE code = $2) OR jsonb_exists(v.level_content, $2))`, in.IDs, in.Level)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

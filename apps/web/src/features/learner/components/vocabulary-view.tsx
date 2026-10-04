@@ -238,17 +238,23 @@ function WordRow({ word, level, open, onToggle }: { word: LibraryWord; level: st
           </span>
           {/* Its meaning in Uzbek and in Russian, each by its flag, then the explanation. */}
           <span className="grid min-w-0 gap-0.5 pl-5 sm:pl-0">
-            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-body-sm">
+            <span className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-0.5 text-body-sm">
               {word.translations.uz && (
                 <span className="flex min-w-0 items-center gap-1.5">
                   <FlagUZ title="O'zbekcha" />
                   <span className="truncate font-medium">{word.translations.uz}</span>
                 </span>
               )}
+              {/* Russian after Uzbek, with how it is said underneath, as the English word has. */}
               {word.translations.ru && (
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <FlagRU title="Русский" />
-                  <span className="truncate font-medium">{word.translations.ru}</span>
+                <span className="grid min-w-0 gap-0">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <FlagRU title="Русский" />
+                    <span className="truncate font-medium">{word.translations.ru}</span>
+                  </span>
+                  {word.translations.ru_pron && (
+                    <span className="truncate pl-[1.5rem] text-[0.6875rem] text-fg-muted">[{word.translations.ru_pron}]</span>
+                  )}
                 </span>
               )}
             </span>

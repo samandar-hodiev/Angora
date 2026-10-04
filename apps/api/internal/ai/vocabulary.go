@@ -20,7 +20,7 @@ import (
 // the model does not hand back the same words every time it is asked.
 
 const (
-	VocabularyPrompt = "vocabulary_author.v2"
+	VocabularyPrompt = "vocabulary_author.v3"
 	SchemaVocabulary = "vocabulary_words"
 
 	// VocabularyBatch is how many words one call writes.
@@ -74,6 +74,7 @@ type generatedWords struct {
 		PronunciationIPA string   `json:"pronunciation_ipa"`
 		Uz               string   `json:"uz"`
 		Ru               string   `json:"ru"`
+		RuPronunciation  string   `json:"ru_pronunciation"`
 		Tags             []string `json:"tags"`
 		Explanations     map[string]struct {
 			SameAsPrevious bool     `json:"same_as_previous"`
@@ -112,7 +113,7 @@ func vocabularySchema(levels []string) json.RawMessage {
 				"type": "array",
 				"items": map[string]any{
 					"type": "object", "additionalProperties": false,
-					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "tags", "explanations"},
+					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation", "tags", "explanations"},
 					"properties": map[string]any{
 						"term":              map[string]any{"type": "string", "description": "The word or fixed phrase, lower case unless it is a proper noun."},
 						"part_of_speech":    map[string]any{"type": "string", "enum": PartsOfSpeech},
@@ -120,6 +121,7 @@ func vocabularySchema(levels []string) json.RawMessage {
 						"pronunciation_ipa": map[string]any{"type": "string", "description": "British IPA between slashes, e.g. /ɪˈvɛntʃuəli/."},
 						"uz":                map[string]any{"type": "string", "description": "The word in Uzbek (Latin script)."},
 						"ru":                map[string]any{"type": "string", "description": "The word in Russian."},
+						"ru_pronunciation":  map[string]any{"type": "string", "description": "How the Russian word sounds, in Uzbek Latin letters with the stressed vowel marked by an acute accent, e.g. dastích for достичь."},
 						"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "One or two topic tags, e.g. travel, work."},
 						"explanations": map[string]any{
 							"type": "object", "additionalProperties": false, "required": levels, "properties": perLevel,
@@ -144,9 +146,23 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	var b strings.Builder
 	b.WriteString("You choose vocabulary for an English-learning app whose learners speak Uzbek or Russian. ")
 	fmt.Fprintf(&b, "Write exactly %d useful words or fixed phrases, varied in topic and part of speech, and explain each one separately for every one of these CEFR levels: %s.\n", count, strings.Join(levels, ", "))
-	b.WriteString("- level: the level a learner usually meets the word at, by the English Vocabulary Profile — everyday words like dusk or campground are not A1. Mix levels across the batch.\n")
+	b.WriteString("- level: the level a learner usually meets the word at, by the English Vocabulary Profile — everyday words like dusk or campground are not A1. Spread the words evenly over the requested levels by how hard the word itself is — for A1 to C2, about as many C1 words as A1 words — never mostly easy words.\n")
 	b.WriteString("- explanations: an entry for every requested level, none left out. When the explanation you gave for the previous level is just as right for this one — common for a simple word at A1 and A2 — set same_as_previous to true and leave definition and examples empty, instead of repeating it or inventing a difference. The first requested level always has its own text. The definition is the meaning only — never put an example in it. Where the levels need different explanations, they must genuinely differ: A1/A2 one very short sentence in the simplest words, with everyday examples; B1/B2 the main senses and common collocations; C1/C2 nuance, register, collocations and less common senses. Each has exactly two natural example sentences written at that level.\n")
-	b.WriteString("- uz and ru: the usual translation of the word in its main sense — a word or two, not a definition.\n")
+	// The words' own difficulty, shared out over the requested levels: asked only to "mix
+	// levels", the model gave A1 and A2 words nine times in ten.
+	b.WriteString("- How many words of each own level to write:")
+	for i, code := range levels {
+		n := count / len(levels)
+		if i < count%len(levels) {
+			n++
+		}
+		if n > 0 {
+			fmt.Fprintf(&b, " %d at %s;", n, code)
+		}
+	}
+	b.WriteString(" a C1 or C2 word is one an advanced learner still meets as new — pick harder words for the higher levels, never an everyday word labelled higher.\n")
+	b.WriteString("- uz and ru: the usual translation of the word in its main sense — a word or two, not a definition; a wrong or loosely related word is worse than none.\n")
+	b.WriteString("- ru_pronunciation: how that Russian translation is said, written in Uzbek Latin letters as it sounds (unstressed o reads as a), with an acute accent on the stressed vowel and no mark for the soft sign — e.g. достичь → dastích, в конце концов → f kantsé kantsóf.\n")
 	b.WriteString("Never include a word from the excluded list, in any form, and never the same word twice.\n")
 
 	input := fmt.Sprintf("COUNT: %d\nLEVELS: %s\n", count, strings.Join(levels, ", "))
@@ -216,6 +232,9 @@ func (g generatedWords) words() []GeneratedWord {
 		}
 		if t := strings.TrimSpace(w.Ru); t != "" {
 			word.Translations["ru"] = t
+			if r := strings.TrimSpace(w.RuPronunciation); r != "" {
+				word.Translations["ru_pron"] = r
+			}
 		}
 		// In level order, so a level that shares the one below finds it already written.
 		prev := ""

@@ -47,7 +47,7 @@ interface Word {
   pronunciation_ipa: string;
   level: CEFRLevel | null;
   tags: string[];
-  translations: { uz?: string; ru?: string };
+  translations: { uz?: string; ru?: string; ru_pron?: string };
   /** The word explained per CEFR level. */
   level_content: Partial<Record<CEFRLevel, LevelText>>;
   status: "draft" | "review" | "published" | "archived";
@@ -130,7 +130,7 @@ interface WordInput {
   /** How hard the word itself is. */
   level: CEFRLevel;
   tags: string[];
-  translations: { uz: string; ru: string };
+  translations: { uz: string; ru: string; ru_pron: string };
   level_content: Partial<Record<CEFRLevel, LevelText>>;
 }
 
@@ -260,7 +260,8 @@ export function VocabularyView() {
   const shownLevels = level === "all" ? cefrLevels : [level];
   const busy = Boolean(jobId) || generate.isPending;
 
-  const columns: Column<Word>[] = [
+  // Each level's section shows the word as it is explained for that level.
+  const columnsFor = (shownLevel: CEFRLevel): Column<Word>[] => [
     {
       key: "word",
       header: "Word",
@@ -268,6 +269,7 @@ export function VocabularyView() {
         <div className="grid gap-0.5">
           <span className="font-medium">{w.term}</span>
           <span className="text-caption text-fg-muted">
+            {w.level && w.level !== shownLevel && `${w.level} word · `}
             {w.part_of_speech}
             {w.pronunciation_ipa && ` · ${w.pronunciation_ipa}`}
           </span>
@@ -280,7 +282,7 @@ export function VocabularyView() {
       hideBelow: "md",
       cell: (w) => (
         <div className="grid max-w-md gap-0.5">
-          <span className="line-clamp-2 text-body-sm">{w.definition}</span>
+          <span className="line-clamp-2 text-body-sm">{w.level_content[shownLevel]?.definition || w.definition}</span>
           {Object.keys(w.level_content).length > 1 && (
             <span className="text-caption text-fg-muted">
               Explained for {explainedFor(w.level_content)}
@@ -288,7 +290,7 @@ export function VocabularyView() {
           )}
           {(w.translations.uz || w.translations.ru) && (
             <span className="text-caption text-fg-muted">
-              {[w.translations.uz && `uz: ${w.translations.uz}`, w.translations.ru && `ru: ${w.translations.ru}`]
+              {[w.translations.uz && `uz: ${w.translations.uz}`, w.translations.ru && `ru: ${w.translations.ru}${w.translations.ru_pron ? ` [${w.translations.ru_pron}]` : ""}`]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -421,7 +423,7 @@ export function VocabularyView() {
             filters={filters}
             count={summary?.by_level[code] ?? 0}
             drafts={summary?.drafts_by_level?.[code] ?? 0}
-            columns={columns}
+            columns={columnsFor(code)}
             // A single chosen level, or a search, opens straight away; otherwise the first
             // level with drafts waiting does — that is where the work is.
             defaultOpen={
@@ -643,7 +645,11 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
       pronunciation_ipa: word?.pronunciation_ipa ?? "",
       level: word?.level ?? "B1",
       tags: word?.tags ?? [],
-      translations: { uz: word?.translations.uz ?? "", ru: word?.translations.ru ?? "" },
+      translations: {
+        uz: word?.translations.uz ?? "",
+        ru: word?.translations.ru ?? "",
+        ru_pron: word?.translations.ru_pron ?? "",
+      },
       level_content: content,
     };
   });
@@ -718,7 +724,7 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
             </NativeSelect>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
             <Label htmlFor="word-uz">O&apos;zbekcha</Label>
             <Input
@@ -733,6 +739,15 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
               id="word-ru"
               value={form.translations.ru}
               onChange={(e) => set({ translations: { ...form.translations, ru: e.target.value } })}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="word-ru-pron">Русский — talaffuzi</Label>
+            <Input
+              id="word-ru-pron"
+              placeholder="dastích"
+              value={form.translations.ru_pron}
+              onChange={(e) => set({ translations: { ...form.translations, ru_pron: e.target.value } })}
             />
           </div>
           <div className="grid gap-1.5">

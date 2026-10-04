@@ -92,7 +92,7 @@ export interface LibraryWord {
   /** How hard the word itself is. */
   level: string | null;
   tags: string[];
-  translations: { uz?: string; ru?: string };
+  translations: { uz?: string; ru?: string; ru_pron?: string };
   level_content: Partial<Record<string, VocabularyLevelText>>;
   in_deck: boolean;
 }
@@ -119,7 +119,7 @@ export interface VocabularyCard {
   examples: string[];
   pronunciation_ipa: string;
   /** The word in the learner's own language. */
-  translations?: { uz?: string; ru?: string };
+  translations?: { uz?: string; ru?: string; ru_pron?: string };
   /** The word explained per CEFR level; empty for words written before levels existed. */
   level_content?: Partial<Record<string, VocabularyLevelText>>;
   level: string | null;
