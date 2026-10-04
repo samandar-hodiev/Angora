@@ -7,6 +7,8 @@ import {
   Eye,
   Languages,
   ListChecks,
+  Mic,
+  PenLine,
   Pencil,
   Plus,
   RefreshCw,
@@ -40,18 +42,22 @@ import {
   usePublishGrammarContent,
   useRefineGrammarLevel,
   useSaveGrammarLevel,
+  useSaveGrammarTask,
   useTranslateGrammarLevel,
 } from "../hooks";
 import { formatDate } from "../lib/format";
-import { cefrLevels, contentLanguageLabels, contentLanguages } from "../types";
+import { cefrLevels, contentLanguageLabels, contentLanguages, generateParts } from "../types";
 import type {
   CEFRLevel,
   ContentLanguage,
+  GeneratePart,
   GrammarBody,
   LevelContent,
   LevelStatus,
   PracticeKind,
   PracticeQuestion,
+  PracticeTask,
+  PracticeTaskKind,
   ProposedLevel,
   RefineAction,
 } from "../types";
@@ -94,7 +100,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   /** What was just asked for, shown as being written before the server has said "queued". */
-  const [requested, setRequested] = useState<{ levels: CEFRLevel[]; languages: ContentLanguage[] } | null>(null);
+  const [requested, setRequested] = useState<Writing>(null);
 
   const content = useGrammarContent(slug, language);
   const validation = useGrammarValidation(slug, language);
@@ -106,16 +112,20 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
       // "uz:B1" a translation that did not come back. Each has its own fix.
       const tests = failed.filter((f) => f.startsWith("test:")).map((f) => f.slice(5));
       const empty = failed.filter((f) => f.startsWith("en:")).map((f) => f.slice(3));
-      const translations = failed.filter((f) => !f.startsWith("test:") && !f.startsWith("en:"));
+      const tasks = failed.filter((f) => f.startsWith("writing:") || f.startsWith("speaking:"));
+      const translations = failed.filter(
+        (f) => !f.startsWith("test:") && !f.startsWith("en:") && !f.startsWith("writing:") && !f.startsWith("speaking:"),
+      );
       const notes = [
         empty.length > 0 && `${empty.join(", ")} came back empty — generate ${empty.length === 1 ? "it" : "them"} again.`,
         translations.length > 0 &&
           `Some translations did not come back (${translations.join(", ")}) — use "Translate from English" there.`,
         tests.length > 0 && `The test for ${tests.join(", ")} could not be written — use "Generate more" on the Test tab.`,
+        tasks.length > 0 && `Some tasks could not be written (${tasks.join(", ")}) — use "Regenerate" on their tab.`,
       ].filter(Boolean);
       toast({
         title: "Draft written",
-        description: notes.length > 0 ? notes.join(" ") : "Every language and its test is a draft now. Read it before publishing.",
+        description: notes.length > 0 ? notes.join(" ") : "Everything you asked for is a draft now. Read it before publishing.",
         variant: notes.length > 0 ? "default" : "success",
       });
     },
@@ -124,7 +134,11 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   });
   /** Levels and languages the model is writing right now; their fields show placeholders. */
   const writing = generation.active
-    ? { levels: generation.active.levels as CEFRLevel[], languages: generation.active.languages }
+    ? {
+        levels: generation.active.levels as CEFRLevel[],
+        languages: generation.active.languages,
+        parts: generation.active.parts,
+      }
     : generation.start.isPending
       ? requested
       : null;
@@ -156,14 +170,14 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const written = data.levels.filter((entry) => entry.status !== "not_created" && entry.status !== "not_applicable");
   const live = data.levels.filter((entry) => entry.status === "published");
 
-  function runGenerate(levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[]) {
+  function runGenerate(levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[], parts: GeneratePart[]) {
     // The dialog closes at once: the editor itself shows what is being written, field by
     // field, rather than a spinner in a modal that blocks the page for minutes.
     setDialogOpen(false);
-    setRequested({ levels, languages });
+    setRequested({ levels, languages, parts });
     if (!levels.includes(level)) setLevel(levels[0]!);
     generation.start.mutate(
-      { languages, levels, overwrite },
+      { languages, levels, overwrite, parts },
       {
         onError: (error) => {
           // A refusal to overwrite hand-written work is not a failure; it is the guard
@@ -313,6 +327,16 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
               {current.questions?.length ?? 0}
             </span>
           </TabsTrigger>
+          <TabsTrigger value="writing" className={activeTab}>
+            <PenLine className="size-4" aria-hidden />
+            Writing
+            {taskOf(current, "writing")?.status === "draft" && <span className="size-1.5 rounded-full bg-warning" aria-label="draft" />}
+          </TabsTrigger>
+          <TabsTrigger value="speaking" className={activeTab}>
+            <Mic className="size-4" aria-hidden />
+            Speaking
+            {taskOf(current, "speaking")?.status === "draft" && <span className="size-1.5 rounded-full bg-warning" aria-label="draft" />}
+          </TabsTrigger>
           <TabsTrigger value="preview" className={activeTab}>
             <Eye className="size-4" aria-hidden />
             Preview
@@ -320,7 +344,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         </TabsList>
 
         <TabsContent value="editor">
-          {isWriting(writing, current.level, language) ? (
+          {isWriting(writing, current.level, language, "explanation") ? (
             <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
             <LevelEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
@@ -328,15 +352,32 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         </TabsContent>
 
         <TabsContent value="test">
-          {isWriting(writing, current.level, language) ? (
+          {isWriting(writing, current.level, language, "test") ? (
             <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
             <TestEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
           )}
         </TabsContent>
 
+        {(["writing", "speaking"] as const).map((kind) => (
+          <TabsContent key={kind} value={kind}>
+            {isWriting(writing, current.level, language, kind) ? (
+              <WritingPlaceholder level={current.level} languages={["en"]} startedAt={generation.active?.started_at} />
+            ) : (
+              <TaskEditor
+                key={`${kind}-${current.level}-${taskKey(current, kind)}`}
+                slug={slug}
+                kind={kind}
+                content={current}
+                busy={generation.generating}
+                onRegenerate={() => runGenerate([current.level], false, ["en"], [kind])}
+              />
+            )}
+          </TabsContent>
+        ))}
+
         <TabsContent value="preview">
-          {isWriting(writing, current.level, language) ? (
+          {isWriting(writing, current.level, language, "explanation") ? (
             <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
             <LearnerPreview topic={data.topic.name} level={current.level} language={language} content={current} />
@@ -1319,6 +1360,230 @@ function PracticeEditor({
   );
 }
 
+const taskOf = (content: LevelContent, kind: PracticeTaskKind) => content.tasks?.find((t) => t.kind === kind);
+
+/** Changes when the stored task does, so the editor below reloads it after a save or a generate. */
+const taskKey = (content: LevelContent, kind: PracticeTaskKind) => {
+  const t = taskOf(content, kind);
+  return t ? `${t.status}-${t.title}-${t.prompt.length}` : "none";
+};
+
+const taskCopy: Record<PracticeTaskKind, { title: string; empty: string; listLabel: string; listPlaceholder: string }> = {
+  writing: {
+    title: "Writing task",
+    empty: "No writing task at this level yet.",
+    listLabel: "What to include",
+    listPlaceholder: "Use a or an before each new thing you mention.",
+  },
+  speaking: {
+    title: "Speaking task",
+    empty: "No speaking task at this level yet.",
+    listLabel: "Points to talk about",
+    listPlaceholder: "Say where it is and what it is like.",
+  },
+};
+
+/**
+ * A level's writing or speaking task, on its own tab.
+ *
+ * The learner who finishes the topic at this level is sent to write — or to speak — with
+ * it, and this is the task they get. It is written with the topic, for the level, and goes
+ * live when the topic is published. English only: it is what the learner does, not text
+ * they read in their own language, so it is the same in every language tab.
+ */
+function TaskEditor({
+  slug,
+  kind,
+  content,
+  busy,
+  onRegenerate,
+}: {
+  slug: string;
+  kind: PracticeTaskKind;
+  content: LevelContent;
+  busy: boolean;
+  onRegenerate: () => void;
+}) {
+  const save = useSaveGrammarTask(slug);
+  const stored = taskOf(content, kind);
+  const copy = taskCopy[kind];
+  const [task, setTask] = useState<PracticeTask | null>(stored ?? null);
+  const update = (patch: Partial<PracticeTask>) => setTask((t) => (t ? { ...t, ...patch } : t));
+
+  if (content.status === "not_applicable") {
+    return (
+      <SectionCard title={`${content.level} ${copy.title.toLowerCase()}`} description="This level is marked not applicable">
+        <p className="text-body-sm text-fg-secondary">A level that is not taught has no {kind} task.</p>
+      </SectionCard>
+    );
+  }
+
+  if (!task) {
+    return (
+      <SectionCard
+        title={`${content.level} ${copy.title.toLowerCase()}`}
+        description="Nothing written yet"
+        action={
+          <span className="flex flex-wrap gap-1">
+            <Button variant="ghost" size="sm" disabled={busy} onClick={onRegenerate}>
+              <Sparkles aria-hidden /> Generate for {content.level}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setTask({
+                  kind, level: content.level, title: "", prompt: "", instructions: [""],
+                  min_words: kind === "writing" ? 80 : 0, target_seconds: kind === "speaking" ? 60 : 0,
+                  minutes: kind === "writing" ? 15 : 2, focus: "", status: "draft", source: "curated", live: false,
+                })
+              }
+            >
+              <Plus aria-hidden /> Write it yourself
+            </Button>
+          </span>
+        }
+      >
+        <p className="text-body-sm text-fg-secondary">{copy.empty}</p>
+      </SectionCard>
+    );
+  }
+
+  const problem = !task.title.trim() ? "Give it a title." : task.prompt.trim().length < 5 ? "Write the task itself." : null;
+
+  function persist() {
+    if (!task || problem) {
+      toast({ title: problem ?? "Nothing to save", variant: "error" });
+      return;
+    }
+    save.mutate(
+      {
+        level: content.level,
+        kind,
+        input: {
+          title: task.title, prompt: task.prompt, instructions: task.instructions.filter((i) => i.trim()),
+          min_words: task.min_words, target_seconds: task.target_seconds, minutes: task.minutes, focus: task.focus,
+        },
+      },
+      {
+        onSuccess: () => toast({ title: `${copy.title} saved as a draft`, description: "Learners get it when you publish.", variant: "success" }),
+        onError: (error) =>
+          toast({ title: "It could not be saved", description: isApiError(error) ? error.message : undefined, variant: "error" }),
+      },
+    );
+  }
+
+  const state =
+    task.status === "published" ? "live" : `draft${task.live ? " · a live version is behind it" : ""}`;
+  return (
+    <SectionCard
+      title={`${content.level} ${copy.title.toLowerCase()}`}
+      description={`English · ${state} · ${task.source === "ai" ? "written by AI, unreviewed" : "edited by hand"}`}
+      action={
+        <span className="flex flex-wrap items-center gap-1">
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onRegenerate}>
+            <RefreshCw aria-hidden /> Regenerate
+          </Button>
+          <Button size="sm" loading={save.isPending} onClick={persist}>
+            Save task
+          </Button>
+        </span>
+      }
+    >
+      <div className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor={`${kind}-title`}>Title</Label>
+          <Input id={`${kind}-title`} value={task.title} onChange={(e) => update({ title: e.target.value })} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor={`${kind}-prompt`}>Task — what the learner reads</Label>
+          <Textarea id={`${kind}-prompt`} rows={3} value={task.prompt} onChange={(e) => update({ prompt: e.target.value })} />
+        </div>
+        <fieldset className="grid gap-1.5">
+          <legend className="mb-1 text-label">{copy.listLabel}</legend>
+          {task.instructions.map((line, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-5 text-caption text-fg-muted tabular-nums">{i + 1}</span>
+              <Input
+                aria-label={`${copy.listLabel} ${i + 1}`}
+                value={line}
+                placeholder={copy.listPlaceholder}
+                onChange={(e) => update({ instructions: task.instructions.map((x, j) => (j === i ? e.target.value : x)) })}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove line ${i + 1}`}
+                onClick={() => update({ instructions: task.instructions.filter((_, j) => j !== i) })}
+              >
+                <X aria-hidden />
+              </Button>
+            </div>
+          ))}
+          {task.instructions.length < 8 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-self-start"
+              onClick={() => update({ instructions: [...task.instructions, ""] })}
+            >
+              <Plus aria-hidden /> Add a line
+            </Button>
+          )}
+        </fieldset>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {kind === "writing" ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="task-words">Minimum words</Label>
+              <Input
+                id="task-words"
+                type="number"
+                min={0}
+                max={1000}
+                value={task.min_words}
+                onChange={(e) => update({ min_words: Number(e.target.value) || 0 })}
+              />
+            </div>
+          ) : (
+            <div className="grid gap-1.5">
+              <Label htmlFor="task-seconds">Speak for (seconds)</Label>
+              <Input
+                id="task-seconds"
+                type="number"
+                min={0}
+                max={600}
+                value={task.target_seconds}
+                onChange={(e) => update({ target_seconds: Number(e.target.value) || 0 })}
+              />
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label htmlFor="task-minutes">Minutes</Label>
+            <Input
+              id="task-minutes"
+              type="number"
+              min={1}
+              max={120}
+              value={task.minutes}
+              onChange={(e) => update({ minutes: Math.max(1, Number(e.target.value) || 1) })}
+            />
+          </div>
+          <div className="grid gap-1.5 sm:col-span-1">
+            <Label htmlFor="task-focus">Grammar focus</Label>
+            <Input
+              id="task-focus"
+              value={task.focus}
+              placeholder="This task practises a / an."
+              onChange={(e) => update({ focus: e.target.value })}
+            />
+          </div>
+        </div>
+        {problem && <p className="text-caption text-error">{problem}</p>}
+      </div>
+    </SectionCard>
+  );
+}
+
 /**
  * Rewriting this level from another one.
  *
@@ -1806,26 +2071,33 @@ function GenerateDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   levels: LevelContent[];
-  onGenerate: (levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[]) => void;
+  onGenerate: (levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[], parts: GeneratePart[]) => void;
 }) {
   const untouched = levels.filter((level) => level.status === "not_created").map((level) => level.level);
   const [selected, setSelected] = useState<CEFRLevel[]>(untouched.length > 0 ? untouched : cefrLevels);
   const [languages, setLanguages] = useState<ContentLanguage[]>([...contentLanguages]);
+  const [parts, setParts] = useState<GeneratePart[]>([...generateParts]);
   const [overwrite, setOverwrite] = useState(false);
 
-  const replacing = levels.filter(
-    (level) => selected.includes(level.level) && level.source === "curated" && level.status !== "not_created",
-  );
+  const explaining = parts.includes("explanation");
+  const togglePart = (part: GeneratePart) =>
+    setParts(parts.includes(part) ? parts.filter((p) => p !== part) : [...parts, part]);
+  // Only a new explanation replaces hand-written text; a test or a task on its own does not.
+  const replacing = explaining
+    ? levels.filter(
+        (level) => selected.includes(level.level) && level.source === "curated" && level.status !== "not_created",
+      )
+    : [];
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Generate with AI"
-      description="English is written first and translated into the other languages you pick, so every language teaches the same thing. Everything lands as a draft for you to read."
+      description="Pick the levels, then what to write for each of them. Every part is written for the level it belongs to, and everything lands as a draft for you to read."
       confirmLabel={replacing.length > 0 && overwrite ? "Replace" : "Generate"}
-      disabled={selected.length === 0 || (replacing.length > 0 && !overwrite)}
-      onConfirm={() => onGenerate(selected, overwrite, languages)}
+      disabled={selected.length === 0 || parts.length === 0 || (replacing.length > 0 && !overwrite)}
+      onConfirm={() => onGenerate(selected, overwrite, languages, parts)}
     >
       <div className="grid gap-4">
         <div className="grid gap-1.5">
@@ -1849,25 +2121,60 @@ function GenerateDialog({
           </p>
         </div>
 
-        <div className="grid gap-1.5">
-          <p className="text-label text-fg-muted">Languages</p>
-          <div className="flex flex-wrap gap-1.5">
-            {contentLanguages.map((code) => (
-              <ToggleChip
-                key={code}
-                pressed={languages.includes(code)}
-                // English is the source the others are translated from.
-                disabled={code === "en"}
-                onToggle={() =>
-                  setLanguages(
-                    languages.includes(code) ? languages.filter((item) => item !== code) : [...languages, code],
-                  )
-                }
-              >
-                {contentLanguageLabels[code]}
-              </ToggleChip>
-            ))}
+        <div className="grid gap-2">
+          <PartRow
+            index={1}
+            checked={explaining}
+            onToggle={() => togglePart("explanation")}
+            title="Adaptive explanation"
+            description="A different explanation for each level — simpler at A1, fuller at C1."
+          />
+          <div className={cn("grid gap-1.5 pl-9", !explaining && "opacity-50")}>
+            <p className="flex items-baseline gap-2 text-label text-fg-muted">
+              <span className="tabular-nums">2.</span> Languages
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {contentLanguages.map((code) => (
+                <ToggleChip
+                  key={code}
+                  pressed={languages.includes(code)}
+                  // English is the source the others are translated from.
+                  disabled={code === "en" || !explaining}
+                  onToggle={() =>
+                    setLanguages(
+                      languages.includes(code) ? languages.filter((item) => item !== code) : [...languages, code],
+                    )
+                  }
+                >
+                  {contentLanguageLabels[code]}
+                </ToggleChip>
+              ))}
+            </div>
+            <p className="text-caption text-fg-muted">
+              English is written first and translated, so every language teaches the same thing.
+            </p>
           </div>
+          <PartRow
+            index={3}
+            checked={parts.includes("test")}
+            onToggle={() => togglePart("test")}
+            title="Test — 15 questions per level"
+            description="Multiple choice and typed answers, written for each level and checked before you see them."
+          />
+          <PartRow
+            index={4}
+            checked={parts.includes("writing")}
+            onToggle={() => togglePart("writing")}
+            title="Writing task per level"
+            description="Something to write that needs this grammar — longer and harder as the level goes up."
+          />
+          <PartRow
+            index={5}
+            checked={parts.includes("speaking")}
+            onToggle={() => togglePart("speaking")}
+            title="Speaking task per level"
+            description="Something to talk about that needs this grammar — from under a minute at A1 to two at C2."
+          />
         </div>
 
         {replacing.length > 0 && (
@@ -1888,6 +2195,39 @@ function GenerateDialog({
         )}
       </div>
     </ConfirmDialog>
+  );
+}
+
+/** One part of a generation: a numbered row with a checkbox, ticked by default. */
+function PartRow({
+  index,
+  checked,
+  onToggle,
+  title,
+  description,
+}: {
+  index: number;
+  checked: boolean;
+  onToggle: () => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors duration-micro",
+        checked ? "border-primary/50 bg-primary-subtle/40" : "hover:bg-surface-hover",
+      )}
+    >
+      <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1 size-4 accent-[var(--primary)]" />
+      <span className="grid gap-0.5">
+        <span className="text-body-sm font-medium">
+          <span className="mr-1.5 tabular-nums text-fg-muted">{index}.</span>
+          {title}
+        </span>
+        <span className="text-caption text-fg-muted">{description}</span>
+      </span>
+    </label>
   );
 }
 
@@ -1918,10 +2258,20 @@ function ToggleChip({
   );
 }
 
-type Writing = { levels: CEFRLevel[]; languages: ContentLanguage[] } | null;
+type Writing = { levels: CEFRLevel[]; languages: ContentLanguage[]; parts?: GeneratePart[] } | null;
 
-function isWriting(writing: Writing, level: string, language: ContentLanguage) {
-  return Boolean(writing && writing.levels.includes(level as CEFRLevel) && writing.languages.includes(language));
+/**
+ * Whether the model is writing this level right now — in this language, or, given a part,
+ * that part of it. The test and the tasks are shared by every language, so for them the
+ * language does not matter.
+ */
+function isWriting(writing: Writing, level: string, language: ContentLanguage, part?: GeneratePart) {
+  if (!writing || !writing.levels.includes(level as CEFRLevel)) return false;
+  const parts = writing.parts && writing.parts.length > 0 ? writing.parts : generateParts;
+  if (part && !parts.includes(part)) return false;
+  if (part && part !== "explanation") return true;
+  if (!part && !parts.includes("explanation")) return true;
+  return writing.languages.includes(language);
 }
 
 function WritingBadge({ compact = false }: { compact?: boolean }) {

@@ -1262,13 +1262,41 @@ export interface LevelContent {
   updated_at: ISODate | null;
   /** The live version a learner is reading, when this draft is not it. */
   published_version: number | null;
+  /** The level's writing and speaking tasks: the draft when there is one, else the live one. */
+  tasks?: PracticeTask[];
 }
+
+export type PracticeTaskKind = "writing" | "speaking";
+
+/** A level's writing or speaking task. English only: it is what the learner does, not reads. */
+export interface PracticeTask {
+  kind: PracticeTaskKind;
+  level: CEFRLevel;
+  title: string;
+  prompt: string;
+  /** writing: what to include; speaking: the points to talk about. */
+  instructions: string[];
+  min_words: number;
+  target_seconds: number;
+  minutes: number;
+  focus: string;
+  status: "draft" | "published";
+  source: "ai" | "curated";
+  /** A live version exists behind this draft. */
+  live: boolean;
+}
+
+/** What one Generate writes. */
+export type GeneratePart = "explanation" | "test" | "writing" | "speaking";
+export const generateParts: GeneratePart[] = ["explanation", "test", "writing", "speaking"];
 
 export interface GenerateInput {
   /** Every language to end up with; English is written first and the rest translated from it. */
   languages: ContentLanguage[];
   levels: string[];
   overwrite?: boolean;
+  /** Empty or absent means every part. */
+  parts?: GeneratePart[];
 }
 
 /** A queued generation: poll the job until it finishes, then read the content again. */
@@ -1276,6 +1304,7 @@ export interface GenerationStarted {
   job_id: string;
   languages: ContentLanguage[];
   levels: string[];
+  parts?: GeneratePart[];
   /** Set by the client when it queued the job, so a job that never finishes can be given up on. */
   started_at?: number;
 }

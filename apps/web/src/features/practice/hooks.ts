@@ -67,6 +67,16 @@ export function useSubmitWriting() {
   });
 }
 
+/** The speaking task for a grammar topic; idle when there is no topic. */
+export function useTopicSpeakingTask(topic: string | undefined) {
+  return useQuery({
+    queryKey: ["practice", "speaking-topic-task", topic ?? ""],
+    queryFn: () => speakingApi.topicTask(topic!),
+    enabled: Boolean(topic),
+    staleTime: Infinity,
+  });
+}
+
 export function useSpeakingTasks() {
   return useQuery({ queryKey: queryKeys.practice.speakingTasks, queryFn: speakingApi.tasks });
 }

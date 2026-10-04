@@ -14,6 +14,8 @@ import { apiClient } from "@/lib/api";
 import type {
   ContentLanguage,
   ContentTaxonomy,
+  PracticeTask,
+  PracticeTaskKind,
   ContentVersionDetail,
   ContentVersionRow,
   MapCategory,
@@ -411,6 +413,8 @@ export const grammarMapApi = {
   job: (id: string) => apiClient.get<JobState>(`/jobs/${id}`),
   saveLevel: (slug: string, level: string, input: Record<string, unknown>) =>
     apiClient.put<TopicContent>(`/admin/grammar/topics/${slug}/levels/${level}`, input),
+  saveTask: (slug: string, level: string, kind: PracticeTaskKind, input: Record<string, unknown>) =>
+    apiClient.put<PracticeTask>(`/admin/grammar/topics/${slug}/levels/${level}/tasks/${kind}`, input),
   publish: (slug: string, input: { language?: string; languages?: string[]; levels?: string[] }) =>
     apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/publish`, input),
   // Neither of these saves anything: they answer with a proposal the editor keeps or drops.

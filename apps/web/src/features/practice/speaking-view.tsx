@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Mic, Radio } from "lucide-react";
+import { Clock, Mic, Radio, Target } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -16,10 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePlatformFeature } from "@/features/platform/hooks";
 import { isApiError } from "@/lib/api";
 
-import { useSpeakingSessions, useSpeakingTasks, useSubmitSpeaking } from "./hooks";
+import { useSpeakingSessions, useSpeakingTasks, useSubmitSpeaking, useTopicSpeakingTask } from "./hooks";
 import type { SpeakingFeedback } from "./api";
 
 const MAX_DURATION_MS = 120_000;
+/** The select's value for the task written for a grammar topic, which has no id. */
+const TOPIC_KEY = "topic";
 
 function LiveCoachLink() {
   return (
@@ -38,8 +40,12 @@ function LiveCoachLink() {
  * Record, send, read the report. The transcript comes back with it, because the most useful
  * thing after speaking is seeing what you actually said — and because it shows the learner
  * what the feedback was judging.
+ *
+ * Arriving from a grammar topic ("Use it in real English → Speaking"), the task is the one
+ * the topic was published with at the learner's level, and the report is told to judge that
+ * grammar first — the speaking twin of the writing page.
  */
-export function SpeakingView({ initialContentId }: { initialContentId?: string }) {
+export function SpeakingView({ initialContentId, grammarTopic }: { initialContentId?: string; grammarTopic?: string }) {
   // The owner's switch for whether the product offers live coaching at all. Whether *this*
   // learner may use it is a plan question, and the live page asks it separately.
   const liveCoach = usePlatformFeature("realtime_speaking_coach");
@@ -47,12 +53,35 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
   const history = useSpeakingSessions();
   const submit = useSubmitSpeaking();
 
-  const [taskId, setTaskId] = useState(initialContentId);
+  const topicTask = useTopicSpeakingTask(grammarTopic);
+  const [taskId, setTaskId] = useState(initialContentId ?? (grammarTopic ? TOPIC_KEY : undefined));
   const items = tasks.data?.items ?? [];
-  const task = items.find((item) => item.id === taskId) ?? items[0];
+  const onTopic = taskId === TOPIC_KEY && topicTask.data ? topicTask.data : null;
+  const library = items.find((item) => item.id === taskId) ?? items[0];
+  // One shape for both: a library task or the topic's own.
+  const task = onTopic
+    ? {
+        id: undefined,
+        level: onTopic.level,
+        title: onTopic.title,
+        prompt: onTopic.prompt,
+        instructions: onTopic.points,
+        seconds: onTopic.target_seconds,
+      }
+    : library
+      ? {
+          id: library.id,
+          level: library.level,
+          title: library.title,
+          prompt: library.body.prompt,
+          instructions: library.body.instructions ?? [],
+          seconds: 0,
+        }
+      : null;
   const session = submit.data;
 
-  if (tasks.isPending) {
+  // The topic task is what the learner came for: wait for it rather than flashing the library.
+  if (tasks.isPending || (grammarTopic && topicTask.isPending)) {
     return (
       <>
         <PageHeader pinned={false} compact title="Speaking practice" description="Record an answer and get feedback on how you said it." />
@@ -73,7 +102,7 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
     );
   }
 
-  if (items.length === 0) {
+  if (!task) {
     return (
       <>
         <PageHeader pinned={false} compact title="Speaking practice" description="Record an answer and get feedback on how you said it." />
@@ -92,17 +121,22 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">
         <div className="grid gap-4">
-          {items.length > 1 && (
+          {items.length + (topicTask.data ? 1 : 0) > 1 && (
             <div className="grid max-w-md gap-2">
               <Label htmlFor="speaking-task">Task</Label>
               <NativeSelect
                 id="speaking-task"
-                value={task?.id}
+                value={onTopic ? TOPIC_KEY : task.id}
                 onChange={(event) => {
                   setTaskId(event.target.value);
                   submit.reset();
                 }}
               >
+                {topicTask.data && (
+                  <option value={TOPIC_KEY}>
+                    For {topicTask.data.topic.name} · {topicTask.data.title}
+                  </option>
+                )}
                 {items.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.level ? `${item.level} · ` : ""}
@@ -115,22 +149,36 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
 
           <article className="grid gap-4 rounded-xl border bg-surface p-6">
             <div className="flex flex-wrap gap-2">
-              {task?.level && <Badge variant="secondary">{task.level}</Badge>}
+              {onTopic && (
+                <Badge>
+                  <Target aria-hidden /> Practising {onTopic.topic.name}
+                </Badge>
+              )}
+              {task.level && <Badge variant="secondary">{task.level}</Badge>}
               <Badge variant="outline">
-                <Clock aria-hidden /> up to {MAX_DURATION_MS / 60_000} min
+                <Clock aria-hidden />{" "}
+                {task.seconds > 0 ? `about ${Math.round(task.seconds / 15) * 15} seconds` : `up to ${MAX_DURATION_MS / 60_000} min`}
               </Badge>
             </div>
-            <h2 className="text-h3">{task?.title}</h2>
-            {task?.body.prompt && <p className="text-body">{task.body.prompt}</p>}
-            {task?.body.instructions && task.body.instructions.length > 0 && (
+            <h2 className="text-h3">{task.title}</h2>
+            {task.prompt && <p className="text-body">{task.prompt}</p>}
+            {task.instructions.length > 0 && (
               <ul className="grid gap-1.5">
-                {task.body.instructions.map((instruction) => (
+                {task.instructions.map((instruction) => (
                   <li key={instruction} className="flex items-start gap-2 text-body-sm text-fg-secondary">
                     <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
                     {instruction}
                   </li>
                 ))}
               </ul>
+            )}
+            {onTopic && (
+              <p className="rounded-lg border border-primary/30 bg-primary-subtle/40 px-3 py-2 text-caption">
+                {onTopic.focus || `This task practises ${onTopic.topic.name}.`} The report looks at it first.{" "}
+                <Link href={`/app/grammar/${onTopic.topic.slug}`} className="font-medium text-primary hover:underline">
+                  Back to the topic
+                </Link>
+              </p>
             )}
           </article>
 
@@ -145,7 +193,9 @@ export function SpeakingView({ initialContentId }: { initialContentId?: string }
                       blob: recording.blob,
                       mimeType: recording.mimeType,
                       durationMs: recording.durationMs,
-                      taskId: task?.id,
+                      taskId: task.id,
+                      prompt: onTopic ? onTopic.prompt : undefined,
+                      grammarTopic: onTopic ? onTopic.topic.slug : undefined,
                     })
                   }
                 >

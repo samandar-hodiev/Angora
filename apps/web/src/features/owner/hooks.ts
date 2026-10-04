@@ -19,6 +19,7 @@ import type {
   GenerateInput,
   GenerationStarted,
   JobState,
+  PracticeTaskKind,
   QuestionInput,
   QuestionQuery,
   QuestionStatus,
@@ -616,6 +617,19 @@ export function useSaveGrammarLevel(slug: string) {
     onSuccess: (content) => {
       client.setQueryData(queryKeys.owner.grammarContent(slug, content.language), content);
       client.invalidateQueries({ queryKey: queryKeys.owner.grammarValidation(slug, content.language) });
+    },
+  });
+}
+
+export function useSaveGrammarTask(slug: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ level, kind, input }: { level: string; kind: PracticeTaskKind; input: Record<string, unknown> }) =>
+      assessmentApi.grammarMapApi.saveTask(slug, level, kind, input),
+    onSuccess: () => {
+      // Tasks are shared by every language, so every open language's copy is out of date.
+      void client.invalidateQueries({ queryKey: ["owner", "grammar-content", slug] });
+      void client.invalidateQueries({ queryKey: ["owner", "grammar-map"] });
     },
   });
 }

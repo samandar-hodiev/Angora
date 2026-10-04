@@ -102,6 +102,19 @@ export interface TopicWritingTask {
   focus: string;
 }
 
+/** A speaking task for the grammar topic a learner has just studied. Not library content: no id. */
+export interface TopicSpeakingTask {
+  topic: { slug: string; name: string };
+  level: string;
+  title: string;
+  prompt: string;
+  /** The things to talk about, in order. */
+  points: string[];
+  target_seconds: number;
+  /** What the task practises, in one sentence. */
+  focus: string;
+}
+
 export interface WritingFeedback {
   task_response: number;
   grammar: number;
@@ -164,14 +177,25 @@ export interface SpeakingSession {
 export const speakingApi = {
   tasks: () => apiClient.getPage<WritingTask>("/speaking/tasks", { query: { page_size: 50 } }),
   sessions: () => apiClient.getPage<SpeakingSession>("/speaking/sessions", { query: { page_size: 20 } }),
+  topicTask: (topic: string) => apiClient.get<TopicSpeakingTask>("/speaking/topic-task", { query: { topic } }),
   /** The recording goes up as multipart; the report comes back when all three stages finish. */
-  submit: (input: { blob: Blob; mimeType: string; durationMs: number; taskId?: string }) => {
+  submit: (input: {
+    blob: Blob;
+    mimeType: string;
+    durationMs: number;
+    taskId?: string;
+    /** A topic task has no id: it carries its prompt and topic instead. */
+    prompt?: string;
+    grammarTopic?: string;
+  }) => {
     const form = new FormData();
     // The filename's extension matters: the server checks the declared type against the bytes.
     const extension = input.mimeType.includes("ogg") ? "ogg" : input.mimeType.includes("mp4") ? "m4a" : "webm";
     form.append("audio", new File([input.blob], `answer.${extension}`, { type: input.mimeType }));
     form.append("duration_ms", String(Math.round(input.durationMs)));
     if (input.taskId) form.append("task_id", input.taskId);
+    if (input.prompt) form.append("prompt", input.prompt);
+    if (input.grammarTopic) form.append("grammar_topic", input.grammarTopic);
     return apiClient.postForm<SpeakingSession>("/speaking/sessions", form);
   },
 };
