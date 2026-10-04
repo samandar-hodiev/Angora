@@ -182,6 +182,25 @@ function explanationAt(content: LibraryWord["level_content"], level: string): { 
 }
 
 /**
+ * The levels in order, with neighbours that share one explanation folded into a single
+ * group — "A1–B1" — so the same text is not shown three times. Levels without one are
+ * their own empty group.
+ */
+function levelGroups(content: LibraryWord["level_content"]): { codes: string[]; text?: VocabularyLevelText }[] {
+  const groups: { codes: string[]; text?: VocabularyLevelText; root?: string }[] = [];
+  for (const code of LEVELS) {
+    const text = content[code];
+    const last = groups[groups.length - 1];
+    if (text?.same_as && last?.text && (last.root === text.same_as || last.codes[0] === text.same_as)) {
+      last.codes.push(code);
+      continue;
+    }
+    groups.push({ codes: [code], text: text?.definition ? text : undefined, root: code });
+  }
+  return groups;
+}
+
+/**
  * One word, one line: the word, its meaning in the learner's language, and its explanation
  * at their level. Opened, the same row shows the word explained at every level side by side.
  */
@@ -242,9 +261,9 @@ function WordRow({ word, level, open, onToggle }: { word: LibraryWord; level: st
           </p>
           <div className="-mx-1 overflow-x-auto px-1 pb-1">
             <div className="grid min-w-max grid-flow-col auto-cols-[minmax(13rem,1fr)] gap-2">
-              {LEVELS.map((code) => {
-                const text = word.level_content[code];
-                const mine = code === level;
+              {levelGroups(word.level_content).map(({ codes, text }) => {
+                const code = codes.length > 1 ? `${codes[0]}–${codes[codes.length - 1]}` : codes[0]!;
+                const mine = codes.includes(level);
                 return (
                   <div
                     key={code}

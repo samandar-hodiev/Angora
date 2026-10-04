@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { apiClient, isApiError } from "@/lib/api";
@@ -58,6 +59,21 @@ interface Word {
 interface LevelText {
   definition: string;
   examples: string[];
+  /** The lower level whose explanation this one shares. */
+  same_as?: string;
+}
+
+/** "A1–B1 · C1 · C2": the levels a word is explained for, shared explanations folded together. */
+function explainedFor(content: Partial<Record<CEFRLevel, LevelText>>): string {
+  const groups: string[][] = [];
+  for (const code of cefrLevels) {
+    const text = content[code];
+    if (!text?.definition) continue;
+    const last = groups[groups.length - 1];
+    if (text.same_as && last && last[0] === text.same_as) last.push(code);
+    else groups.push([code]);
+  }
+  return groups.map((g) => (g.length > 1 ? `${g[0]}–${g[g.length - 1]}` : g[0])).join(" · ");
 }
 
 interface VocabularyPage {
@@ -118,17 +134,30 @@ interface WordInput {
   level_content: Partial<Record<CEFRLevel, LevelText>>;
 }
 
-function readJob(): string | null {
+/** A generation in progress: enough to show how far it has got after a reload. */
+interface RunningJob {
+  id: string;
+  /** Words in the library when it started; the new ones are everything above this. */
+  startTotal: number;
+  count: number;
+  levels: string[];
+  startedAt: number;
+}
+
+function readJob(): RunningJob | null {
   try {
-    return window.localStorage.getItem(JOB_KEY);
+    const raw = window.localStorage.getItem(JOB_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RunningJob;
+    return parsed && typeof parsed.id === "string" ? parsed : null;
   } catch {
     return null;
   }
 }
 
-function writeJob(id: string | null) {
+function writeJob(job: RunningJob | null) {
   try {
-    if (id) window.localStorage.setItem(JOB_KEY, id);
+    if (job) window.localStorage.setItem(JOB_KEY, JSON.stringify(job));
     else window.localStorage.removeItem(JOB_KEY);
   } catch {
     /* private mode: a reload simply forgets the running job */
@@ -142,12 +171,13 @@ export function VocabularyView() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [editing, setEditing] = useState<Word | "new" | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [running, setRunning] = useState<RunningJob | null>(null);
+  const jobId = running?.id ?? null;
 
   // A generation keeps running if the page is left; coming back picks it up again.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setJobId(readJob());
+    setRunning(readJob());
   }, []);
 
   // The library at a glance: the counts the header, the tiles and each level's section show.
@@ -155,6 +185,9 @@ export function VocabularyView() {
     queryKey: ["owner", "vocabulary", "summary"],
     queryFn: () => vocabularyApi.list({ page: 1, page_size: 1 }),
     placeholderData: (previous) => previous,
+    // While words are being written they are saved batch by batch: polling the counts is
+    // what moves the progress bar.
+    refetchInterval: () => (readJob() ? 2500 : false),
   });
   const refresh = () => void client.invalidateQueries({ queryKey: ["owner", "vocabulary"] });
 
@@ -186,16 +219,23 @@ export function VocabularyView() {
       toast({ title: "AI vocabulary generation failed", description: "Nothing was changed. Please try again.", variant: "error" });
     }
     refresh();
-    setJobId(null);
+    setRunning(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, jobStatus, job.isError]);
 
   const generate = useMutation({
     mutationFn: vocabularyApi.generate,
-    onSuccess: (started) => {
+    onSuccess: (started, input) => {
       if (started.job_id) {
-        writeJob(started.job_id);
-        setJobId(started.job_id);
+        const run: RunningJob = {
+          id: started.job_id,
+          startTotal: list.data?.data.summary.total ?? 0,
+          count: input.count,
+          levels: input.levels,
+          startedAt: Date.now(),
+        };
+        writeJob(run);
+        setRunning(run);
       } else {
         refresh();
       }
@@ -243,7 +283,7 @@ export function VocabularyView() {
           <span className="line-clamp-2 text-body-sm">{w.definition}</span>
           {Object.keys(w.level_content).length > 1 && (
             <span className="text-caption text-fg-muted">
-              Explained for {cefrLevels.filter((c) => w.level_content[c]).join(" · ")}
+              Explained for {explainedFor(w.level_content)}
             </span>
           )}
           {(w.translations.uz || w.translations.ru) && (
@@ -325,15 +365,7 @@ export function VocabularyView() {
         }
       />
 
-      {jobId && (
-        <div
-          role="status"
-          className="mb-4 flex items-center gap-3 rounded-xl border border-primary/40 bg-primary-subtle/40 px-4 py-3 text-body-sm"
-        >
-          <Sparkles className="size-4 animate-pulse text-primary" aria-hidden />
-          Writing new words for each level — they appear here as drafts when they are ready. You can leave this page.
-        </div>
-      )}
+      {running && <GeneratingPanel run={running} written={Math.max(0, (summary?.total ?? running.startTotal) - running.startTotal)} />}
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <SummaryTile label="In the library" value={summary?.total} />
@@ -528,6 +560,63 @@ function LevelSection({
   );
 }
 
+const placeholderWidths = ["w-24", "w-32", "w-20", "w-28"];
+
+/**
+ * What the page shows while a generation runs: how many of the asked-for words are written
+ * so far, and rows shimmering where the rest will land. Words are saved as each batch comes
+ * back, so the bar moves in steps of about ten.
+ */
+function GeneratingPanel({ run, written }: { run: RunningJob; written: number }) {
+  const done = Math.min(written, run.count);
+  const pct = Math.round((done / Math.max(run.count, 1)) * 100);
+  return (
+    <section
+      role="status"
+      aria-live="polite"
+      className="relative mb-4 grid gap-4 overflow-hidden rounded-xl border border-primary/40 bg-surface p-4"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
+      />
+      <div className="relative flex flex-wrap items-center gap-3">
+        <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+          <Sparkles className="size-4 animate-spin [animation-duration:2.4s]" aria-hidden />
+        </span>
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <p className="text-body font-medium">
+            Writing {run.count} new words <span className="text-fg-muted">· {done} done</span>
+          </p>
+          <p className="text-caption text-fg-muted">
+            Each one explained for {run.levels.join(" · ")}, with examples, pronunciation, Uzbek and Russian. You can leave
+            this page — it keeps going.
+          </p>
+        </div>
+        <span className="text-h4 tabular-nums text-primary">{pct}%</span>
+      </div>
+      <div className="relative h-2 overflow-hidden rounded-full bg-surface-active">
+        <div className="h-full rounded-full bg-primary transition-[width] duration-700" style={{ width: `${Math.max(pct, 4)}%` }} />
+      </div>
+      <ul aria-hidden className="relative grid gap-2">
+        {placeholderWidths.map((width, i) => (
+          <li key={i} className="flex items-center gap-3 rounded-lg border bg-surface px-3 py-2.5" style={{ animationDelay: `${i * 150}ms` }}>
+            <Skeleton className={cn("h-4 rounded", width)} />
+            <div className="flex gap-1">
+              {run.levels.map((code) => (
+                <span key={code} className="animate-pulse rounded bg-surface-active px-1 text-[0.625rem] text-fg-muted">
+                  {code}
+                </span>
+              ))}
+            </div>
+            <Skeleton className="ml-auto hidden h-3 w-1/3 rounded sm:block" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function SummaryTile({ label, value, tone }: { label: string; value?: number; tone?: "warning" | "success" }) {
   return (
     <div className="grid gap-0.5 rounded-xl border bg-surface px-4 py-3">
@@ -561,8 +650,9 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
   const [tab, setTab] = useState<CEFRLevel>(() => (word?.level && form.level_content[word.level] ? word.level : (Object.keys(form.level_content)[0] as CEFRLevel) ?? "B1"));
   const set = (patch: Partial<WordInput>) => setForm((f) => ({ ...f, ...patch }));
   const current = form.level_content[tab] ?? { definition: "", examples: [""] };
+  // Editing a level that shared another's text gives it text of its own.
   const setLevelText = (patch: Partial<LevelText>) =>
-    set({ level_content: { ...form.level_content, [tab]: { ...current, ...patch } } });
+    set({ level_content: { ...form.level_content, [tab]: { ...current, ...patch, same_as: undefined } } });
 
   const save = useMutation({
     mutationFn: () => {
@@ -678,7 +768,9 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
                   )}
                 >
                   {code}
-                  <span className={cn("text-[0.625rem] font-normal", has ? "text-success" : "text-fg-muted")}>{has ? "written" : "empty"}</span>
+                  <span className={cn("text-[0.625rem] font-normal", has ? "text-success" : "text-fg-muted")}>
+                    {form.level_content[code]?.same_as ? `= ${form.level_content[code]?.same_as}` : has ? "written" : "empty"}
+                  </span>
                 </button>
               );
             })}

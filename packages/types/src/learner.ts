@@ -107,6 +107,8 @@ export interface VocabularyLibrary {
 export interface VocabularyLevelText {
   definition: string;
   examples: string[];
+  /** The lower level whose explanation this one shares; the text is the same. */
+  same_as?: string;
 }
 
 export interface VocabularyCard {

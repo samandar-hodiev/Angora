@@ -43,6 +43,10 @@ type VocabularyRequest struct {
 type LevelText struct {
 	Definition string   `json:"definition"`
 	Examples   []string `json:"examples"`
+	// SameAs names the lower level whose explanation this one shares, when one explanation
+	// serves both — "the A1 text is right for A2 too". The text is copied, so a reader that
+	// knows nothing of sharing still finds a full explanation at every level.
+	SameAs string `json:"same_as,omitempty"`
 }
 
 // GeneratedWord is one word as the model wrote it.
@@ -64,14 +68,18 @@ type GeneratedWord struct {
 
 type generatedWords struct {
 	Words []struct {
-		Term             string               `json:"term"`
-		PartOfSpeech     string               `json:"part_of_speech"`
-		Level            string               `json:"level"`
-		PronunciationIPA string               `json:"pronunciation_ipa"`
-		Uz               string               `json:"uz"`
-		Ru               string               `json:"ru"`
-		Tags             []string             `json:"tags"`
-		Explanations     map[string]LevelText `json:"explanations"`
+		Term             string   `json:"term"`
+		PartOfSpeech     string   `json:"part_of_speech"`
+		Level            string   `json:"level"`
+		PronunciationIPA string   `json:"pronunciation_ipa"`
+		Uz               string   `json:"uz"`
+		Ru               string   `json:"ru"`
+		Tags             []string `json:"tags"`
+		Explanations     map[string]struct {
+			SameAsPrevious bool     `json:"same_as_previous"`
+			Definition     string   `json:"definition"`
+			Examples       []string `json:"examples"`
+		} `json:"explanations"`
 	} `json:"words"`
 }
 
@@ -83,8 +91,12 @@ var PartsOfSpeech = []string{"noun", "verb", "adjective", "adverb", "phrasal ver
 // it, and did, nineteen times in twenty; a required key cannot be left out.
 func vocabularySchema(levels []string) json.RawMessage {
 	explanation := map[string]any{
-		"type": "object", "additionalProperties": false, "required": []string{"definition", "examples"},
+		"type": "object", "additionalProperties": false, "required": []string{"same_as_previous", "definition", "examples"},
 		"properties": map[string]any{
+			"same_as_previous": map[string]any{
+				"type":        "boolean",
+				"description": "True when the explanation for the previous requested level is just as right here; then leave definition and examples empty.",
+			},
 			"definition": map[string]any{"type": "string", "description": "The meaning only, in English a learner at this level can read. No examples in it."},
 			"examples":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Two natural sentences at this level."},
 		},
@@ -133,7 +145,7 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	b.WriteString("You choose vocabulary for an English-learning app whose learners speak Uzbek or Russian. ")
 	fmt.Fprintf(&b, "Write exactly %d useful words or fixed phrases, varied in topic and part of speech, and explain each one separately for every one of these CEFR levels: %s.\n", count, strings.Join(levels, ", "))
 	b.WriteString("- level: the level a learner usually meets the word at, by the English Vocabulary Profile — everyday words like dusk or campground are not A1. Mix levels across the batch.\n")
-	b.WriteString("- explanations: an entry for every requested level, none left out. The definition is the meaning only — never put an example in it. The explanations must genuinely differ: A1/A2 one very short sentence in the simplest words, with everyday examples; B1/B2 the main senses and common collocations; C1/C2 nuance, register, collocations and less common senses. Each has exactly two natural example sentences written at that level.\n")
+	b.WriteString("- explanations: an entry for every requested level, none left out. When the explanation you gave for the previous level is just as right for this one — common for a simple word at A1 and A2 — set same_as_previous to true and leave definition and examples empty, instead of repeating it or inventing a difference. The first requested level always has its own text. The definition is the meaning only — never put an example in it. Where the levels need different explanations, they must genuinely differ: A1/A2 one very short sentence in the simplest words, with everyday examples; B1/B2 the main senses and common collocations; C1/C2 nuance, register, collocations and less common senses. Each has exactly two natural example sentences written at that level.\n")
 	b.WriteString("- uz and ru: the usual translation of the word in its main sense — a word or two, not a definition.\n")
 	b.WriteString("Never include a word from the excluded list, in any form, and never the same word twice.\n")
 
@@ -205,8 +217,24 @@ func (g generatedWords) words() []GeneratedWord {
 		if t := strings.TrimSpace(w.Ru); t != "" {
 			word.Translations["ru"] = t
 		}
-		for code, e := range w.Explanations {
-			word.LevelContent[strings.ToUpper(strings.TrimSpace(code))] = e
+		// In level order, so a level that shares the one below finds it already written.
+		prev := ""
+		for _, code := range cefrCodes {
+			e, ok := w.Explanations[code]
+			if !ok {
+				continue
+			}
+			if e.SameAsPrevious && prev != "" {
+				shared := word.LevelContent[prev]
+				root := prev
+				if shared.SameAs != "" {
+					root = shared.SameAs
+				}
+				word.LevelContent[code] = LevelText{Definition: shared.Definition, Examples: shared.Examples, SameAs: root}
+			} else {
+				word.LevelContent[code] = LevelText{Definition: e.Definition, Examples: e.Examples}
+			}
+			prev = code
 		}
 		out = append(out, word)
 	}

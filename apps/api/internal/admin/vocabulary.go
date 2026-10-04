@@ -476,7 +476,7 @@ var vocabularyThemes = []string{
 
 // vocabularyWaves bounds how many rounds a run takes to reach its count: words that come back
 // already in the library are skipped, and the next round asks for the shortfall.
-const vocabularyWaves = 4
+const vocabularyWaves = 8
 
 // runVocabularyGeneration writes plan.Count new words in batches, a few batches at a time.
 // Every batch is told every word already in the library and every word written earlier in
@@ -499,62 +499,92 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 	actor := plan.Actor
 	added, skipped, failedBatches, batchIndex := 0, 0, 0, 0
 
-	for wave := 0; wave < vocabularyWaves && added < target; wave++ {
-		want := target - added
-		batches := (want + ai.VocabularyBatch - 1) / ai.VocabularyBatch
-		type result struct {
-			words []ai.GeneratedWord
-			meta  *ai.EvaluationMeta
+	// Words are saved the moment their batch comes back, not when the whole run ends, so the
+	// console can show the count climbing while the rest are still being written. The mutex
+	// keeps the count, the skip list and the target straight across the batches.
+	var mu sync.Mutex
+	seen := map[string]bool{}
+	for _, t := range exclude {
+		seen[t] = true
+	}
+	store := func(words []ai.GeneratedWord, requestID *uuid.UUID) error {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, w := range words {
+			if added >= target {
+				return nil
+			}
+			key := strings.ToLower(w.Term)
+			if seen[key] {
+				skipped++
+				continue
+			}
+			stored, err := m.storeGeneratedWord(ctx, w, requestID, actor)
+			if err != nil {
+				return err
+			}
+			seen[key] = true
+			if stored {
+				added++
+			} else {
+				skipped++
+			}
 		}
-		results := make([]result, batches)
+		return nil
+	}
+
+	for wave := 0; wave < vocabularyWaves; wave++ {
+		mu.Lock()
+		want := target - added
+		known := make([]string, 0, len(seen))
+		for t := range seen {
+			known = append(known, t)
+		}
+		mu.Unlock()
+		if want <= 0 {
+			break
+		}
+		batches := (want + ai.VocabularyBatch - 1) / ai.VocabularyBatch
 		sem := make(chan struct{}, translationConcurrency)
 		var wg sync.WaitGroup
+		var storeErr error
 		for i := 0; i < batches; i++ {
-			count := min(ai.VocabularyBatch, want-i*ai.VocabularyBatch)
+			// A couple over what is still needed: a word can come back already in the library
+			// or missing a level, and is then dropped; the target cuts off any surplus.
+			count := min(ai.VocabularyBatch, want-i*ai.VocabularyBatch) + 2
 			theme := plan.Theme
 			if theme == "" {
 				theme = vocabularyThemes[(batchIndex+i)%len(vocabularyThemes)]
 			}
 			wg.Add(1)
-			go func(i, count int, theme string) {
+			go func(count int, theme string) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
 				words, meta, err := writer.WriteVocabulary(ctx, ai.VocabularyRequest{
-					Count: count, Levels: levels, Theme: theme, Exclude: exclude, ActorID: &actor,
+					Count: count, Levels: levels, Theme: theme, Exclude: known, ActorID: &actor,
 				})
-				if err == nil {
-					results[i] = result{words, meta}
+				if err != nil {
+					mu.Lock()
+					failedBatches++
+					mu.Unlock()
+					return
 				}
-			}(i, count, theme)
+				var requestID *uuid.UUID
+				if meta != nil && meta.AIRequestID != uuid.Nil {
+					requestID = &meta.AIRequestID
+				}
+				if err := store(words, requestID); err != nil {
+					mu.Lock()
+					storeErr = err
+					mu.Unlock()
+				}
+			}(count, theme)
 		}
 		wg.Wait()
 		batchIndex += batches
-
-		for _, r := range results {
-			if r.words == nil {
-				failedBatches++
-				continue
-			}
-			var requestID *uuid.UUID
-			if r.meta != nil && r.meta.AIRequestID != uuid.Nil {
-				requestID = &r.meta.AIRequestID
-			}
-			for _, w := range r.words {
-				if added >= target {
-					break
-				}
-				stored, err := m.storeGeneratedWord(ctx, w, requestID, actor)
-				if err != nil {
-					return nil, err
-				}
-				if stored {
-					added++
-				} else {
-					skipped++
-				}
-				exclude = append(exclude, strings.ToLower(w.Term))
-			}
+		if storeErr != nil {
+			return nil, storeErr
 		}
 	}
 	if added == 0 {
