@@ -3,6 +3,7 @@
 import { BookMarked, CalendarClock, Check, CheckCheck, ChevronRight, Plus, Search, SpellCheck, X } from "lucide-react";
 import { useState } from "react";
 
+import { FlagGB, FlagRU, FlagUZ } from "@/components/common/flags";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState, ErrorState } from "@/components/common/states";
 import { VocabularyCard } from "@/components/learning/cards";
@@ -208,7 +209,6 @@ function WordRow({ word, level, open, onToggle }: { word: LibraryWord; level: st
   const add = useAddToDeck();
   const shown = explanationAt(word.level_content, level);
   const inDeck = word.in_deck || add.data?.added === true;
-  const translation = [word.translations.uz, word.translations.ru].filter(Boolean).join(" · ");
 
   return (
     <li className="border-b last:border-b-0">
@@ -217,20 +217,42 @@ function WordRow({ word, level, open, onToggle }: { word: LibraryWord; level: st
           type="button"
           aria-expanded={open}
           onClick={onToggle}
-          className="grid min-w-0 flex-1 grid-cols-1 items-baseline gap-x-4 gap-y-0.5 rounded text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)]"
+          className="grid min-w-0 flex-1 grid-cols-1 items-center gap-x-3 gap-y-1 rounded text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:grid-cols-[minmax(7rem,11rem)_minmax(0,1fr)]"
         >
-          <span className="flex min-w-0 items-baseline gap-2">
+          {/* The English word, its pronunciation underneath. */}
+          <span className="flex min-w-0 items-start gap-2">
             <ChevronRight
-              className={cn("size-3.5 shrink-0 self-center text-fg-muted transition-transform duration-micro", open && "rotate-90")}
+              className={cn("mt-1 size-3.5 shrink-0 text-fg-muted transition-transform duration-micro", open && "rotate-90")}
               aria-hidden
             />
-            <span className="truncate font-medium">{word.term}</span>
-            {word.level && <span className="shrink-0 text-[0.6875rem] font-semibold text-fg-muted">{word.level}</span>}
+            <span className="grid min-w-0 gap-0">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <FlagGB title="English" />
+                <span className="truncate font-medium">{word.term}</span>
+                {word.level && <span className="shrink-0 text-[0.6875rem] font-semibold text-fg-muted">{word.level}</span>}
+              </span>
+              {word.pronunciation_ipa && (
+                <span className="truncate pl-[1.5rem] font-mono text-[0.6875rem] text-fg-muted">{word.pronunciation_ipa}</span>
+              )}
+            </span>
           </span>
-          <span className="min-w-0 truncate pl-5 text-body-sm text-fg-secondary sm:pl-0">
-            {translation && <span className="font-medium text-foreground">{translation}</span>}
-            {translation && shown && <span className="text-fg-muted"> — </span>}
-            {shown?.text.definition}
+          {/* Its meaning in Uzbek and in Russian, each by its flag, then the explanation. */}
+          <span className="grid min-w-0 gap-0.5 pl-5 sm:pl-0">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-body-sm">
+              {word.translations.uz && (
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <FlagUZ title="O'zbekcha" />
+                  <span className="truncate font-medium">{word.translations.uz}</span>
+                </span>
+              )}
+              {word.translations.ru && (
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <FlagRU title="Русский" />
+                  <span className="truncate font-medium">{word.translations.ru}</span>
+                </span>
+              )}
+            </span>
+            {shown && <span className="truncate text-caption text-fg-secondary">{shown.text.definition}</span>}
           </span>
         </button>
         {inDeck ? (
