@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  BookOpen,
   Check,
   Eye,
   Languages,
@@ -2062,6 +2063,42 @@ function LearnerPreview({
  * been asked for explicitly. English is always written — it is what the other languages are
  * translated from, so all three teach the same thing.
  */
+const levelState: Record<string, string> = {
+  not_created: "new",
+  not_applicable: "not taught",
+  draft: "draft",
+  review: "draft",
+  published: "live",
+  archived: "archived",
+};
+
+const partCards: { part: GeneratePart; icon: typeof Pencil; title: string; description: string }[] = [
+  {
+    part: "explanation",
+    icon: BookOpen,
+    title: "Adaptive explanation",
+    description: "A different lesson for each level — simpler at A1, fuller at C1.",
+  },
+  {
+    part: "test",
+    icon: ListChecks,
+    title: "Test · 15 per level",
+    description: "Multiple choice and typed answers, checked before you see them.",
+  },
+  {
+    part: "writing",
+    icon: PenLine,
+    title: "Writing task",
+    description: "Something to write that needs this grammar, harder as the level rises.",
+  },
+  {
+    part: "speaking",
+    icon: Mic,
+    title: "Speaking task",
+    description: "Something to talk about — under a minute at A1, two at C2.",
+  },
+];
+
 function GenerateDialog({
   open,
   onOpenChange,
@@ -2073,8 +2110,8 @@ function GenerateDialog({
   levels: LevelContent[];
   onGenerate: (levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[], parts: GeneratePart[]) => void;
 }) {
-  const untouched = levels.filter((level) => level.status === "not_created").map((level) => level.level);
-  const [selected, setSelected] = useState<CEFRLevel[]>(untouched.length > 0 ? untouched : cefrLevels);
+  // Every level and every part is ticked to start with: one Generate writes the whole topic.
+  const [selected, setSelected] = useState<CEFRLevel[]>([...cefrLevels]);
   const [languages, setLanguages] = useState<ContentLanguage[]>([...contentLanguages]);
   const [parts, setParts] = useState<GeneratePart[]>([...generateParts]);
   const [overwrite, setOverwrite] = useState(false);
@@ -2082,100 +2119,148 @@ function GenerateDialog({
   const explaining = parts.includes("explanation");
   const togglePart = (part: GeneratePart) =>
     setParts(parts.includes(part) ? parts.filter((p) => p !== part) : [...parts, part]);
+  const toggleLevel = (code: CEFRLevel) =>
+    setSelected(selected.includes(code) ? selected.filter((item) => item !== code) : [...selected, code]);
   // Only a new explanation replaces hand-written text; a test or a task on its own does not.
   const replacing = explaining
     ? levels.filter(
         (level) => selected.includes(level.level) && level.source === "curated" && level.status !== "not_created",
       )
     : [];
+  const statusOf = (code: CEFRLevel) => levels.find((l) => l.level === code)?.status ?? "not_created";
+
+  const summary =
+    selected.length === 0 || parts.length === 0
+      ? "Pick at least one level and one part"
+      : `${selected.length} ${selected.length === 1 ? "level" : "levels"} · ${parts.length} ${parts.length === 1 ? "part" : "parts"}${
+          explaining ? ` · ${languages.length} ${languages.length === 1 ? "language" : "languages"}` : ""
+        }`;
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
+      className="sm:max-w-2xl"
       title="Generate with AI"
-      description="Pick the levels, then what to write for each of them. Every part is written for the level it belongs to, and everything lands as a draft for you to read."
-      confirmLabel={replacing.length > 0 && overwrite ? "Replace" : "Generate"}
+      description="Choose the levels and what to write for each. Everything lands as a draft for you to read before it goes live."
+      confirmLabel={replacing.length > 0 && overwrite ? "Replace and generate" : "Generate"}
       disabled={selected.length === 0 || parts.length === 0 || (replacing.length > 0 && !overwrite)}
       onConfirm={() => onGenerate(selected, overwrite, languages, parts)}
+      footerStart={summary}
     >
-      <div className="grid gap-4">
-        <div className="grid gap-1.5">
-          <p className="text-label text-fg-muted">Levels</p>
-          <div className="flex flex-wrap gap-1.5">
-            {cefrLevels.map((code) => (
-              <ToggleChip
-                key={code}
-                pressed={selected.includes(code)}
-                onToggle={() =>
-                  setSelected(selected.includes(code) ? selected.filter((item) => item !== code) : [...selected, code])
-                }
-              >
-                {code}
-              </ToggleChip>
-            ))}
+      <div className="grid max-h-[60vh] gap-5 overflow-y-auto pr-1">
+        <section className="grid gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="text-label">Levels</h3>
+            <button
+              type="button"
+              className="text-caption font-medium text-primary hover:underline"
+              onClick={() => setSelected(selected.length === cefrLevels.length ? [] : [...cefrLevels])}
+            >
+              {selected.length === cefrLevels.length ? "Clear all" : "Select all"}
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {cefrLevels.map((code) => {
+              const on = selected.includes(code);
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleLevel(code)}
+                  className={cn(
+                    "grid justify-items-center gap-0.5 rounded-lg border px-2 py-2 outline-none transition-colors duration-micro",
+                    "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+                    on ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
+                  )}
+                >
+                  <span className="text-body font-semibold">{code}</span>
+                  <span className={cn("text-[0.6875rem]", on ? "opacity-80" : "text-fg-muted")}>
+                    {levelState[statusOf(code)] ?? statusOf(code)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <p className="text-caption text-fg-muted">
-            The model decides which of these the topic is actually worth teaching at, and says so for the rest instead of
+            The model decides which levels the topic is really worth teaching at, and marks the rest as not taught instead of
             inventing a version that is wrong.
           </p>
-        </div>
+        </section>
 
-        <div className="grid gap-2">
-          <PartRow
-            index={1}
-            checked={explaining}
-            onToggle={() => togglePart("explanation")}
-            title="Adaptive explanation"
-            description="A different explanation for each level — simpler at A1, fuller at C1."
-          />
-          <div className={cn("grid gap-1.5 pl-9", !explaining && "opacity-50")}>
-            <p className="flex items-baseline gap-2 text-label text-fg-muted">
-              <span className="tabular-nums">2.</span> Languages
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {contentLanguages.map((code) => (
-                <ToggleChip
-                  key={code}
-                  pressed={languages.includes(code)}
-                  // English is the source the others are translated from.
-                  disabled={code === "en" || !explaining}
-                  onToggle={() =>
-                    setLanguages(
-                      languages.includes(code) ? languages.filter((item) => item !== code) : [...languages, code],
-                    )
-                  }
+        <section className="grid gap-2">
+          <h3 className="text-label">What to write</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {partCards.map(({ part, icon: Icon, title, description }) => {
+              const on = parts.includes(part);
+              return (
+                <div
+                  key={part}
+                  className={cn(
+                    "grid content-start gap-2 rounded-xl border p-3 transition-colors duration-micro",
+                    on ? "border-primary/60 bg-primary-subtle/40" : "bg-surface",
+                    part === "explanation" && "sm:col-span-2",
+                  )}
                 >
-                  {contentLanguageLabels[code]}
-                </ToggleChip>
-              ))}
-            </div>
-            <p className="text-caption text-fg-muted">
-              English is written first and translated, so every language teaches the same thing.
-            </p>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    onClick={() => togglePart(part)}
+                    className="flex items-start gap-3 rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                  >
+                    <span
+                      className={cn(
+                        "grid size-9 shrink-0 place-items-center rounded-lg",
+                        on ? "bg-primary text-primary-foreground" : "bg-surface-active text-fg-muted",
+                      )}
+                    >
+                      <Icon className="size-4" aria-hidden />
+                    </span>
+                    <span className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="text-body-sm font-medium">{title}</span>
+                      <span className="text-caption text-fg-muted">{description}</span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border",
+                        on ? "border-primary bg-primary text-primary-foreground" : "border-border",
+                      )}
+                    >
+                      {on && <Check className="size-3.5" />}
+                    </span>
+                  </button>
+                  {part === "explanation" && on && (
+                    <div className="flex flex-wrap items-center gap-1.5 border-t pt-2 pl-12">
+                      <span className="mr-1 text-caption text-fg-muted">Languages</span>
+                      {contentLanguages.map((code) => (
+                        <ToggleChip
+                          key={code}
+                          pressed={languages.includes(code)}
+                          // English is the source the others are translated from.
+                          disabled={code === "en"}
+                          onToggle={() =>
+                            setLanguages(
+                              languages.includes(code) ? languages.filter((item) => item !== code) : [...languages, code],
+                            )
+                          }
+                        >
+                          {contentLanguageLabels[code]}
+                        </ToggleChip>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <PartRow
-            index={3}
-            checked={parts.includes("test")}
-            onToggle={() => togglePart("test")}
-            title="Test — 15 questions per level"
-            description="Multiple choice and typed answers, written for each level and checked before you see them."
-          />
-          <PartRow
-            index={4}
-            checked={parts.includes("writing")}
-            onToggle={() => togglePart("writing")}
-            title="Writing task per level"
-            description="Something to write that needs this grammar — longer and harder as the level goes up."
-          />
-          <PartRow
-            index={5}
-            checked={parts.includes("speaking")}
-            onToggle={() => togglePart("speaking")}
-            title="Speaking task per level"
-            description="Something to talk about that needs this grammar — from under a minute at A1 to two at C2."
-          />
-        </div>
+          <p className="text-caption text-fg-muted">
+            The test and the tasks are in English and shared by every language; the explanation is written in English first
+            and translated, so every language teaches the same thing.
+          </p>
+        </section>
 
         {replacing.length > 0 && (
           <label className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning-subtle/40 p-3">
@@ -2187,47 +2272,14 @@ function GenerateDialog({
             />
             <span className="grid gap-0.5 text-caption">
               <span className="font-medium">
-                This will replace the current content in {replacing.map((level) => level.level).join(", ")}
+                This will replace the explanation in {replacing.map((level) => level.level).join(", ")}
               </span>
-              <span className="text-fg-muted">Those levels were edited by hand.</span>
+              <span className="text-fg-muted">Those levels were edited by hand. Untick the explanation to keep them.</span>
             </span>
           </label>
         )}
       </div>
     </ConfirmDialog>
-  );
-}
-
-/** One part of a generation: a numbered row with a checkbox, ticked by default. */
-function PartRow({
-  index,
-  checked,
-  onToggle,
-  title,
-  description,
-}: {
-  index: number;
-  checked: boolean;
-  onToggle: () => void;
-  title: string;
-  description: string;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors duration-micro",
-        checked ? "border-primary/50 bg-primary-subtle/40" : "hover:bg-surface-hover",
-      )}
-    >
-      <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1 size-4 accent-[var(--primary)]" />
-      <span className="grid gap-0.5">
-        <span className="text-body-sm font-medium">
-          <span className="mr-1.5 tabular-nums text-fg-muted">{index}.</span>
-          {title}
-        </span>
-        <span className="text-caption text-fg-muted">{description}</span>
-      </span>
-    </label>
   );
 }
 

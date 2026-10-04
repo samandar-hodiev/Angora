@@ -578,11 +578,17 @@ export function ConfirmDialog({
   disabled = false,
   onConfirm,
   children,
+  className,
+  footerStart,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
+  /** Widens or otherwise adjusts the dialog, for one with more to choose than a yes or no. */
+  className?: string;
+  /** Shown at the start of the footer, opposite the buttons — a summary of what will happen. */
+  footerStart?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
@@ -594,13 +600,14 @@ export function ConfirmDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className={className}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {children}
-        <DialogFooter>
+        <DialogFooter className={footerStart ? "sm:items-center" : undefined}>
+          {footerStart && <div className="mr-auto text-caption text-fg-muted">{footerStart}</div>}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
