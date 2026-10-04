@@ -112,7 +112,7 @@ function TextForm({ question, value, onChange, onSubmit, disabled, expected, cor
           disabled={disabled}
           placeholder={
             question.type === "fill_blank"
-              ? `${hint ? `${hint} → ` : ""}the missing word, or the whole sentence`
+              ? `${hint ? `${hint} → ` : ""}the missing word only`
               : hint
                 ? `${hint} →`
                 : "Your answer"

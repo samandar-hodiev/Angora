@@ -114,19 +114,14 @@ func TestNormalizeAnswerKeepsWordsIntact(t *testing.T) {
 	}
 }
 
-func TestScoreGapAcceptsTheWholeSentence(t *testing.T) {
-	q := Question{Type: TypeFillBlank, Prompt: "I have ___ apple in my bag.", answer: Answer{Accepted: []string{"an"}}}
-	cases := map[string]bool{
-		"an":                         true,
-		"I have an apple in my bag":  true,
-		"i have an apple in my bag.": true,
-		"I have a apple in my bag.":  false,
-		"I have an apple in my box.": false, // the rest of the sentence must be the same
-		"I have an apple":            false,
+func TestScoreGapWantsOnlyTheMissingWord(t *testing.T) {
+	// The answer is what goes in the gap. A whole sentence typed back is not checked word
+	// by word: one slip elsewhere ("grows ui") would fail an answer whose grammar was right.
+	q := Question{Type: TypeFillBlank, Prompt: "She wants to be ___ artist.", answer: Answer{Accepted: []string{"an"}}}
+	if !Score(q, Response{Text: " An "}).Correct {
+		t.Error("the missing word should be accepted")
 	}
-	for text, want := range cases {
-		if got := Score(q, Response{Text: text}).Correct; got != want {
-			t.Errorf("%q: correct = %v, want %v", text, got, want)
-		}
+	if Score(q, Response{Text: "She wants to be an artist."}).Correct {
+		t.Error("only the missing word is the answer")
 	}
 }

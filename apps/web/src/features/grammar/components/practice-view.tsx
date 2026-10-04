@@ -186,7 +186,7 @@ function Session({
         <div className="grid gap-1.5">
           <p className="text-caption text-fg-muted tabular-nums">
             Question {index + 1} of {questions.length}
-            {question.type === "fill_blank" && " · type the missing word(s) or the whole sentence"}
+            {question.type === "fill_blank" && " · type only the missing word(s)"}
           </p>
           <h1 id="question-prompt" className="text-h3">
             {question.prompt}
