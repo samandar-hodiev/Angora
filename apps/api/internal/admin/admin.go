@@ -149,6 +149,14 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/content/:id/versions/:version", content, m.contentVersion)
 	g.POST("/content/:id/versions/:version/restore", content, m.restoreContentVersion)
 
+	// The vocabulary library: words written by hand or by the model, published when read.
+	g.GET("/vocabulary", content, m.vocabularyList)
+	g.POST("/vocabulary", content, m.createWord)
+	g.POST("/vocabulary/generate", content, m.generateVocabulary)
+	g.POST("/vocabulary/publish", content, m.publishWords)
+	g.PATCH("/vocabulary/:id", content, m.updateWord)
+	g.POST("/vocabulary/:id/status", content, m.setWordStatus)
+
 	g.GET("/grammar/categories", content, m.grammarCategories)
 	g.GET("/grammar/topics", content, m.grammarTopics)
 	g.POST("/grammar/topics", content, m.createGrammarTopic)

@@ -265,3 +265,20 @@ func TestAgreedPracticeDropsAGapThatAllowsAnUnkeyedAnswer(t *testing.T) {
 		t.Errorf("kept %+v, want the open gap dropped", got)
 	}
 }
+
+func TestVocabularySchemaIsStrictModeSafe(t *testing.T) {
+	assertStrictSchema(t, vocabularySchema)
+}
+
+func TestUsableWordsDropsDuplicatesAndExcluded(t *testing.T) {
+	got := UsableWords([]GeneratedWord{
+		{Term: " Travel ", PartOfSpeech: "verb", Definition: "go somewhere", Examples: []string{"I travel.", " "}},
+		{Term: "travel", PartOfSpeech: "noun", Definition: "a trip"},
+		{Term: "journey", PartOfSpeech: "noun", Definition: "a trip"},
+		{Term: "go", PartOfSpeech: "thing", Definition: "move"},
+		{Term: "ticket", PartOfSpeech: "noun", Definition: ""},
+	}, map[string]bool{"journey": true})
+	if len(got) != 1 || got[0].Term != "Travel" || len(got[0].Examples) != 1 {
+		t.Errorf("got %+v, want only Travel with its one real example", got)
+	}
+}

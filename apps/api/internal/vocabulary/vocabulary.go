@@ -5,6 +5,7 @@
 package vocabulary
 
 import (
+	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,18 +17,20 @@ import (
 )
 
 type Card struct {
-	ID               uuid.UUID  `json:"id"`
-	Term             string     `json:"term"`
-	PartOfSpeech     string     `json:"part_of_speech"`
-	Definition       string     `json:"definition"`
-	Examples         []string   `json:"examples"`
-	PronunciationIPA string     `json:"pronunciation_ipa"`
-	Level            *string    `json:"level"`
-	Tags             []string   `json:"tags"`
-	Status           string     `json:"status"`
-	Mastery          int        `json:"mastery"`
-	DueAt            time.Time  `json:"due_at"`
-	LastReviewedAt   *time.Time `json:"last_reviewed_at"`
+	ID               uuid.UUID `json:"id"`
+	Term             string    `json:"term"`
+	PartOfSpeech     string    `json:"part_of_speech"`
+	Definition       string    `json:"definition"`
+	Examples         []string  `json:"examples"`
+	PronunciationIPA string    `json:"pronunciation_ipa"`
+	// Translations is the word in the learner's own language: {"uz": "...", "ru": "..."}.
+	Translations   map[string]string `json:"translations"`
+	Level          *string           `json:"level"`
+	Tags           []string          `json:"tags"`
+	Status         string            `json:"status"`
+	Mastery        int               `json:"mastery"`
+	DueAt          time.Time         `json:"due_at"`
+	LastReviewedAt *time.Time        `json:"last_reviewed_at"`
 }
 
 type DeckSummary struct {
@@ -74,6 +77,11 @@ func (m *Module) deck(c *gin.Context) {
 	page = page.Normalize()
 	ctx := c.Request.Context()
 
+	if err := m.topUp(ctx, p.UserID); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+
 	deck := Deck{Cards: []Card{}}
 	err := m.pool.QueryRow(ctx, `
 		SELECT count(*)::int,
@@ -91,7 +99,7 @@ func (m *Module) deck(c *gin.Context) {
 	}
 
 	rows, err := m.pool.Query(ctx, `
-		SELECT v.id, v.term, v.part_of_speech, v.definition, v.examples, v.pronunciation_ipa, l.code, v.tags,
+		SELECT v.id, v.term, v.part_of_speech, v.definition, v.examples, v.pronunciation_ipa, v.translations, l.code, v.tags,
 		       uv.status, uv.repetitions, uv.due_at, uv.last_reviewed_at
 		FROM user_vocabulary uv
 		JOIN vocabulary v ON v.id = uv.vocabulary_id
@@ -108,7 +116,7 @@ func (m *Module) deck(c *gin.Context) {
 		var card Card
 		var repetitions int
 		if err := rows.Scan(&card.ID, &card.Term, &card.PartOfSpeech, &card.Definition, &card.Examples,
-			&card.PronunciationIPA, &card.Level, &card.Tags, &card.Status, &repetitions, &card.DueAt,
+			&card.PronunciationIPA, &card.Translations, &card.Level, &card.Tags, &card.Status, &repetitions, &card.DueAt,
 			&card.LastReviewedAt); err != nil {
 			httpx.Fail(c, err)
 			return
@@ -121,4 +129,32 @@ func (m *Module) deck(c *gin.Context) {
 		return
 	}
 	httpx.OKWithMeta(c, deck, httpx.Meta{Page: page.Page, PageSize: page.PageSize, Total: int64(deck.Summary.Total)})
+}
+
+// newWordsInDeck is how many unstarted words a deck holds before more are added: enough to
+// learn from, few enough that the deck does not become a list nobody finishes.
+const newWordsInDeck = 10
+
+// topUp adds published words at the learner's level — one either side of it too — while
+// their deck has fewer than newWordsInDeck new words. Words an owner publishes reach learners
+// this way, without anyone having to assign them.
+func (m *Module) topUp(ctx context.Context, userID uuid.UUID) error {
+	_, err := m.pool.Exec(ctx, `
+		WITH learner AS (
+		    SELECT COALESCE((SELECT l.rank FROM profiles pr JOIN levels l ON l.id = pr.current_level_id
+		                     WHERE pr.user_id = $1), (SELECT rank FROM levels WHERE code = 'B1')) AS rank
+		), room AS (
+		    SELECT GREATEST($2 - count(*), 0) AS n FROM user_vocabulary WHERE user_id = $1 AND status = 'new'
+		)
+		INSERT INTO user_vocabulary (user_id, vocabulary_id, source)
+		SELECT $1, v.id, 'library'
+		FROM vocabulary v
+		JOIN levels l ON l.id = v.level_id, learner
+		WHERE v.status = 'published'
+		  AND l.rank BETWEEN learner.rank - 1 AND learner.rank + 1
+		  AND NOT EXISTS (SELECT 1 FROM user_vocabulary uv WHERE uv.user_id = $1 AND uv.vocabulary_id = v.id)
+		ORDER BY abs(l.rank - learner.rank), v.frequency_rank NULLS LAST, v.published_at, v.term
+		LIMIT (SELECT n FROM room)
+		ON CONFLICT DO NOTHING`, userID, newWordsInDeck)
+	return err
 }
