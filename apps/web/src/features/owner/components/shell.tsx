@@ -403,7 +403,7 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
             bind on any ordinary desk monitor, and it centres when it finally does, so the
             two sides stay equal at every width rather than dumping the remainder on the
             right. */}
-        <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main id="main" className="min-w-0 flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">
           <div className="mx-auto w-full max-w-[160rem]">{children}</div>
         </main>
       </div>

@@ -123,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           // can follow the picture instead of the theme (see theme.css). --app-header-h is the
           // header above: anything pinned inside the area measures from it.
           data-wallpaper-tone={wallpaper.tone ?? (wallpaper.selection === "custom" ? "dark" : undefined)}
-          className="relative isolate flex-1 px-4 pt-(--main-pt) pb-32 [--main-pt:1.5rem] sm:px-6 md:pb-12 lg:px-10 lg:[--main-pt:2rem]"
+          className="relative isolate flex-1 px-3 pt-(--main-pt) pb-32 [--main-pt:1rem] sm:px-5 md:pb-10 lg:px-6 lg:[--main-pt:1.25rem]"
         >
           {/* The learner's wallpaper covers this area only, never the header or sidebar. */}
           <WallpaperLayer />
