@@ -556,3 +556,76 @@ func (s *GrammarTutorService) TranslateDefinitions(ctx context.Context, items []
 	}
 	return out, nil
 }
+
+// Irregular verb examples: one sentence for each form, so a learner sees went and gone used,
+// not only listed. Written once per verb.
+
+const (
+	VerbExamplesPrompt      = "irregular_verb_examples.v1"
+	TaskVerbExamples   Task = "irregular_verb_examples"
+)
+
+// VerbForms is an irregular verb's three forms, as the table lists them.
+type VerbForms struct {
+	Base, Past, Participle string
+}
+
+// WriteVerbExamples writes a short, natural sentence for each form of each verb:
+// base → {"base", "past", "participle"}.
+func (s *GrammarTutorService) WriteVerbExamples(ctx context.Context, verbs []VerbForms) (map[string]map[string]string, error) {
+	out := map[string]map[string]string{}
+	if len(verbs) == 0 {
+		return out, nil
+	}
+	schema, _ := json.Marshal(map[string]any{
+		"type": "object", "additionalProperties": false, "required": []string{"verbs"},
+		"properties": map[string]any{"verbs": map[string]any{
+			"type": "array",
+			"items": map[string]any{
+				"type": "object", "additionalProperties": false, "required": []string{"base", "base_example", "past_example", "participle_example"},
+				"properties": map[string]any{
+					"base":               map[string]any{"type": "string"},
+					"base_example":       map[string]any{"type": "string", "description": "A sentence using the base form."},
+					"past_example":       map[string]any{"type": "string", "description": "A sentence in the past simple using the past form."},
+					"participle_example": map[string]any{"type": "string", "description": "A sentence in the present perfect (or passive) using the past participle."},
+				},
+			},
+		}},
+	})
+	var in strings.Builder
+	for _, v := range verbs {
+		fmt.Fprintf(&in, "%s | %s | %s\n", v.Base, v.Past, v.Participle)
+	}
+	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
+		Task:          TaskVerbExamples,
+		PromptVersion: VerbExamplesPrompt,
+		Metadata:      map[string]any{"kind": "irregular_verb_examples", "count": len(verbs)},
+	}, AnalysisRequest{
+		Model: s.fastModel,
+		Instructions: "For each English irregular verb (base | past | past participle), write three short, natural, everyday sentences " +
+			"a B1 learner understands: one with the base form, one in the past simple with the past form, one in the present perfect " +
+			"(or the passive) with the past participle. Use the first spelling where two are given. Answer for every verb.",
+		Input: in.String(), SchemaName: "irregular_verb_examples", Schema: schema,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var raw struct {
+		Verbs []struct {
+			Base       string `json:"base"`
+			Base1      string `json:"base_example"`
+			Past       string `json:"past_example"`
+			Participle string `json:"participle_example"`
+		} `json:"verbs"`
+	}
+	if err := json.Unmarshal(res.Output, &raw); err != nil {
+		return nil, fmt.Errorf("verb examples are not valid JSON: %w", err)
+	}
+	for _, v := range raw.Verbs {
+		b, p, pp := strings.TrimSpace(v.Base1), strings.TrimSpace(v.Past), strings.TrimSpace(v.Participle)
+		if b != "" && p != "" && pp != "" {
+			out[strings.ToLower(strings.TrimSpace(v.Base))] = map[string]string{"base": b, "past": p, "participle": pp}
+		}
+	}
+	return out, nil
+}

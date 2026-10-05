@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { ReviewRating, VocabularyLibraryQuery } from "@engora/types";
+import type { IrregularVerbQuery, ReviewRating, VocabularyLibraryQuery } from "@engora/types";
 
 import { useSession } from "@/features/auth/hooks";
 import { queryKeys } from "@/lib/query/keys";
@@ -115,6 +115,22 @@ export function useReviewWord() {
 
 export function useCompareWords() {
   return useMutation({ mutationFn: learnerApi.compareWords });
+}
+
+export function useIrregularVerbs(query: IrregularVerbQuery) {
+  return useQuery({
+    queryKey: queryKeys.vocabulary.irregular(query),
+    queryFn: () => learnerApi.irregularVerbs(query),
+    enabled: useAuthed(),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAnswerVerb() {
+  return useMutation({
+    mutationFn: ({ id, past, participle }: { id: string; past: string; participle: string }) =>
+      learnerApi.answerVerb(id, past, participle),
+  });
 }
 
 export function useLadder() {

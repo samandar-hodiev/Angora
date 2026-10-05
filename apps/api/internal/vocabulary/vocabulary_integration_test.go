@@ -58,6 +58,14 @@ func (f *fakeWriter) TranslateDefinitions(_ context.Context, items []ai.Definiti
 	return out, nil
 }
 
+func (f *fakeWriter) WriteVerbExamples(_ context.Context, verbs []ai.VerbForms) (map[string]map[string]string, error) {
+	out := map[string]map[string]string{}
+	for _, v := range verbs {
+		out[v.Base] = map[string]string{"base": "I " + v.Base + ".", "past": "I " + v.Past + ".", "participle": "I have " + v.Participle + "."}
+	}
+	return out, nil
+}
+
 type countingPlans struct{ used, released atomic.Int32 }
 
 func (p *countingPlans) ConsumeUsage(context.Context, uuid.UUID, string, int) error {
@@ -228,6 +236,38 @@ func TestLearnerVocabularyPostgres(t *testing.T) {
 		call(http.MethodGet, "/library?topic="+topic+"&kind=phrase&register=informal", nil, &page)
 		if len(page.Items) != 1 || page.Items[0].Kind != "phrase" || page.Items[0].Definition != "meaning" {
 			t.Fatalf("kind filter: %+v", page.Items)
+		}
+	})
+
+	t.Run("irregular verbs: the table, a marked answer, and mistakes first in practice", func(t *testing.T) {
+		var page irregularPage
+		if code := call(http.MethodGet, "/irregular-verbs?pattern=ABA", nil, &page); code != http.StatusOK || len(page.Items) == 0 {
+			t.Fatalf("table: %d, %d verbs", code, len(page.Items))
+		}
+		var goID uuid.UUID
+		if err := pool.QueryRow(ctx, `SELECT id FROM irregular_verbs WHERE base = 'go'`).Scan(&goID); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = pool.Exec(context.Background(), `DELETE FROM user_irregular_verbs WHERE user_id = $1`, learner.ID)
+		})
+		var check VerbCheck
+		call(http.MethodPost, "/irregular-verbs/"+goID.String()+"/answer", map[string]any{"past": "went", "past_participle": "goed"}, &check)
+		if check.Correct || !check.PastRight || check.ParticipleRight || check.State != "mistake" {
+			t.Fatalf("wrong participle: %+v", check)
+		}
+		var round struct {
+			Items []IrregularVerb `json:"items"`
+		}
+		call(http.MethodGet, "/irregular-verbs/practice?show=mistakes", nil, &round)
+		if len(round.Items) != 1 || round.Items[0].Base != "go" {
+			t.Fatalf("mistakes round: %+v", round.Items)
+		}
+		for range 3 {
+			call(http.MethodPost, "/irregular-verbs/"+goID.String()+"/answer", map[string]any{"past": " Went", "past_participle": "gone"}, &check)
+		}
+		if !check.Correct || check.State != "known" {
+			t.Fatalf("three right in a row: %+v", check)
 		}
 	})
 

@@ -369,3 +369,51 @@ export interface ListeningExerciseBody {
   transcript?: string;
   questions: ChoiceQuestion[];
 }
+
+// ---- Irregular verbs ------------------------------------------------------------------
+
+/** AAA cut-cut-cut · ABB buy-bought-bought · ABA come-came-come · ABC go-went-gone. */
+export type VerbPattern = "AAA" | "ABB" | "ABA" | "ABC";
+
+/** never: not practised · learning · mistake: last answer wrong · known: three right in a row. */
+export type VerbState = "never" | "learning" | "mistake" | "known";
+
+export interface IrregularVerb {
+  id: UUID;
+  base: string;
+  /** Two accepted spellings are kept together, British first: "learnt / learned". */
+  past: string;
+  past_participle: string;
+  pattern: VerbPattern;
+  level: string;
+  uz: string;
+  ru: string;
+  /** What trips learners up about this verb, in Uzbek; empty for most. */
+  note: string;
+  examples: { base?: string; past?: string; participle?: string };
+  state: VerbState;
+  correct: number;
+  wrong: number;
+}
+
+export interface IrregularVerbTable {
+  items: IrregularVerb[];
+  summary: { total: number; practiced: number; known: number; mistakes: number };
+  levels: { value: string; count: number }[];
+}
+
+export interface IrregularVerbQuery {
+  q: string;
+  level: string;
+  pattern: string;
+  show: "" | "mistakes" | "known" | "new";
+}
+
+export interface VerbCheck {
+  past_right: boolean;
+  past_participle_right: boolean;
+  correct: boolean;
+  past: string;
+  past_participle: string;
+  state: VerbState;
+}

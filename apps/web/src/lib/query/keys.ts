@@ -49,6 +49,7 @@ export const queryKeys = {
     library: (query: object) => ["vocabulary", "library", query] as const,
     word: (id: string) => ["vocabulary", "word", id] as const,
     review: (kind: string) => ["vocabulary", "review", kind] as const,
+    irregular: (query: object) => ["vocabulary", "irregular", query] as const,
   },
   practice: {
     all: ["practice"] as const,

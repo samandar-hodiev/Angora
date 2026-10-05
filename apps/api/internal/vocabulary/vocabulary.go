@@ -74,6 +74,7 @@ type Writer interface {
 	CompareWords(ctx context.Context, req ai.CompareRequest) (*ai.WordComparison, *ai.EvaluationMeta, error)
 	WriteLadder(ctx context.Context, term string, userID *uuid.UUID) (*ai.Ladder, *ai.EvaluationMeta, error)
 	TranslateDefinitions(ctx context.Context, items []ai.DefinitionItem) (map[string]map[string]string, error)
+	WriteVerbExamples(ctx context.Context, verbs []ai.VerbForms) (map[string]map[string]string, error)
 }
 
 // Entitlements is the slice of the subscription service that meters comparisons.
@@ -125,6 +126,9 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	v.GET("/words/:id", m.word)
 	v.GET("/review", m.reviewQueue)
 	v.POST("/review/:id", m.review)
+	v.GET("/irregular-verbs", m.irregularVerbs)
+	v.GET("/irregular-verbs/practice", m.irregularPractice)
+	v.POST("/irregular-verbs/:id/answer", m.irregularAnswer)
 	if m.redis != nil {
 		limiter := ratelimit.NewRedisLimiter(m.redis)
 		v.POST("/compare", m.userLimit(limiter, "vocabulary_compare", comparePerHour), m.compare)

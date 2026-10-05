@@ -77,3 +77,25 @@ func TestNormalizeTerms(t *testing.T) {
 		t.Fatalf("phrases: got %v, %v", got, err)
 	}
 }
+
+func TestAcceptsForm(t *testing.T) {
+	cases := []struct {
+		form, answer string
+		want         bool
+	}{
+		{"went", "went", true},
+		{"went", " Went ", true},
+		{"learnt / learned", "learned", true},
+		{"learnt / learned", "learnt", true},
+		{"was / were", "was/were", true},
+		{"was / were", "were", true},
+		{"got / gotten", "gotten", true},
+		{"gone", "goed", false},
+		{"gone", "", false},
+	}
+	for _, tc := range cases {
+		if got := AcceptsForm(tc.form, tc.answer); got != tc.want {
+			t.Errorf("AcceptsForm(%q, %q) = %v, want %v", tc.form, tc.answer, got, tc.want)
+		}
+	}
+}

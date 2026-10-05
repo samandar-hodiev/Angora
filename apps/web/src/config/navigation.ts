@@ -13,6 +13,7 @@ import {
   Link2,
   ListChecks,
   Quote,
+  Shuffle,
   Settings,
   Sparkles,
   SpellCheck,
@@ -59,6 +60,7 @@ export const lexiconItems: NavItem[] = [
   { href: "/app/vocabulary", label: "Vocabulary", icon: SpellCheck },
   { href: "/app/phrases", label: "Phrases", icon: Quote },
   { href: "/app/collocations", label: "Collocations", icon: Link2 },
+  { href: "/app/irregular-verbs", label: "Irregular verbs", icon: Shuffle },
 ];
 
 export const primaryNav: NavItem[] = [

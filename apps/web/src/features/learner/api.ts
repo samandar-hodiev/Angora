@@ -1,6 +1,10 @@
 import type {
   ComparisonResponse,
   HistoryItem,
+  IrregularVerb,
+  IrregularVerbQuery,
+  IrregularVerbTable,
+  VerbCheck,
   LadderResponse,
   LearningPlan,
   Mistake,
@@ -44,6 +48,11 @@ export const learnerApi = {
   addToDeck: (id: string) => apiClient.post<{ added: boolean }>(`/vocabulary/deck/${id}`),
   removeFromDeck: (id: string) => apiClient.delete<{ removed: boolean }>(`/vocabulary/deck/${id}`),
   markKnown: (id: string) => apiClient.post<{ status: string; mastery: number }>(`/vocabulary/deck/${id}/known`),
+  irregularVerbs: (query: IrregularVerbQuery) => apiClient.get<IrregularVerbTable>("/vocabulary/irregular-verbs", { query: { ...query } }),
+  irregularPractice: (query: Omit<IrregularVerbQuery, "q"> & { count: number }) =>
+    apiClient.get<{ items: IrregularVerb[] }>("/vocabulary/irregular-verbs/practice", { query: { ...query } }),
+  answerVerb: (id: string, past: string, pastParticiple: string) =>
+    apiClient.post<VerbCheck>(`/vocabulary/irregular-verbs/${id}/answer`, { past, past_participle: pastParticiple }),
   recommendations: () => apiClient.get<Recommendation[]>("/recommendations"),
   learningPlan: () => apiClient.get<{ plan: LearningPlan | null }>("/learning-plan").then((r) => r.plan),
 };
