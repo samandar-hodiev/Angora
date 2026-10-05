@@ -62,11 +62,22 @@ stop() {
 trap stop INT TERM EXIT
 
 # start NAME COMMAND... — run in the background with every line prefixed by the name.
+#
+# A service that stops on its own is started again: anything that kills it — a crash, or a
+# "pkill -f cmd/server" run for some other project on this machine — would otherwise leave
+# the web app up and every page saying the API is unavailable until someone notices.
+# Ctrl+C still stops everything, loop included, because each service has its own process group.
 start() {
   name=$1
   shift
   set -m
-  ( "$@" 2>&1 | sed -u "s/^/[$name] /" ) &
+  (
+    while :; do
+      "$@" 2>&1 | sed -u "s/^/[$name] /"
+      echo "[$name] dev: stopped — starting it again in 3s (Ctrl+C stops everything)"
+      sleep 3
+    done
+  ) &
   PIDS="$PIDS $!"
   set +m
 }
