@@ -121,28 +121,28 @@ export function Library({
             })),
           ]}
         />
-        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-            <Input
-              type="search"
-              value={query.q}
-              onChange={(e) => set({ q: e.target.value })}
-              placeholder={names.search}
-              aria-label={`Search ${names.plural}`}
-              className="h-10 pr-9 pl-9"
-            />
-            {query.q && (
-              <button
-                type="button"
-                aria-label="Clear search"
-                onClick={() => set({ q: "" })}
-                className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-fg-muted hover:text-foreground"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            )}
-          </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
+          <Input
+            type="search"
+            value={query.q}
+            onChange={(e) => set({ q: e.target.value })}
+            placeholder={`Search ${names.plural} in English, Uzbek or Russian`}
+            aria-label={`Search ${names.plural}`}
+            className="h-10 pr-9 pl-9"
+          />
+          {query.q && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => set({ q: "" })}
+              className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-fg-muted hover:text-foreground"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <NativeSelect value={query.register} onChange={(e) => set({ register: e.target.value })} aria-label="Formality">
             <option value="">Formal and informal</option>
             {facets?.registers.map((f) => (
@@ -184,7 +184,11 @@ export function Library({
               Every topic
             </Chip>
             {facets.topics.map((t) => (
-              <Chip key={t.value} active={query.topic === t.value} onClick={() => set({ topic: query.topic === t.value ? "" : t.value })}>
+              <Chip
+                key={t.value}
+                active={query.topic === t.value}
+                onClick={() => set({ topic: query.topic === t.value ? "" : t.value })}
+              >
                 <span className="capitalize">{t.value}</span>
                 <span className="text-[0.6875rem] text-fg-muted tabular-nums">{t.count}</span>
               </Chip>
@@ -205,7 +209,9 @@ export function Library({
         <EmptyState
           icon={SpellCheck}
           title={filtered ? `No ${names.plural} match` : `No ${names.plural} yet`}
-          description={filtered ? "Try another search, level or topic." : `New ${names.plural} appear here as soon as they are published.`}
+          description={
+            filtered ? "Try another search, level or topic." : `New ${names.plural} appear here as soon as they are published.`
+          }
           action={
             filtered ? (
               <Button variant="outline" size="sm" onClick={reset}>
@@ -216,22 +222,16 @@ export function Library({
         />
       ) : (
         <>
-          <p className="flex flex-wrap items-center gap-x-2 text-caption text-fg-muted">
-            <span>
-              <span className="tabular-nums">{total}</span> {total === 1 ? names.singular : names.plural}
-            </span>
-            <span>·</span>
-            <span>
-              open one for everything about it · <Eye className="inline size-3" aria-label="eye" /> shows a hidden meaning ·{" "}
-              <ArrowLeftRight className="inline size-3" aria-label="compare" /> on two or three compares them
-            </span>
-            {filtered && (
-              <Button variant="link" size="sm" className="text-caption" onClick={reset}>
-                Clear filters
-              </Button>
-            )}
-          </p>
-          <ListHeader columns={columns} setColumns={setColumns} revealAll={revealAll} setRevealAll={setRevealAll} />
+          <ListHeader
+            count={total}
+            names={names}
+            filtered={Boolean(filtered)}
+            onReset={reset}
+            columns={columns}
+            setColumns={setColumns}
+            revealAll={revealAll}
+            setRevealAll={setRevealAll}
+          />
           <div className="grid gap-4">
             {groups.map((group) => (
               <section key={group.level || "all"} className="grid gap-2">
@@ -348,15 +348,24 @@ function gridFor(count: number) {
 }
 
 /**
- * The list's header: a title over each language column, and the control that arranges them —
- * which language leads, which is left out — and shows every hidden translation at once.
+ * Above the list: how many entries match, the controls that show every hidden meaning and
+ * arrange the language columns, and — on wide screens — a title over each column, in the same
+ * grid as the rows so each language lines up down the page.
  */
 function ListHeader({
+  count,
+  names,
+  filtered,
+  onReset,
   columns,
   setColumns,
   revealAll,
   setRevealAll,
 }: {
+  count: number;
+  names: { singular: string; plural: string };
+  filtered: boolean;
+  onReset: () => void;
   columns: Columns;
   setColumns: (next: Columns) => void;
   revealAll: boolean;
@@ -364,81 +373,97 @@ function ListHeader({
 }) {
   const langs = shown(columns);
   return (
-    <div className={cn("grid items-center gap-x-4 px-3 sm:px-4", gridFor(langs.length))}>
-      {langs.map((lang, i) => {
-        const { name, Flag } = LANG[lang];
-        return (
-          <span key={lang} className="hidden items-center gap-1.5 text-caption font-medium text-fg-muted md:flex">
-            <Flag title={name} />
-            {name}
-            {i > 0 && <span className="font-normal">· meaning hidden</span>}
-          </span>
-        );
-      })}
-      <div className="flex items-center justify-end gap-1 md:col-auto">
-        <Button
-          size="sm"
-          variant={revealAll ? "subtle" : "ghost"}
-          aria-pressed={revealAll}
-          onClick={() => setRevealAll(!revealAll)}
-          title={revealAll ? "Hide the translated meanings" : "Show every translated meaning"}
-        >
-          {revealAll ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-          <span className="hidden lg:inline">{revealAll ? "Hide meanings" : "Show meanings"}</span>
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost" aria-label="Arrange columns">
-              <Columns3 aria-hidden />
-              <span className="hidden lg:inline">Columns</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>Languages, in order</DropdownMenuLabel>
-            {columns.order.map((lang, i) => {
-              const { name, Flag } = LANG[lang];
-              const on = !columns.hidden.includes(lang);
-              const lastTwo = on && shown(columns).length <= 2;
-              return (
-                <div key={lang} className="flex items-center gap-2 px-2 py-1.5 text-body-sm">
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    disabled={lastTwo}
-                    onChange={() => setColumns(toggled(columns, lang))}
-                    aria-label={`Show ${name}`}
-                    title={lastTwo ? "At least two languages stay on" : undefined}
-                    className="size-4 accent-(--color-primary)"
-                  />
-                  <Flag title={name} />
-                  <span className={cn("flex-1", !on && "text-fg-muted line-through")}>{name}</span>
-                  <IconButton
-                    label={`Move ${name} left`}
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={i === 0}
-                    onClick={() => setColumns(moved(columns, lang, -1))}
-                  >
-                    <ArrowUp />
-                  </IconButton>
-                  <IconButton
-                    label={`Move ${name} right`}
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={i === columns.order.length - 1}
-                    onClick={() => setColumns(moved(columns, lang, 1))}
-                  >
-                    <ArrowDown />
-                  </IconButton>
-                </div>
-              );
-            })}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setColumns(DEFAULT_COLUMNS)}>
-              <RotateCcw aria-hidden /> English first, all three
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-caption text-fg-muted">
+          <span className="tabular-nums">{count}</span> {count === 1 ? names.singular : names.plural}
+        </span>
+        {filtered && (
+          <Button variant="link" size="sm" className="h-auto text-caption" onClick={onReset}>
+            Clear filters
+          </Button>
+        )}
+        <span className="ml-auto flex items-center gap-1">
+          <Button
+            size="sm"
+            variant={revealAll ? "subtle" : "ghost"}
+            aria-pressed={revealAll}
+            onClick={() => setRevealAll(!revealAll)}
+            title={revealAll ? "Hide the translated meanings" : "Show every translated meaning"}
+          >
+            {revealAll ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+            {revealAll ? "Hide meanings" : "Show meanings"}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" aria-label="Arrange columns">
+                <Columns3 aria-hidden />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Languages, in order</DropdownMenuLabel>
+              {columns.order.map((lang, i) => {
+                const { name, Flag } = LANG[lang];
+                const on = !columns.hidden.includes(lang);
+                const lastTwo = on && langs.length <= 2;
+                return (
+                  <div key={lang} className="flex items-center gap-2 px-2 py-1.5 text-body-sm">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      disabled={lastTwo}
+                      onChange={() => setColumns(toggled(columns, lang))}
+                      aria-label={`Show ${name}`}
+                      title={lastTwo ? "At least two languages stay on" : undefined}
+                      className="size-4 accent-(--color-primary)"
+                    />
+                    <Flag title={name} />
+                    <span className={cn("flex-1", !on && "text-fg-muted line-through")}>{name}</span>
+                    <IconButton
+                      label={`Move ${name} left`}
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={i === 0}
+                      onClick={() => setColumns(moved(columns, lang, -1))}
+                    >
+                      <ArrowUp />
+                    </IconButton>
+                    <IconButton
+                      label={`Move ${name} right`}
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={i === columns.order.length - 1}
+                      onClick={() => setColumns(moved(columns, lang, 1))}
+                    >
+                      <ArrowDown />
+                    </IconButton>
+                  </div>
+                );
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setColumns(DEFAULT_COLUMNS)}>
+                <RotateCcw aria-hidden /> English first, all three
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </span>
+      </div>
+      <div className={cn("hidden items-center gap-x-4 border-b px-3 pb-2 sm:px-4 md:grid", gridFor(langs.length))}>
+        {langs.map((lang, i) => {
+          const { name, Flag } = LANG[lang];
+          return (
+            <span
+              key={lang}
+              className="flex min-w-0 items-center gap-1.5 text-caption font-medium whitespace-nowrap text-fg-muted"
+            >
+              <Flag title={name} />
+              <span className="truncate">{name}</span>
+              {i > 0 && !revealAll && <EyeOff className="size-3 shrink-0 opacity-70" aria-label="meanings hidden" />}
+            </span>
+          );
+        })}
+        <span aria-hidden />
       </div>
     </div>
   );
