@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "@engora/ui/theme.css";
 
+/* A screen with room to spare vertically. Pictures meant to be seen whole — the level ladder —
+   are drawn compact by default and given more air from this height up. */
+@custom-variant tall (@media (min-height: 56rem));
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
