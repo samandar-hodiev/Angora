@@ -24,6 +24,9 @@ env_value() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/[[:space:
 DATABASE_URL=$(env_value DATABASE_URL)
 REDIS_URL=$(env_value REDIS_URL)
 
+# Out of iCloud Drive first: an offloaded node_modules leaves every page loading forever.
+"$ROOT/infrastructure/scripts/icloud-guard.sh"
+
 echo "dev: checking PostgreSQL…"
 if ! pg_isready -d "$DATABASE_URL" >/dev/null 2>&1; then
   echo "dev: PostgreSQL is not reachable at DATABASE_URL — start it (brew services start postgresql, or make infra)" >&2

@@ -4,8 +4,9 @@
 !.env.example
 
 # Node
-node_modules/
-.next/
+node_modules
+*.nosync/
+.next
 out/
 dist/
 coverage/
