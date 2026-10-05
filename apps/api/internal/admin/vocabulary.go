@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -30,15 +31,22 @@ import (
 // JobVocabularyGenerate is the job type a queued vocabulary generation runs as.
 const JobVocabularyGenerate = "vocabulary.generate"
 
-// VocabularyWriter writes a level's words. The content author implements it.
+// VocabularyWriter writes a batch of entries. The content author implements it.
 type VocabularyWriter interface {
 	WriteVocabulary(ctx context.Context, req ai.VocabularyRequest) ([]ai.GeneratedWord, *ai.EvaluationMeta, error)
+}
+
+// LevelChecker gives a second, independent opinion on entries' levels. The content author
+// implements it; without one, levels the word list does not know stay unverified.
+type LevelChecker interface {
+	CheckLevels(ctx context.Context, items []ai.LevelCheckItem) (map[string]string, error)
 }
 
 // Word is one vocabulary entry as the console lists and edits it.
 type Word struct {
 	ID               uuid.UUID         `json:"id"`
 	Term             string            `json:"term"`
+	Kind             string            `json:"kind"`
 	PartOfSpeech     string            `json:"part_of_speech"`
 	Definition       string            `json:"definition"`
 	Examples         []string          `json:"examples"`
@@ -48,8 +56,12 @@ type Word struct {
 	Translations     map[string]string `json:"translations"`
 	/** The word explained per CEFR level: {"A1": {"definition", "examples"}, …}. */
 	LevelContent map[string]ai.LevelText `json:"level_content"`
-	Status       string                  `json:"status"`
-	Source       string                  `json:"source"`
+	Senses       []ai.Sense              `json:"senses"`
+	Register     string                  `json:"register"`
+	/** list | ai_checked | ai | curated: where the level came from; ai is unverified. */
+	LevelSource string `json:"level_source"`
+	Status      string `json:"status"`
+	Source      string `json:"source"`
 	/** How many learners have it in their deck. */
 	Learners  int       `json:"learners"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -57,10 +69,12 @@ type Word struct {
 
 // VocabularySummary is the library at a glance: how much there is, and how much waits.
 type VocabularySummary struct {
-	Total     int            `json:"total"`
-	Draft     int            `json:"draft"`
-	Published int            `json:"published"`
-	ByLevel   map[string]int `json:"by_level"`
+	/** Entries whose level nobody has confirmed yet. */
+	Unverified int            `json:"unverified"`
+	Total      int            `json:"total"`
+	Draft      int            `json:"draft"`
+	Published  int            `json:"published"`
+	ByLevel    map[string]int `json:"by_level"`
 	/** Drafts per level, so each level's section can say what waits in it. */
 	DraftsByLevel map[string]int `json:"drafts_by_level"`
 }
@@ -72,15 +86,20 @@ type vocabularyPage struct {
 
 const wordColumns = `
 	v.id, v.term, v.part_of_speech, v.definition, v.examples, v.pronunciation_ipa, l.code, v.tags,
-	v.translations, v.level_content, v.status, v.source,
+	v.translations, v.level_content, v.status, v.source, v.kind, v.senses, v.register, v.level_source,
 	(SELECT count(*) FROM user_vocabulary uv WHERE uv.vocabulary_id = v.id)::int, v.updated_at`
 
 func scanWord(row pgx.Row) (Word, error) {
 	var w Word
-	var examples, translations, content []byte
+	var examples, translations, content, senses []byte
 	if err := row.Scan(&w.ID, &w.Term, &w.PartOfSpeech, &w.Definition, &examples, &w.PronunciationIPA, &w.Level,
-		&w.Tags, &translations, &content, &w.Status, &w.Source, &w.Learners, &w.UpdatedAt); err != nil {
+		&w.Tags, &translations, &content, &w.Status, &w.Source, &w.Kind, &senses, &w.Register, &w.LevelSource,
+		&w.Learners, &w.UpdatedAt); err != nil {
 		return w, err
+	}
+	_ = json.Unmarshal(senses, &w.Senses)
+	if w.Senses == nil {
+		w.Senses = []ai.Sense{}
 	}
 	_ = json.Unmarshal(examples, &w.Examples)
 	_ = json.Unmarshal(translations, &w.Translations)
@@ -112,6 +131,11 @@ type vocabularyQuery struct {
 	Search string `form:"q" binding:"omitempty,max=100"`
 	Level  string `form:"level" binding:"omitempty,oneof=A1 A2 B1 B2 C1 C2"`
 	Status string `form:"status" binding:"omitempty,oneof=draft published archived"`
+	Kind   string `form:"kind" binding:"omitempty,oneof=word phrase collocation"`
+	Topic  string `form:"topic" binding:"omitempty,max=40"`
+	/** formal | informal | neutral …; or "unverified" in Check for entries whose level waits. */
+	Register string `form:"register" binding:"omitempty,max=20"`
+	Check    string `form:"check" binding:"omitempty,oneof=unverified"`
 	httpx.Pagination
 }
 
@@ -127,16 +151,21 @@ func (m *Module) vocabularyList(c *gin.Context) {
 
 	where := `WHERE ($1 = '' OR v.term ILIKE '%' || $1 || '%' OR v.definition ILIKE '%' || $1 || '%')
 	            AND ($2 = '' OR l.code = $2)
-	            AND (CASE WHEN $3 = '' THEN v.status <> 'archived' ELSE v.status = $3 END)`
+	            AND (CASE WHEN $3 = '' THEN v.status <> 'archived' ELSE v.status = $3 END)
+	            AND ($4 = '' OR v.kind = $4)
+	            AND ($5 = '' OR EXISTS (SELECT 1 FROM unnest(v.tags) t WHERE lower(t) = lower($5)))
+	            AND ($6 = '' OR v.register = $6)
+	            AND ($7 = '' OR v.level_source = 'ai')`
+	args := []any{q.Search, q.Level, q.Status, q.Kind, q.Topic, q.Register, q.Check}
 	var total int64
 	if err := m.pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id `+where,
-		q.Search, q.Level, q.Status).Scan(&total); err != nil {
+		args...).Scan(&total); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	rows, err := m.pool.Query(ctx, `SELECT `+wordColumns+` FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id `+where+`
 		ORDER BY (v.status = 'draft') DESC, l.rank NULLS LAST, lower(v.term)
-		OFFSET $4 LIMIT $5`, q.Search, q.Level, q.Status, q.Offset(), q.PageSize)
+		OFFSET $8 LIMIT $9`, append(args, q.Offset(), q.PageSize)...)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -155,18 +184,20 @@ func (m *Module) vocabularyList(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	if out.Summary, err = m.vocabularySummary(ctx); err != nil {
+	if out.Summary, err = m.vocabularySummary(ctx, q.Kind); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	httpx.OKWithMeta(c, out, httpx.Meta{Page: q.Page, PageSize: q.PageSize, Total: total})
 }
 
-func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, error) {
+// vocabularySummary counts the library, or one kind of entry in it.
+func (m *Module) vocabularySummary(ctx context.Context, kind string) (VocabularySummary, error) {
 	s := VocabularySummary{ByLevel: map[string]int{}, DraftsByLevel: map[string]int{}}
 	if err := m.pool.QueryRow(ctx, `
-		SELECT count(*)::int, count(*) FILTER (WHERE status = 'published')::int
-		FROM vocabulary WHERE status <> 'archived'`).Scan(&s.Total, &s.Published); err != nil {
+		SELECT count(*)::int, count(*) FILTER (WHERE status = 'published')::int,
+		       count(*) FILTER (WHERE level_source = 'ai')::int
+		FROM vocabulary WHERE status <> 'archived' AND ($1 = '' OR kind = $1)`, kind).Scan(&s.Total, &s.Published, &s.Unverified); err != nil {
 		return s, err
 	}
 	s.Draft = s.Total - s.Published
@@ -176,7 +207,7 @@ func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, erro
 	rows, err := m.pool.Query(ctx, `
 		SELECT l.code, v.status, count(*)::int
 		FROM vocabulary v JOIN levels l ON l.id = v.level_id
-		WHERE v.status <> 'archived' GROUP BY 1, 2`)
+		WHERE v.status <> 'archived' AND ($1 = '' OR v.kind = $1) GROUP BY 1, 2`, kind)
 	if err != nil {
 		return s, err
 	}
@@ -204,6 +235,8 @@ type wordInput struct {
 	Level            string                  `json:"level" binding:"required,oneof=A1 A2 B1 B2 C1 C2"`
 	Tags             []string                `json:"tags" binding:"omitempty,max=6,dive,max=40"`
 	Translations     map[string]string       `json:"translations"`
+	Register         string                  `json:"register" binding:"omitempty,max=20"`
+	Senses           []ai.Sense              `json:"senses" binding:"omitempty,max=4"`
 }
 
 func (in wordInput) clean() (ai.GeneratedWord, error) {
@@ -223,7 +256,8 @@ func (in wordInput) clean() (ai.GeneratedWord, error) {
 	w := ai.GeneratedWord{
 		Term: in.Term, PartOfSpeech: strings.ToLower(strings.TrimSpace(in.PartOfSpeech)), Level: in.Level,
 		PronunciationIPA: strings.TrimSpace(in.PronunciationIPA), Tags: in.Tags,
-		Translations: map[string]string{}, LevelContent: content,
+		Translations: map[string]string{}, LevelContent: content, Senses: in.Senses,
+		Usage: ai.WordUsage{Register: in.Register},
 	}
 	for _, lang := range []string{"uz", "ru", "ru_pron"} {
 		if t := strings.TrimSpace(in.Translations[lang]); t != "" {
@@ -269,14 +303,16 @@ func (m *Module) createWord(c *gin.Context) {
 	examples, _ := json.Marshal(orEmptyStrings(w.Examples))
 	translations, _ := json.Marshal(w.Translations)
 	content, _ := json.Marshal(w.LevelContent)
+	senses, _ := json.Marshal(w.Senses)
 	ctx := c.Request.Context()
 	var id uuid.UUID
 	err = m.pool.QueryRow(ctx, `
 		INSERT INTO vocabulary (term, part_of_speech, definition, examples, pronunciation_ipa, level_id, tags,
-		                        translations, level_content, status, source, created_by)
-		VALUES ($1, $2, $3, $4, $5, (SELECT id FROM levels WHERE code = $6), $7, $8, $9, 'draft', 'curated', $10)
+		                        translations, level_content, status, source, created_by, kind, senses, register, level_source)
+		VALUES ($1, $2, $3, $4, $5, (SELECT id FROM levels WHERE code = $6), $7, $8, $9, 'draft', 'curated', $10,
+		        $11, $12, $13, 'curated')
 		RETURNING id`, w.Term, w.PartOfSpeech, w.Definition, examples, w.PronunciationIPA, w.Level,
-		orEmptyStrings(w.Tags), translations, content, p.UserID).Scan(&id)
+		orEmptyStrings(w.Tags), translations, content, p.UserID, w.Kind, senses, w.Usage.Register).Scan(&id)
 	if err != nil {
 		httpx.Fail(c, duplicateWord(err))
 		return
@@ -304,12 +340,19 @@ func (m *Module) updateWord(c *gin.Context) {
 	examples, _ := json.Marshal(orEmptyStrings(w.Examples))
 	translations, _ := json.Marshal(w.Translations)
 	content, _ := json.Marshal(w.LevelContent)
+	// Senses and register are kept when the editor did not send them.
+	var senses []byte
+	if in.Senses != nil {
+		senses, _ = json.Marshal(w.Senses)
+	}
+	// Saving is the owner's word on the level: from here it is curated, not the model's guess.
 	tag, err := m.pool.Exec(c.Request.Context(), `
 		UPDATE vocabulary SET term = $2, part_of_speech = $3, definition = $4, examples = $5, pronunciation_ipa = $6,
 		       level_id = (SELECT id FROM levels WHERE code = $7), tags = $8, translations = $9, level_content = $10,
-		       source = 'curated'
+		       source = 'curated', kind = $11, senses = COALESCE($12::jsonb, senses),
+		       register = COALESCE(NULLIF($13, ''), register), level_source = 'curated'
 		WHERE id = $1`, id, w.Term, w.PartOfSpeech, w.Definition, examples, w.PronunciationIPA, w.Level,
-		orEmptyStrings(w.Tags), translations, content)
+		orEmptyStrings(w.Tags), translations, content, w.Kind, senses, w.Usage.Register)
 	if err != nil {
 		httpx.Fail(c, duplicateWord(err))
 		return
@@ -352,10 +395,46 @@ func (m *Module) setWordStatus(c *gin.Context) {
 	m.respondWord(c, id)
 }
 
+type wordLevelInput struct {
+	Level string `json:"level" binding:"required,oneof=A1 A2 B1 B2 C1 C2"`
+}
+
+// POST /admin/vocabulary/:id/level — the owner confirms or corrects an entry's level. Its one
+// explanation moves with it.
+func (m *Module) setWordLevel(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, apperr.BadRequest("Invalid word id"))
+		return
+	}
+	var in wordLevelInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	tag, err := m.pool.Exec(c.Request.Context(), `
+		UPDATE vocabulary v SET level_id = (SELECT id FROM levels WHERE code = $2), level_source = 'curated',
+		       level_content = CASE
+		           WHEN (SELECT count(*) FROM jsonb_object_keys(v.level_content)) = 1
+		           THEN jsonb_build_object($2::text, (SELECT value FROM jsonb_each(v.level_content) LIMIT 1))
+		           ELSE v.level_content END
+		WHERE v.id = $1`, id, in.Level)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Fail(c, apperr.NotFound("Word"))
+		return
+	}
+	m.respondWord(c, id)
+}
+
 type publishWordsInput struct {
 	/** The words to publish. Empty publishes every draft, or every draft at Level. */
 	IDs   []uuid.UUID `json:"ids" binding:"omitempty,max=500"`
 	Level string      `json:"level" binding:"omitempty,oneof=A1 A2 B1 B2 C1 C2"`
+	Kind  string      `json:"kind" binding:"omitempty,oneof=word phrase collocation"`
 }
 
 // POST /admin/vocabulary/publish — publish drafts in one go.
@@ -369,7 +448,8 @@ func (m *Module) publishWords(c *gin.Context) {
 		UPDATE vocabulary v SET status = 'published', published_at = COALESCE(v.published_at, now())
 		WHERE v.status IN ('draft', 'review')
 		  AND ($1::uuid[] IS NULL OR cardinality($1::uuid[]) = 0 OR v.id = ANY ($1))
-		  AND ($2 = '' OR v.level_id = (SELECT id FROM levels WHERE code = $2))`, in.IDs, in.Level)
+		  AND ($2 = '' OR v.level_id = (SELECT id FROM levels WHERE code = $2))
+		  AND ($3 = '' OR v.kind = $3)`, in.IDs, in.Level, in.Kind)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -394,23 +474,29 @@ func (m *Module) respondWord(c *gin.Context, id uuid.UUID) {
 // ---- generation -----------------------------------------------------------------------
 
 type vocabularyPlan struct {
-	/** How many new words, in all. */
+	/** How many new entries, in all. */
 	Count int `json:"count"`
-	/** The levels each word is explained for. */
-	Levels []string  `json:"levels"`
-	Theme  string    `json:"theme"`
-	Actor  uuid.UUID `json:"actor"`
+	/** word | phrase | collocation. */
+	Kind   string   `json:"kind"`
+	Topics []string `json:"topics"`
+	/** Optional bounds on the entries' own level. */
+	MinLevel string    `json:"min_level"`
+	MaxLevel string    `json:"max_level"`
+	Actor    uuid.UUID `json:"actor"`
 }
 
 type generateWordsInput struct {
-	/** How many new words to write. Each is explained for every level in Levels. */
-	Count  int      `json:"count" binding:"omitempty,min=10,max=100"`
-	Levels []string `json:"levels" binding:"required,min=1,max=6,dive,oneof=A1 A2 B1 B2 C1 C2"`
-	Theme  string   `json:"theme" binding:"omitempty,max=80"`
+	/** How many new entries to write. */
+	Count int    `json:"count" binding:"omitempty,min=10,max=100"`
+	Kind  string `json:"kind" binding:"omitempty,oneof=word phrase collocation"`
+	/** Topics from the list, or the owner's own; empty for a mix. */
+	Topics   []string `json:"topics" binding:"omitempty,max=8,dive,min=2,max=40"`
+	MinLevel string   `json:"min_level" binding:"omitempty,oneof=A1 A2 B1 B2 C1 C2"`
+	MaxLevel string   `json:"max_level" binding:"omitempty,oneof=A1 A2 B1 B2 C1 C2"`
 }
 
-// POST /admin/vocabulary/generate — write new words, each explained for every level asked
-// for, as drafts. Never a word already in the library.
+// POST /admin/vocabulary/generate — write new entries of one kind, from the topics asked for,
+// as drafts, each at a level that has been checked. Never an entry already in the library.
 func (m *Module) generateVocabulary(c *gin.Context) {
 	p, err := authz.CurrentPrincipal(c)
 	if err != nil {
@@ -429,7 +515,19 @@ func (m *Module) generateVocabulary(c *gin.Context) {
 	if in.Count == 0 {
 		in.Count = 20
 	}
-	plan := vocabularyPlan{Count: in.Count, Levels: in.Levels, Theme: strings.TrimSpace(in.Theme), Actor: p.UserID}
+	if in.Kind == "" {
+		in.Kind = ai.KindWord
+	}
+	if in.MinLevel != "" && in.MaxLevel != "" && levelRank(in.MinLevel) > levelRank(in.MaxLevel) {
+		in.MinLevel, in.MaxLevel = in.MaxLevel, in.MinLevel
+	}
+	topics := []string{}
+	for _, t := range in.Topics {
+		if t = strings.ToLower(strings.TrimSpace(t)); t != "" && !slices.Contains(topics, t) {
+			topics = append(topics, t)
+		}
+	}
+	plan := vocabularyPlan{Count: in.Count, Kind: in.Kind, Topics: topics, MinLevel: in.MinLevel, MaxLevel: in.MaxLevel, Actor: p.UserID}
 	ctx := c.Request.Context()
 	if m.jobs != nil {
 		job, err := jobs.New(JobVocabularyGenerate, &p.UserID, plan)
@@ -442,7 +540,7 @@ func (m *Module) generateVocabulary(c *gin.Context) {
 			httpx.Fail(c, err)
 			return
 		}
-		httpx.Accepted(c, map[string]any{"job_id": job.ID, "levels": plan.Levels, "count": plan.Count})
+		httpx.Accepted(c, map[string]any{"job_id": job.ID, "kind": plan.Kind, "topics": plan.Topics, "count": plan.Count})
 		return
 	}
 	result, err := m.runVocabularyGeneration(ctx, plan)
@@ -466,30 +564,34 @@ func (m *Module) HandleVocabularyJob(ctx context.Context, job *jobs.Job) (map[st
 	return result, nil
 }
 
-// vocabularyThemes spread the batches of one run when no theme was asked for, so parallel
-// batches do not all reach for the same handful of common words.
-var vocabularyThemes = []string{
-	"daily life and home", "work and study", "travel and places", "feelings and personality",
-	"health and the body", "food and shopping", "technology and media", "nature and the environment",
-	"society and people", "time, change and abstract ideas",
+// VocabularyTopics are the topics the console offers; an owner may type others.
+var VocabularyTopics = []string{
+	"nature", "animals", "plants", "weather", "environment", "work", "business", "money", "travel", "transport",
+	"city", "home", "family", "people", "feelings", "personality", "food", "health", "body", "sport",
+	"education", "science", "technology", "media", "art", "music", "shopping", "clothes", "society", "time",
 }
 
-// vocabularyWaves bounds how many rounds a run takes to reach its count: words that come back
-// already in the library are skipped, and the next round asks for the shortfall.
+func levelRank(code string) int {
+	return slices.Index([]string{"A1", "A2", "B1", "B2", "C1", "C2"}, code)
+}
+
+// vocabularyWaves bounds how many rounds a run takes to reach its count: entries that come
+// back already in the library, or outside the level range, are skipped, and the next round
+// asks for the shortfall.
 const vocabularyWaves = 8
 
-// runVocabularyGeneration writes plan.Count new words in batches, a few batches at a time.
-// Every batch is told every word already in the library and every word written earlier in
-// this run, and the unique index catches anything that slips through, so no word is stored
-// twice. A round that comes back short is topped up by the next.
+// runVocabularyGeneration writes plan.Count new entries in batches, a few batches at a time.
+// Each batch takes one of the topics in turn, so a run over several topics covers all of them.
+// Every batch is told every entry already in the library and written earlier in this run, and
+// the unique index catches anything that slips through. Each batch's levels are checked before
+// it is stored.
 func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPlan) (map[string]any, error) {
 	writer, ok := m.author.(VocabularyWriter)
 	if !ok {
 		return nil, apperr.New(apperr.CodeUnavailable, "AI content generation is not configured")
 	}
-	levels, err := parseLevels(plan.Levels)
-	if err != nil {
-		return nil, err
+	if plan.Kind == "" {
+		plan.Kind = ai.KindWord
 	}
 	exclude, err := m.existingTerms(ctx)
 	if err != nil {
@@ -497,17 +599,17 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 	}
 	target := min(max(plan.Count, 1), 100)
 	actor := plan.Actor
-	added, skipped, failedBatches, batchIndex := 0, 0, 0, 0
+	added, skipped, outOfRange, failedBatches, batchIndex := 0, 0, 0, 0, 0
+	verified := map[string]int{}
 
-	// Words are saved the moment their batch comes back, not when the whole run ends, so the
-	// console can show the count climbing while the rest are still being written. The mutex
-	// keeps the count, the skip list and the target straight across the batches.
+	// Entries are saved the moment their batch comes back, not when the whole run ends, so the
+	// console can show the count climbing while the rest are still being written.
 	var mu sync.Mutex
 	seen := map[string]bool{}
 	for _, t := range exclude {
 		seen[t] = true
 	}
-	store := func(words []ai.GeneratedWord, requestID *uuid.UUID) error {
+	store := func(words []checkedWord, requestID *uuid.UUID) error {
 		mu.Lock()
 		defer mu.Unlock()
 		for _, w := range words {
@@ -519,13 +621,18 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 				skipped++
 				continue
 			}
-			stored, err := m.storeGeneratedWord(ctx, w, requestID, actor)
+			if !inRange(w.Level, plan.MinLevel, plan.MaxLevel) {
+				outOfRange++
+				continue
+			}
+			stored, err := m.storeGeneratedWord(ctx, w.GeneratedWord, w.source, requestID, actor)
 			if err != nil {
 				return err
 			}
 			seen[key] = true
 			if stored {
 				added++
+				verified[w.source]++
 			} else {
 				skipped++
 			}
@@ -549,20 +656,24 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 		var wg sync.WaitGroup
 		var storeErr error
 		for i := 0; i < batches; i++ {
-			// A couple over what is still needed: a word can come back already in the library
-			// or missing a level, and is then dropped; the target cuts off any surplus.
+			// A couple over what is still needed: an entry can come back already in the library or
+			// outside the level range, and is then dropped; the target cuts off any surplus.
 			count := min(ai.VocabularyBatch, want-i*ai.VocabularyBatch) + 2
-			theme := plan.Theme
-			if theme == "" {
-				theme = vocabularyThemes[(batchIndex+i)%len(vocabularyThemes)]
+			var topics []string
+			switch {
+			case len(plan.Topics) > 0:
+				topics = []string{plan.Topics[(batchIndex+i)%len(plan.Topics)]}
+			default:
+				topics = []string{VocabularyTopics[(batchIndex+i*7)%len(VocabularyTopics)]}
 			}
 			wg.Add(1)
-			go func(count int, theme string) {
+			go func(count int, topics []string) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
 				words, meta, err := writer.WriteVocabulary(ctx, ai.VocabularyRequest{
-					Count: count, Levels: levels, Theme: theme, Exclude: known, ActorID: &actor,
+					Count: count, Kind: plan.Kind, Topics: topics, MinLevel: plan.MinLevel, MaxLevel: plan.MaxLevel,
+					Exclude: known, ActorID: &actor,
 				})
 				if err != nil {
 					mu.Lock()
@@ -574,12 +685,12 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 				if meta != nil && meta.AIRequestID != uuid.Nil {
 					requestID = &meta.AIRequestID
 				}
-				if err := store(words, requestID); err != nil {
+				if err := store(m.checkLevels(ctx, words), requestID); err != nil {
 					mu.Lock()
 					storeErr = err
 					mu.Unlock()
 				}
-			}(count, theme)
+			}(count, topics)
 		}
 		wg.Wait()
 		batchIndex += batches
@@ -590,28 +701,138 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 	if added == 0 {
 		return nil, apperr.New(apperr.CodeUnavailable, "AI vocabulary generation failed. Please try again.")
 	}
-	return map[string]any{"added": added, "requested": target, "skipped_duplicates": skipped, "failed_batches": failedBatches}, nil
+	return map[string]any{
+		"added": added, "requested": target, "skipped_duplicates": skipped, "out_of_range": outOfRange,
+		"failed_batches": failedBatches, "level_sources": verified,
+	}, nil
 }
 
-// storeGeneratedWord saves one word as a draft. It reports false when the word was already in
-// the library — the same term and part of speech — and nothing was written.
-func (m *Module) storeGeneratedWord(ctx context.Context, w ai.GeneratedWord, requestID *uuid.UUID, actor uuid.UUID) (bool, error) {
+func inRange(level, lo, hi string) bool {
+	r := levelRank(level)
+	return (lo == "" || r >= levelRank(lo)) && (hi == "" || r <= levelRank(hi))
+}
+
+// checkedWord is a generated entry with where its level now comes from.
+type checkedWord struct {
+	ai.GeneratedWord
+	source string
+}
+
+// checkLevels settles each entry's level. A level in the CEFR word list wins outright. Any other
+// is asked again of a second, independent check that does not see the first answer: when the
+// two agree the level counts as checked; when they disagree the checker's — stricter — level
+// is kept and the entry is marked unverified, for the owner to look at.
+func (m *Module) checkLevels(ctx context.Context, words []ai.GeneratedWord) []checkedWord {
+	out := make([]checkedWord, len(words))
+	terms := make([]string, len(words))
+	for i, w := range words {
+		out[i] = checkedWord{GeneratedWord: w, source: "ai"}
+		terms[i] = strings.ToLower(w.Term)
+	}
+	listed, err := m.listedLevels(ctx, terms)
+	if err != nil {
+		listed = map[string]map[string]string{}
+	}
+	var unlisted []ai.LevelCheckItem
+	for i := range out {
+		byPOS := listed[terms[i]]
+		level := byPOS[out[i].PartOfSpeech]
+		if level == "" && len(byPOS) == 1 {
+			for _, l := range byPOS {
+				level = l
+			}
+		}
+		if level != "" {
+			setLevel(&out[i].GeneratedWord, level)
+			out[i].source = "list"
+			continue
+		}
+		unlisted = append(unlisted, ai.LevelCheckItem{Term: out[i].Term, PartOfSpeech: out[i].PartOfSpeech, Definition: out[i].Definition})
+	}
+	checker, ok := m.author.(LevelChecker)
+	if !ok || len(unlisted) == 0 {
+		return out
+	}
+	checked, err := checker.CheckLevels(ctx, unlisted)
+	if err != nil {
+		return out
+	}
+	for i := range out {
+		if out[i].source == "list" {
+			continue
+		}
+		second := checked[terms[i]]
+		if levelRank(second) < 0 {
+			continue
+		}
+		if second == out[i].Level {
+			out[i].source = "ai_checked"
+		} else {
+			setLevel(&out[i].GeneratedWord, second)
+		}
+	}
+	return out
+}
+
+// setLevel moves an entry, and its one explanation, to another level.
+func setLevel(w *ai.GeneratedWord, level string) {
+	if w.Level == level {
+		return
+	}
+	if text, ok := w.LevelContent[w.Level]; ok && len(w.LevelContent) == 1 {
+		w.LevelContent = map[string]ai.LevelText{level: text}
+	}
+	w.Level = level
+}
+
+// listedLevels reads the CEFR word list for these terms: term → part of speech → level.
+func (m *Module) listedLevels(ctx context.Context, terms []string) (map[string]map[string]string, error) {
+	rows, err := m.pool.Query(ctx, `SELECT lower(headword), pos, level_code FROM cefr_wordlist WHERE lower(headword) = ANY ($1)`, terms)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[string]string{}
+	for rows.Next() {
+		var term, pos, level string
+		if err := rows.Scan(&term, &pos, &level); err != nil {
+			return nil, err
+		}
+		if out[term] == nil {
+			out[term] = map[string]string{}
+		}
+		out[term][pos] = level
+	}
+	return out, rows.Err()
+}
+
+// storeGeneratedWord saves one entry as a draft. It reports false when it was already in the
+// library — the same term and part of speech — and nothing was written.
+func (m *Module) storeGeneratedWord(ctx context.Context, w ai.GeneratedWord, levelSource string, requestID *uuid.UUID, actor uuid.UUID) (bool, error) {
 	examples, _ := json.Marshal(orEmptyStrings(w.Examples))
 	translations, _ := json.Marshal(w.Translations)
 	content, _ := json.Marshal(w.LevelContent)
+	senses, _ := json.Marshal(w.Senses)
+	if w.Senses == nil {
+		senses = []byte("[]")
+	}
 	u := w.Usage
+	kind := w.Kind
+	if kind == "" {
+		kind = ai.KindOf(w.PartOfSpeech)
+	}
 	tag, err := m.pool.Exec(ctx, `
 		INSERT INTO vocabulary (term, part_of_speech, definition, examples, pronunciation_ipa, level_id, tags,
 		                        translations, level_content, status, source, ai_request_id, created_by,
 		                        usage_note, register, collocations, synonyms, antonyms, word_family, common_mistake,
-		                        enriched_at)
+		                        enriched_at, kind, senses, level_source)
 		VALUES ($1, $2, $3, $4, $5, (SELECT id FROM levels WHERE code = $6), $7, $8, $9, 'draft', 'ai', $10, $11,
-		        $12, $13, $14, $15, $16, $17, $18, CASE WHEN $19 THEN now() END)
+		        $12, $13, $14, $15, $16, $17, $18, CASE WHEN $19 THEN now() END, $20, $21, $22)
 		ON CONFLICT (lower(term), part_of_speech) DO NOTHING`,
 		w.Term, w.PartOfSpeech, w.Definition, examples, w.PronunciationIPA, w.Level,
 		orEmptyStrings(w.Tags), translations, content, requestID, actor,
 		u.UsageNote, u.Register, orEmptyStrings(u.Collocations), orEmptyStrings(u.Synonyms), orEmptyStrings(u.Antonyms),
-		orEmptyStrings(u.WordFamily), u.CommonMistake, !u.Empty())
+		orEmptyStrings(u.WordFamily), u.CommonMistake, !u.Empty(), kind, senses, levelSource)
 	if err != nil {
 		return false, fmt.Errorf("store word %q: %w", w.Term, err)
 	}

@@ -10,17 +10,17 @@ import { Meter, Stat } from "@/components/ui/data-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/lib/query/keys";
-import type { ReviewQueue, ReviewRating, VocabularyCard } from "@engora/types";
+import type { LexiconKind, ReviewQueue, ReviewRating, VocabularyCard } from "@engora/types";
 
 import { learnerApi } from "../../api";
 import { useMarkKnown, useReviewWord, useVocabularyDeck } from "../../hooks";
 import { Pagination } from "../pagination";
-import { DeckBadge, LevelTag, Segmented, SpeakButton, Translations, explanationAt } from "./shared";
+import { DeckBadge, KINDS, LevelTag, Segmented, SpeakButton, Translations, explanationAt } from "./shared";
 
 type Filter = "" | "due" | "new" | "learning" | "mastered";
 
 /** The learner's own words: what is due, a review session, and every word with its progress. */
-export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
+export function Deck({ kind, onOpenWord }: { kind: LexiconKind; onOpenWord: (id: string) => void }) {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<Filter>("");
   const [session, setSession] = useState<{
@@ -29,7 +29,7 @@ export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
   } | null>(null);
   const [starting, setStarting] = useState(false);
   const client = useQueryClient();
-  const deck = useVocabularyDeck(page, filter);
+  const deck = useVocabularyDeck(page, filter, kind);
   const data = deck.data?.data;
   const total = deck.data?.meta?.total ?? 0;
   const learnerLevel = data?.learner_level || "B1";
@@ -40,8 +40,8 @@ export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
     setStarting(true);
     try {
       const queue = await client.fetchQuery({
-        queryKey: queryKeys.vocabulary.review,
-        queryFn: learnerApi.reviewQueue,
+        queryKey: queryKeys.vocabulary.review(kind),
+        queryFn: () => learnerApi.reviewQueue(kind),
         staleTime: 0,
       });
       setSession((s) => ({ n: (s?.n ?? 0) + 1, queue }));
@@ -80,8 +80,8 @@ export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
     return (
       <EmptyState
         icon={SpellCheck}
-        title="No words in your list yet"
-        description="Add words from Explore; new words at your level are added for you as well."
+        title={`No ${KINDS[kind].plural} in your list yet`}
+        description={`Add ${KINDS[kind].plural} from Explore${kind === "word" ? "; new words at your level are added for you as well" : ""}.`}
       />
     );
   }
@@ -94,7 +94,7 @@ export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
           <p className="text-body-sm text-fg-secondary">
             {s.due > 0
               ? "A few minutes now keeps them from slipping away. Words you remember come back less often."
-              : "Nothing is due right now. Add new words from Explore, or come back later."}
+              : `Nothing is due right now. Add new ${KINDS[kind].plural} from Explore, or come back later.`}
           </p>
         </div>
         <Button size="lg" variant="liquid" disabled={s.due === 0} loading={starting} onClick={() => void startReview()}>
@@ -103,7 +103,7 @@ export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="My words" value={s.total} icon={BookMarked} hint={`${s.new} not started`} />
+        <Stat label="My list" value={s.total} icon={BookMarked} hint={`${s.new} not started`} />
         <Stat label="Due now" value={s.due} icon={CalendarClock} />
         <Stat label="Mastered" value={s.mastered} icon={CheckCheck} hint={`${s.learning + s.reviewing} in progress`} />
         <Stat label="Reviewed today" value={s.reviewed_today} icon={Flame} />
@@ -124,7 +124,7 @@ export function Deck({ onOpenWord }: { onOpenWord: (id: string) => void }) {
       />
 
       {data.cards.length === 0 ? (
-        <EmptyState icon={SpellCheck} title="No words here" description="Pick another group above." />
+        <EmptyState icon={SpellCheck} title="Nothing here" description="Pick another group above." />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.cards.map((card) => (
@@ -310,7 +310,7 @@ function ReviewSession({
             </Button>
           )}
           <Button variant="outline" onClick={onDone}>
-            Back to my words
+            Back to my list
           </Button>
         </div>
       </div>

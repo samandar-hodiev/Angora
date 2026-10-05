@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -11,61 +12,105 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/pkg/cefr"
 )
 
-// Writing vocabulary.
+// Writing the lexicon: words, phrases and collocations.
 //
-// A word is written once and explained for every level asked for: "consequence" is one entry,
-// with a plain sentence and an everyday example for A1 and the collocations and register for
-// C1. One call writes a small batch — a dozen words, each explained six ways, is about as much
-// as a model writes carefully at once — and the words already in the library are passed in so
-// the model does not hand back the same words every time it is asked.
+// An entry is written once, explained once, at its own level — the level a learner usually
+// meets it at. What differs between levels is the senses, not the wording: "run" is A1 for
+// moving fast and B2 for running a company, so the other senses are listed, each with its own
+// level. The owner asks for a kind and topics, not for levels; the model says each entry's
+// level, and a second, independent call (CheckLevels) checks it.
 
 const (
-	VocabularyPrompt = "vocabulary_author.v4"
+	VocabularyPrompt = "vocabulary_author.v5"
 	SchemaVocabulary = "vocabulary_words"
+	LevelCheckPrompt = "vocabulary_level_check.v1"
+	SchemaLevelCheck = "vocabulary_levels"
 
-	// VocabularyBatch is how many words one call writes.
+	TaskVocabularyLevelCheck Task = "vocabulary_level_check"
+
+	// VocabularyBatch is how many entries one call writes.
 	VocabularyBatch = 10
 )
+
+// Kinds of lexicon entry.
+const (
+	KindWord        = "word"
+	KindPhrase      = "phrase"
+	KindCollocation = "collocation"
+)
+
+// KindPartsOfSpeech is what part_of_speech holds for each kind: a word class, a phrase type,
+// or a collocation's pattern.
+var KindPartsOfSpeech = map[string][]string{
+	KindWord:        {"noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "determiner"},
+	KindPhrase:      {"phrasal verb", "idiom", "phrase"},
+	KindCollocation: {"verb + noun", "adjective + noun", "adverb + adjective", "adverb + verb", "noun + noun", "verb + preposition", "noun + preposition", "verb + adverb"},
+}
+
+// PartsOfSpeech are every value a part of speech may take, across kinds.
+var PartsOfSpeech = func() []string {
+	out := []string{}
+	for _, k := range []string{KindWord, KindPhrase, KindCollocation} {
+		out = append(out, KindPartsOfSpeech[k]...)
+	}
+	return out
+}()
+
+// KindOf is the kind an entry's part of speech belongs to.
+func KindOf(partOfSpeech string) string {
+	for kind, list := range KindPartsOfSpeech {
+		if slices.Contains(list, partOfSpeech) {
+			return kind
+		}
+	}
+	return KindWord
+}
 
 // VocabularyRequest is one batch to write.
 type VocabularyRequest struct {
 	Count int
-	/** The levels each word is explained for. */
-	Levels []cefr.Level
-	/** Optional: a theme the words should come from — travel, work, feelings. */
-	Theme string
-	/** Words already in the library, or written earlier in this run, so they are not written again. */
+	/** word | phrase | collocation. */
+	Kind string
+	/** Topics the entries come from — nature, animals, work; empty for a mix. */
+	Topics []string
+	/** Optional bounds on the entries' own level. */
+	MinLevel, MaxLevel string
+	/** Entries already in the library, or written earlier in this run, so they are not written again. */
 	Exclude []string
 	ActorID *uuid.UUID
 }
 
-// LevelText is a word explained for one level.
+// LevelText is an entry explained for one level. New entries have one, at their own level;
+// SameAs is only read on entries written before that.
 type LevelText struct {
 	Definition string   `json:"definition"`
 	Examples   []string `json:"examples"`
-	// SameAs names the lower level whose explanation this one shares, when one explanation
-	// serves both — "the A1 text is right for A2 too". The text is copied, so a reader that
-	// knows nothing of sharing still finds a full explanation at every level.
-	SameAs string `json:"same_as,omitempty"`
+	SameAs     string   `json:"same_as,omitempty"`
 }
 
-// GeneratedWord is one word as the model wrote it.
+// Sense is one more meaning of an entry, at the level a learner meets that meaning.
+type Sense struct {
+	Definition string `json:"definition"`
+	Level      string `json:"level"`
+	Example    string `json:"example"`
+}
+
+// GeneratedWord is one entry as the model wrote it.
 type GeneratedWord struct {
 	Term         string `json:"term"`
+	Kind         string `json:"kind"`
 	PartOfSpeech string `json:"part_of_speech"`
-	/** How hard the word itself is: the level a learner usually meets it at. */
+	/** The level a learner usually meets the entry at, in its main sense. */
 	Level            string            `json:"level"`
 	PronunciationIPA string            `json:"pronunciation_ipa"`
 	Translations     map[string]string `json:"translations"`
 	Tags             []string          `json:"tags"`
-	/** The explanation per CEFR level. */
+	/** The explanation at its own level, as {level: text}. */
 	LevelContent map[string]LevelText `json:"level_content"`
-	// Definition and Examples are the explanation at the word's own level — what a reader
-	// that knows nothing of levels shows.
-	Definition string   `json:"definition"`
-	Examples   []string `json:"examples"`
-	/** How the word is used, beyond what it means. */
-	Usage WordUsage `json:"usage"`
+	Definition   string               `json:"definition"`
+	Examples     []string             `json:"examples"`
+	Senses       []Sense              `json:"senses"`
+	Usage        WordUsage            `json:"usage"`
 }
 
 type generatedWords struct {
@@ -77,37 +122,25 @@ type generatedWords struct {
 		Uz               string    `json:"uz"`
 		Ru               string    `json:"ru"`
 		RuPronunciation  string    `json:"ru_pronunciation"`
-		Tags             []string  `json:"tags"`
+		Topics           []string  `json:"topics"`
+		Definition       string    `json:"definition"`
+		Examples         []string  `json:"examples"`
+		Senses           []Sense   `json:"other_senses"`
 		Usage            WordUsage `json:"usage"`
-		Explanations     map[string]struct {
-			SameAsPrevious bool     `json:"same_as_previous"`
-			Definition     string   `json:"definition"`
-			Examples       []string `json:"examples"`
-		} `json:"explanations"`
 	} `json:"words"`
 }
 
-// PartsOfSpeech are the values a word's part of speech may take.
-var PartsOfSpeech = []string{"noun", "verb", "adjective", "adverb", "phrasal verb", "idiom", "phrase", "preposition", "conjunction", "pronoun", "determiner"}
-
-// vocabularySchema is the answer's shape for one set of levels. Each requested level is its
-// own required key under "explanations" — a list of explanations could come back with one in
-// it, and did, nineteen times in twenty; a required key cannot be left out.
-func vocabularySchema(levels []string) json.RawMessage {
-	explanation := map[string]any{
-		"type": "object", "additionalProperties": false, "required": []string{"same_as_previous", "definition", "examples"},
-		"properties": map[string]any{
-			"same_as_previous": map[string]any{
-				"type":        "boolean",
-				"description": "True when the explanation for the previous requested level is just as right here; then leave definition and examples empty.",
-			},
-			"definition": map[string]any{"type": "string", "description": "The meaning only, in English a learner at this level can read. No examples in it."},
-			"examples":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Two natural sentences at this level."},
-		},
+func vocabularySchema(kind string) json.RawMessage {
+	pos := KindPartsOfSpeech[kind]
+	if pos == nil {
+		pos = KindPartsOfSpeech[KindWord]
 	}
-	perLevel := map[string]any{}
-	for _, code := range levels {
-		perLevel[code] = explanation
+	posDescription := "The word class."
+	switch kind {
+	case KindPhrase:
+		posDescription = "What kind of phrase it is."
+	case KindCollocation:
+		posDescription = "The collocation's pattern."
 	}
 	schema := map[string]any{
 		"type": "object", "additionalProperties": false, "required": []string{"words"},
@@ -116,21 +149,31 @@ func vocabularySchema(levels []string) json.RawMessage {
 				"type": "array",
 				"items": map[string]any{
 					"type": "object", "additionalProperties": false,
-					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation", "tags", "usage", "explanations"},
+					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation",
+						"topics", "definition", "examples", "other_senses", "usage"},
 					"properties": map[string]any{
-						"term":              map[string]any{"type": "string", "description": "The word or fixed phrase, lower case unless it is a proper noun."},
-						"part_of_speech":    map[string]any{"type": "string", "enum": PartsOfSpeech},
-						"level":             map[string]any{"type": "string", "enum": cefrCodes, "description": "The CEFR level a learner usually meets this word at."},
-						"pronunciation_ipa": map[string]any{"type": "string", "description": "British IPA between slashes, e.g. /ɪˈvɛntʃuəli/."},
-						"uz":                map[string]any{"type": "string", "description": "The word in Uzbek (Latin script)."},
-						"ru":                map[string]any{"type": "string", "description": "The word in Russian."},
-						"ru_pronunciation":  map[string]any{"type": "string", "description": "How the Russian word sounds, in Uzbek Latin letters with the stressed vowel marked by an acute accent, e.g. dastích for достичь."},
-						"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "One or two topic tags, e.g. travel, work."},
-						"usage":             wordUsageSchema,
-						"explanations": map[string]any{
-							"type": "object", "additionalProperties": false, "required": levels, "properties": perLevel,
-							"description": "The word explained separately for each of these levels.",
+						"term":              map[string]any{"type": "string", "description": "The entry, lower case unless it is a proper noun."},
+						"part_of_speech":    map[string]any{"type": "string", "enum": pos, "description": posDescription},
+						"level":             map[string]any{"type": "string", "enum": cefrCodes, "description": "The CEFR level a learner usually meets the entry at in its main sense, by the English Vocabulary Profile."},
+						"pronunciation_ipa": map[string]any{"type": "string", "description": "British IPA between slashes."},
+						"uz":                map[string]any{"type": "string", "description": "The entry in Uzbek (Latin script)."},
+						"ru":                map[string]any{"type": "string", "description": "The entry in Russian."},
+						"ru_pronunciation":  map[string]any{"type": "string", "description": "How the Russian is said, in Uzbek Latin letters with the stressed vowel marked by an acute accent, e.g. dastích for достичь."},
+						"topics":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "One or two topics from the requested ones, lower case."},
+						"definition":        map[string]any{"type": "string", "description": "The main meaning only, in English a learner at the entry's level can read."},
+						"examples":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Two natural sentences at that level."},
+						"other_senses": map[string]any{
+							"type": "array", "description": "0 to 3 other common meanings, each at the level a learner meets it.",
+							"items": map[string]any{
+								"type": "object", "additionalProperties": false, "required": []string{"definition", "level", "example"},
+								"properties": map[string]any{
+									"definition": map[string]any{"type": "string"},
+									"level":      map[string]any{"type": "string", "enum": cefrCodes},
+									"example":    map[string]any{"type": "string"},
+								},
+							},
 						},
+						"usage": wordUsageSchema,
 					},
 				},
 			},
@@ -140,39 +183,38 @@ func vocabularySchema(levels []string) json.RawMessage {
 	return raw
 }
 
-// WriteVocabulary writes one batch of words, each explained for every requested level.
+var kindGuide = map[string]string{
+	KindWord:        "single English words",
+	KindPhrase:      "phrases learned as a whole: phrasal verbs (look after), idioms (break the ice) and fixed phrases (by the way) — never single words, never free combinations",
+	KindCollocation: "collocations: two or three words that naturally go together where another word would sound wrong (make a decision, heavy rain, deeply sorry) — never single words, never idioms",
+}
+
+// WriteVocabulary writes one batch of entries of one kind.
 func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req VocabularyRequest) ([]GeneratedWord, *EvaluationMeta, error) {
 	count := min(max(req.Count, 1), 20)
-	levels := levelCodes(req.Levels)
-	if len(levels) == 0 {
-		levels = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
+	kind := req.Kind
+	if kindGuide[kind] == "" {
+		kind = KindWord
 	}
 	var b strings.Builder
-	b.WriteString("You choose vocabulary for an English-learning app whose learners speak Uzbek or Russian. ")
-	fmt.Fprintf(&b, "Write exactly %d useful words or fixed phrases, varied in topic and part of speech, and explain each one separately for every one of these CEFR levels: %s.\n", count, strings.Join(levels, ", "))
-	b.WriteString("- level: the level a learner usually meets the word at, by the English Vocabulary Profile — everyday words like dusk or campground are not A1. Spread the words evenly over the requested levels by how hard the word itself is — for A1 to C2, about as many C1 words as A1 words — never mostly easy words.\n")
-	b.WriteString("- explanations: an entry for every requested level, none left out. When the explanation you gave for the previous level is just as right for this one — common for a simple word at A1 and A2 — set same_as_previous to true and leave definition and examples empty, instead of repeating it or inventing a difference. The first requested level always has its own text. The definition is the meaning only — never put an example in it. Where the levels need different explanations, they must genuinely differ: A1/A2 one very short sentence in the simplest words, with everyday examples; B1/B2 the main senses and common collocations; C1/C2 nuance, register, collocations and less common senses. Each has exactly two natural example sentences written at that level.\n")
-	// The words' own difficulty, shared out over the requested levels: asked only to "mix
-	// levels", the model gave A1 and A2 words nine times in ten.
-	b.WriteString("- How many words of each own level to write:")
-	for i, code := range levels {
-		n := count / len(levels)
-		if i < count%len(levels) {
-			n++
-		}
-		if n > 0 {
-			fmt.Fprintf(&b, " %d at %s;", n, code)
-		}
+	b.WriteString("You choose lexicon for an English-learning app whose learners speak Uzbek or Russian. ")
+	fmt.Fprintf(&b, "Write exactly %d useful %s.\n", count, kindGuide[kind])
+	b.WriteString("- Each entry is explained once, at its own level: definition is the main meaning only (no example in it), in English a learner at that level can read; examples are two natural sentences at that level.\n")
+	b.WriteString("- level: the level a learner usually meets the entry at in its main sense, by the English Vocabulary Profile. Be strict and honest: everyday concrete words (bed, eat, house) are A1–A2 whatever topic they come from; never label an easy entry higher to look advanced.\n")
+	b.WriteString("- other_senses: other common meanings that differ from the main one, each with the level it is met at (run: A1 move fast; B2 manage a business). Empty when there are none — never restate the main meaning.\n")
+	b.WriteString("- usage.register: formal, informal, neutral and so on — how formal the entry is. " + wordUsageGuide + "\n")
+	b.WriteString("- uz and ru: the usual translation in the main sense — a word or two, not a definition; a wrong or loosely related word is worse than none.\n")
+	b.WriteString("- ru_pronunciation: how that Russian translation is said, in Uzbek Latin letters as it sounds (unstressed o reads as a), acute accent on the stressed vowel — e.g. достичь → dastích.\n")
+	if req.MinLevel != "" || req.MaxLevel != "" {
+		fmt.Fprintf(&b, "- Only entries whose own level is between %s and %s.\n", orDefault(req.MinLevel, "A1"), orDefault(req.MaxLevel, "C2"))
+	} else {
+		b.WriteString("- A natural mix of levels, from everyday to advanced.\n")
 	}
-	b.WriteString(" a C1 or C2 word is one an advanced learner still meets as new — pick harder words for the higher levels, never an everyday word labelled higher.\n")
-	b.WriteString("- uz and ru: the usual translation of the word in its main sense — a word or two, not a definition; a wrong or loosely related word is worse than none.\n")
-	b.WriteString("- ru_pronunciation: how that Russian translation is said, written in Uzbek Latin letters as it sounds (unstressed o reads as a), with an acute accent on the stressed vowel and no mark for the soft sign — e.g. достичь → dastích, в конце концов → f kantsé kantsóf.\n")
-	b.WriteString("- usage: " + wordUsageGuide + "\n")
-	b.WriteString("Never include a word from the excluded list, in any form, and never the same word twice.\n")
+	b.WriteString("Never include an entry from the excluded list, in any form, and never the same entry twice.\n")
 
-	input := fmt.Sprintf("COUNT: %d\nLEVELS: %s\n", count, strings.Join(levels, ", "))
-	if t := strings.TrimSpace(req.Theme); t != "" {
-		input += "THEME: " + t + "\n"
+	input := fmt.Sprintf("COUNT: %d\nKIND: %s\n", count, kind)
+	if len(req.Topics) > 0 {
+		input += "TOPICS: " + strings.Join(req.Topics, ", ") + "\n"
 	}
 	if len(req.Exclude) > 0 {
 		input += "EXCLUDED (already in the library): " + strings.Join(req.Exclude, ", ") + "\n"
@@ -182,13 +224,13 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 		Task:          TaskContentGeneration,
 		UserID:        req.ActorID,
 		PromptVersion: VocabularyPrompt,
-		Metadata:      map[string]any{"kind": "vocabulary", "levels": levels, "count": count},
+		Metadata:      map[string]any{"kind": "vocabulary", "entry_kind": kind, "topics": req.Topics, "count": count},
 	}, AnalysisRequest{
 		Model:        s.mainModel,
 		Instructions: b.String(),
 		Input:        input,
 		SchemaName:   SchemaVocabulary,
-		Schema:       vocabularySchema(levels),
+		Schema:       vocabularySchema(kind),
 	})
 	if err != nil {
 		return nil, nil, err
@@ -201,21 +243,7 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	for _, e := range req.Exclude {
 		excluded[strings.ToLower(strings.TrimSpace(e))] = true
 	}
-	words := UsableWords(out.words(), excluded)
-	// A word missing a level it was asked for is half a word: dropped, and the run asks again.
-	kept := words[:0]
-	for _, w := range words {
-		complete := true
-		for _, code := range levels {
-			if _, ok := w.LevelContent[code]; !ok {
-				complete = false
-			}
-		}
-		if complete {
-			kept = append(kept, w)
-		}
-	}
-	words = kept
+	words := UsableWords(out.words(kind), excluded)
 	if len(words) == 0 {
 		return nil, nil, fmt.Errorf("no usable words came back")
 	}
@@ -225,12 +253,21 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	}, nil
 }
 
-func (g generatedWords) words() []GeneratedWord {
+func orDefault(s, d string) string {
+	if s == "" {
+		return d
+	}
+	return s
+}
+
+func (g generatedWords) words(kind string) []GeneratedWord {
 	out := make([]GeneratedWord, 0, len(g.Words))
 	for _, w := range g.Words {
+		level := strings.ToUpper(strings.TrimSpace(w.Level))
 		word := GeneratedWord{
-			Term: w.Term, PartOfSpeech: w.PartOfSpeech, Level: w.Level, PronunciationIPA: w.PronunciationIPA,
-			Tags: w.Tags, Translations: map[string]string{}, LevelContent: map[string]LevelText{}, Usage: w.Usage,
+			Term: w.Term, Kind: kind, PartOfSpeech: w.PartOfSpeech, Level: level, PronunciationIPA: w.PronunciationIPA,
+			Tags: w.Topics, Translations: map[string]string{}, Usage: w.Usage, Senses: w.Senses,
+			LevelContent: map[string]LevelText{level: {Definition: w.Definition, Examples: w.Examples}},
 		}
 		if t := strings.TrimSpace(w.Uz); t != "" {
 			word.Translations["uz"] = t
@@ -241,28 +278,72 @@ func (g generatedWords) words() []GeneratedWord {
 				word.Translations["ru_pron"] = r
 			}
 		}
-		// In level order, so a level that shares the one below finds it already written.
-		prev := ""
-		for _, code := range cefrCodes {
-			e, ok := w.Explanations[code]
-			if !ok {
-				continue
-			}
-			if e.SameAsPrevious && prev != "" {
-				shared := word.LevelContent[prev]
-				root := prev
-				if shared.SameAs != "" {
-					root = shared.SameAs
-				}
-				word.LevelContent[code] = LevelText{Definition: shared.Definition, Examples: shared.Examples, SameAs: root}
-			} else {
-				word.LevelContent[code] = LevelText{Definition: e.Definition, Examples: e.Examples}
-			}
-			prev = code
-		}
 		out = append(out, word)
 	}
 	return out
+}
+
+// LevelCheckItem is an entry whose level is to be checked.
+type LevelCheckItem struct {
+	Term         string
+	PartOfSpeech string
+	Definition   string
+}
+
+// CheckLevels asks, independently of whoever wrote the entries, at which level a learner meets
+// each one in the given sense. The writer's level is not shown, so the answer is a second
+// opinion rather than an echo. Returns lower-case term → level.
+func (s *GrammarTutorService) CheckLevels(ctx context.Context, items []LevelCheckItem) (map[string]string, error) {
+	if len(items) == 0 {
+		return map[string]string{}, nil
+	}
+	schema, _ := json.Marshal(map[string]any{
+		"type": "object", "additionalProperties": false, "required": []string{"levels"},
+		"properties": map[string]any{"levels": map[string]any{
+			"type": "array",
+			"items": map[string]any{
+				"type": "object", "additionalProperties": false, "required": []string{"term", "level"},
+				"properties": map[string]any{
+					"term":  map[string]any{"type": "string"},
+					"level": map[string]any{"type": "string", "enum": cefrCodes},
+				},
+			},
+		}},
+	})
+	var in strings.Builder
+	for _, it := range items {
+		fmt.Fprintf(&in, "- %s (%s): %s\n", it.Term, it.PartOfSpeech, it.Definition)
+	}
+	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
+		Task:          TaskVocabularyLevelCheck,
+		PromptVersion: LevelCheckPrompt,
+		Metadata:      map[string]any{"kind": "vocabulary_level_check", "count": len(items)},
+	}, AnalysisRequest{
+		Model: s.mainModel,
+		Instructions: "You are a CEFR vocabulary examiner. For each English entry, in the sense given, say the level at which a learner " +
+			"usually meets it, following the English Vocabulary Profile (and the English Grammar/Phrasal Verb profiles for phrases). " +
+			"Be strict: everyday concrete words are A1–A2; a level is about the entry, not the topic it came from. Answer for every entry, in order.",
+		Input:      in.String(),
+		SchemaName: SchemaLevelCheck,
+		Schema:     schema,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Levels []struct {
+			Term  string `json:"term"`
+			Level string `json:"level"`
+		} `json:"levels"`
+	}
+	if err := json.Unmarshal(res.Output, &out); err != nil {
+		return nil, fmt.Errorf("level check is not valid JSON: %w", err)
+	}
+	levels := map[string]string{}
+	for _, l := range out.Levels {
+		levels[strings.ToLower(strings.TrimSpace(l.Term))] = strings.ToUpper(strings.TrimSpace(l.Level))
+	}
+	return levels, nil
 }
 
 var cefrCodes = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
@@ -323,6 +404,17 @@ func UsableWords(words []GeneratedWord, excluded map[string]bool) []GeneratedWor
 			w.Translations = map[string]string{}
 		}
 		w.Usage = w.Usage.Clean(key)
+		w.Kind = KindOf(w.PartOfSpeech)
+		senses := []Sense{}
+		for _, sense := range w.Senses {
+			sense.Definition = strings.TrimSpace(sense.Definition)
+			sense.Example = strings.TrimSpace(sense.Example)
+			sense.Level = strings.ToUpper(strings.TrimSpace(sense.Level))
+			if _, err := cefr.Parse(sense.Level); sense.Definition != "" && err == nil && len(senses) < 4 {
+				senses = append(senses, sense)
+			}
+		}
+		w.Senses = senses
 		kept = append(kept, w)
 	}
 	return kept

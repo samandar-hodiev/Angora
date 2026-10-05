@@ -30,6 +30,8 @@ import {
   homeNav,
   isActivePath,
   learnNav,
+  lexiconItems,
+  lexiconNav,
   learnOverviewNav,
   mobileNav,
   primaryNav,
@@ -225,7 +227,8 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
       <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
         <li>{link(homeNav)}</li>
         <li>{link(grammarNav)}</li>
-        <SkillsTree items={skillItems} link={link} collapsed={collapsed} />
+        <NavTree root={learnNav} id="nav-skills" items={skillItems} link={link} collapsed={collapsed} />
+        <NavTree root={lexiconNav} id="nav-lexicon" items={lexiconItems} link={link} collapsed={collapsed} />
         {primaryNav.map((item) => (
           <li key={item.href}>{link(item)}</li>
         ))}
@@ -241,18 +244,23 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
 }
 
 /**
- * Skills: Overview and the four practice skills, folded under one row.
+ * A row that folds a group of pages under it: Skills (Overview and the four practice skills),
+ * Lexicon (vocabulary, phrases, collocations).
  *
  * Closed until it is wanted, so the sidebar reads as a short list of places; it opens by
  * itself when the page you are on is inside it, so a link straight to Writing never lands
  * on a sidebar that hides where you are. Icons only, it becomes a flyout instead — five
  * indented rows in a 64px column would be unreadable.
  */
-function SkillsTree({
+function NavTree({
+  root,
+  id,
   items,
   link,
   collapsed,
 }: {
+  root: NavItem;
+  id: string;
   items: NavItem[];
   link: (item: NavItem, nested?: boolean) => ReactNode;
   collapsed: boolean;
@@ -278,12 +286,12 @@ function SkillsTree({
       <li>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" title={learnNav.label} aria-label={learnNav.label} className={cn(row, "justify-center px-0")}>
-              <learnNav.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+            <button type="button" title={root.label} aria-label={root.label} className={cn(row, "justify-center px-0")}>
+              <root.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="w-52">
-            <DropdownMenuLabel>{learnNav.label}</DropdownMenuLabel>
+            <DropdownMenuLabel>{root.label}</DropdownMenuLabel>
             {items.map((item) => (
               <DropdownMenuItem key={item.href} asChild>
                 <Link href={item.href}>
@@ -298,7 +306,7 @@ function SkillsTree({
     );
   }
 
-  const panelId = "nav-skills";
+  const panelId = id;
   return (
     <li>
       <button
@@ -308,8 +316,8 @@ function SkillsTree({
         aria-controls={panelId}
         className={row}
       >
-        <learnNav.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
-        <span className="truncate">{learnNav.label}</span>
+        <root.icon className={cn("size-4 shrink-0", inside ? "text-primary" : "text-fg-muted")} aria-hidden />
+        <span className="truncate">{root.label}</span>
         <ChevronDown
           className={cn("ml-auto size-3.5 shrink-0 transition-transform duration-micro", !open && "-rotate-90")}
           aria-hidden

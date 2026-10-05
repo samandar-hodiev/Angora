@@ -267,7 +267,9 @@ func TestAgreedPracticeDropsAGapThatAllowsAnUnkeyedAnswer(t *testing.T) {
 }
 
 func TestVocabularySchemaIsStrictModeSafe(t *testing.T) {
-	assertStrictSchema(t, vocabularySchema([]string{"A1", "B2", "C2"}))
+	for _, kind := range []string{KindWord, KindPhrase, KindCollocation} {
+		assertStrictSchema(t, vocabularySchema(kind))
+	}
 }
 
 func TestUsableWordsDropsDuplicatesAndExcluded(t *testing.T) {
@@ -292,27 +294,5 @@ func TestUsableWordsDropsDuplicatesAndExcluded(t *testing.T) {
 	// Its own level is A2, which has no explanation: the nearest one, A1, stands in.
 	if w.Level != "A2" || w.Definition != "go to a place" {
 		t.Errorf("level %q definition %q, want A2 explained by its A1 text", w.Level, w.Definition)
-	}
-}
-
-func TestGeneratedWordsShareAnExplanationAcrossLevels(t *testing.T) {
-	var out generatedWords
-	_ = json.Unmarshal([]byte(`{"words":[{"term":"cat","part_of_speech":"noun","level":"A1","pronunciation_ipa":"","uz":"mushuk","ru":"кошка","tags":[],
-		"explanations":{
-			"A1":{"same_as_previous":false,"definition":"A small animal people keep at home.","examples":["I have a cat."]},
-			"A2":{"same_as_previous":true,"definition":"","examples":[]},
-			"B1":{"same_as_previous":true,"definition":"","examples":[]},
-			"C1":{"same_as_previous":false,"definition":"A domesticated feline; also slang for a person.","examples":["He's a cool cat."]}
-		}}]}`), &out)
-	words := UsableWords(out.words(), map[string]bool{})
-	if len(words) != 1 {
-		t.Fatalf("words = %d", len(words))
-	}
-	c := words[0].LevelContent
-	if c["A2"].Definition != c["A1"].Definition || c["A2"].SameAs != "A1" || c["B1"].SameAs != "A1" {
-		t.Errorf("A2/B1 = %+v / %+v, want both sharing A1's text", c["A2"], c["B1"])
-	}
-	if c["C1"].SameAs != "" || c["A1"].SameAs != "" {
-		t.Errorf("A1/C1 = %+v / %+v, want their own text", c["A1"], c["C1"])
 	}
 }

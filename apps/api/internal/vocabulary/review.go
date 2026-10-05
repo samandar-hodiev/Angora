@@ -89,7 +89,8 @@ type reviewQueue struct {
 }
 
 type reviewQueueQuery struct {
-	Limit int `form:"limit" binding:"omitempty,min=1,max=50"`
+	Limit int    `form:"limit" binding:"omitempty,min=1,max=50"`
+	Kind  string `form:"kind" binding:"omitempty,oneof=word phrase collocation"`
 }
 
 // GET /vocabulary/review — the words due now, oldest first, new words after the due ones.
@@ -108,15 +109,15 @@ func (m *Module) reviewQueue(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	due := `uv.due_at <= now()`
-	cards, err := m.cards(ctx, p.UserID, due+` ORDER BY (uv.status = 'new'), uv.due_at, v.term LIMIT $2`, q.Limit)
+	due := `uv.due_at <= now() AND ($2 = '' OR v.kind = $2)`
+	cards, err := m.cards(ctx, p.UserID, due+` ORDER BY (uv.status = 'new'), uv.due_at, v.term LIMIT $3`, q.Kind, q.Limit)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	var total int
-	if err := m.pool.QueryRow(ctx, `SELECT count(*)::int FROM user_vocabulary uv WHERE uv.user_id = $1 AND `+due,
-		p.UserID).Scan(&total); err != nil {
+	if err := m.pool.QueryRow(ctx, `SELECT count(*)::int FROM user_vocabulary uv JOIN vocabulary v ON v.id = uv.vocabulary_id
+		WHERE uv.user_id = $1 AND `+due, p.UserID, q.Kind).Scan(&total); err != nil {
 		httpx.Fail(c, err)
 		return
 	}

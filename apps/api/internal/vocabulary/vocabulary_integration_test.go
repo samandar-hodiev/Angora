@@ -27,7 +27,7 @@ import (
 
 // fakeWriter counts its calls, so the tests can tell a cached answer from a new one.
 type fakeWriter struct {
-	enriched, compared atomic.Int32
+	enriched, compared, laddered atomic.Int32
 }
 
 func (f *fakeWriter) EnrichWord(_ context.Context, req ai.EnrichRequest) (ai.WordUsage, *ai.EvaluationMeta, error) {
@@ -43,6 +43,11 @@ func (f *fakeWriter) CompareWords(_ context.Context, req ai.CompareRequest) (*ai
 		words = append(words, ai.ComparedWord{Term: t, Meaning: "meaning of " + t})
 	}
 	return &ai.WordComparison{Verdict: "They differ.", Interchangeable: "sometimes", Words: words}, &ai.EvaluationMeta{}, nil
+}
+
+func (f *fakeWriter) WriteLadder(_ context.Context, term string, _ *uuid.UUID) (*ai.Ladder, *ai.EvaluationMeta, error) {
+	f.laddered.Add(1)
+	return ai.CleanLadder(term, "katta", "", []ai.LadderRung{{Level: "A1", Term: term}, {Level: "B2", Term: "enormous"}}), &ai.EvaluationMeta{}, nil
 }
 
 type countingPlans struct{ used, released atomic.Int32 }
@@ -183,6 +188,26 @@ func TestLearnerVocabularyPostgres(t *testing.T) {
 		}
 		if code := call(http.MethodPost, "/compare", map[string]any{"terms": []string{"job", "job"}}, nil); code != http.StatusUnprocessableEntity && code != http.StatusBadRequest {
 			t.Fatalf("the same word twice: %d", code)
+		}
+	})
+
+	t.Run("a ladder is written once and filters by kind work", func(t *testing.T) {
+		var res LadderResponse
+		if code := call(http.MethodPost, "/ladder", map[string]any{"term": "zz" + stamp + "job"}, &res); code != http.StatusOK || res.Cached {
+			t.Fatalf("ladder: %d cached=%v", code, res.Cached)
+		}
+		if len(res.Ladder.Rungs) != 6 || res.Ladder.Rungs[3].Term != "enormous" || len(res.Library) != 1 {
+			t.Fatalf("ladder: %+v library %v", res.Ladder.Rungs, res.Library)
+		}
+		call(http.MethodPost, "/ladder", map[string]any{"term": "zz" + stamp + "job"}, &res)
+		if !res.Cached || writer.laddered.Load() != 1 {
+			t.Fatalf("second ladder: cached=%v written=%d", res.Cached, writer.laddered.Load())
+		}
+		_, _ = pool.Exec(ctx, `UPDATE vocabulary SET kind = 'phrase', register = 'informal' WHERE id = $1`, ids["employ"])
+		var page libraryPage
+		call(http.MethodGet, "/library?topic="+topic+"&kind=phrase&register=informal", nil, &page)
+		if len(page.Items) != 1 || page.Items[0].Kind != "phrase" || page.Items[0].Definition != "meaning" {
+			t.Fatalf("kind filter: %+v", page.Items)
 		}
 	})
 

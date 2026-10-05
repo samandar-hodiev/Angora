@@ -4,18 +4,105 @@ import { Volume2 } from "lucide-react";
 
 import { FlagRU, FlagUZ } from "@/components/common/flags";
 import { cn } from "@/lib/utils";
-import type { LibraryWord, VocabularyLevelText } from "@engora/types";
+import type { LexiconKind, LibraryWord, VocabularyLevelText } from "@engora/types";
 
 export const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
+/**
+ * What each level means for a learner here. The platform works towards an IELTS band, so the
+ * levels a band is built on are named by it.
+ */
 export const LEVEL_NAMES: Record<string, string> = {
   A1: "Beginner",
   A2: "Elementary",
-  B1: "Intermediate",
-  B2: "Upper-intermediate",
-  C1: "Advanced",
-  C2: "Proficient",
+  B1: "IELTS 4.0–5.0",
+  B2: "IELTS 5.5–6.5",
+  C1: "IELTS 7.0–8.0",
+  C2: "IELTS 8.5–9.0",
 };
+
+/** The three kinds of lexicon entry, as each page names them. */
+export const KINDS: Record<
+  LexiconKind,
+  { title: string; singular: string; plural: string; description: string; search: string; compare: string[][] }
+> = {
+  word: {
+    title: "Vocabulary",
+    singular: "word",
+    plural: "words",
+    description: "Words by level and topic, how to use them, how they differ — and the ones you are learning.",
+    search: "Search a word, or its Uzbek or Russian meaning",
+    compare: [
+      ["job", "occupation", "profession"],
+      ["make", "do"],
+      ["say", "tell", "speak"],
+      ["borrow", "lend"],
+      ["look", "see", "watch"],
+      ["fun", "funny"],
+      ["house", "home"],
+      ["affect", "effect"],
+      ["remember", "remind"],
+      ["travel", "trip", "journey"],
+      ["big", "large", "huge"],
+    ],
+  },
+  phrase: {
+    title: "Phrases",
+    singular: "phrase",
+    plural: "phrases",
+    description: "Phrasal verbs, idioms and fixed phrases — learned as a whole, because the parts do not add up to the meaning.",
+    search: "Search a phrase, or its Uzbek or Russian meaning",
+    compare: [
+      ["look after", "take care of"],
+      ["put up with", "tolerate"],
+      ["get on with", "get along with"],
+      ["find out", "discover"],
+      ["give up", "give in"],
+      ["by the way", "anyway"],
+      ["turn down", "reject"],
+    ],
+  },
+  collocation: {
+    title: "Collocations",
+    singular: "collocation",
+    plural: "collocations",
+    description: "Words that naturally go together — make a decision, heavy rain — so your English sounds natural, not translated.",
+    search: "Search a collocation, or its Uzbek or Russian meaning",
+    compare: [
+      ["make a mistake", "do a mistake"],
+      ["heavy rain", "strong rain"],
+      ["do homework", "make homework"],
+      ["take a photo", "make a photo"],
+      ["strong coffee", "powerful coffee"],
+      ["pay attention", "give attention"],
+    ],
+  },
+};
+
+const REGISTER_LABEL: Record<string, string> = {
+  formal: "Formal",
+  informal: "Informal",
+  neutral: "Neutral",
+  spoken: "Spoken",
+  written: "Written",
+  technical: "Technical",
+  literary: "Literary",
+  slang: "Slang",
+};
+
+export function registerLabel(register: string): string {
+  return REGISTER_LABEL[register] ?? register;
+}
+
+/** How formal an entry is, as a small outlined tag; nothing for neutral. */
+export function RegisterTag({ register, className }: { register: string | undefined; className?: string }) {
+  if (!register || register === "neutral") return null;
+  return (
+    <span className={cn("shrink-0 rounded border px-1.5 py-px text-[0.6875rem] text-fg-secondary", className)}>
+      {registerLabel(register)}
+    </span>
+  );
+}
 
 export type Accent = "en-GB" | "en-US" | "ru-RU";
 

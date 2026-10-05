@@ -9,26 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { ComparisonResponse, WordComparison } from "@engora/types";
+import type { ComparisonResponse, LexiconKind, WordComparison } from "@engora/types";
 
 import { useCompareWords } from "../../hooks";
-import { Chip, SpeakButton } from "./shared";
-
-/** Pairs learners from Uzbek and Russian most often mix up, to start from. */
-const POPULAR: string[][] = [
-  ["job", "occupation", "profession"],
-  ["make", "do"],
-  ["say", "tell", "speak"],
-  ["borrow", "lend"],
-  ["look", "see", "watch"],
-  ["fun", "funny"],
-  ["house", "home"],
-  ["affect", "effect"],
-  ["rob", "steal"],
-  ["remember", "remind"],
-  ["travel", "trip", "journey"],
-  ["big", "large", "huge"],
-];
+import { Chip, KINDS, SpeakButton } from "./shared";
 
 const RECENT_KEY = "engora.vocabulary.recent-comparisons";
 
@@ -58,9 +42,11 @@ function rememberRecent(terms: string[]) {
  * and a short quiz to check it stuck.
  */
 export function ComparePanel({
+  kind,
   initial,
   onOpenWord,
 }: {
+  kind: LexiconKind;
   /** Words handed over from a word's page, compared as soon as the panel opens. */
   initial: string[] | null;
   onOpenWord: (id: string) => void;
@@ -112,7 +98,7 @@ export function ComparePanel({
             <ArrowLeftRight className="size-4 text-primary" aria-hidden /> Compare words
           </h2>
           <p className="text-body-sm text-fg-secondary">
-            Two words that mean the same in Uzbek or Russian? See exactly how they differ and when to use each.
+            Two that mean the same in Uzbek or Russian? See exactly how they differ and when to use each.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -123,7 +109,7 @@ export function ComparePanel({
                 <Input
                   value={term}
                   onChange={(e) => setTerms(terms.map((t, j) => (j === i ? e.target.value : t)))}
-                  placeholder={["job", "occupation", "profession"][i]}
+                  placeholder={KINDS[kind].compare[0]?.[i] ?? ""}
                   aria-label={`Word ${i + 1}`}
                   maxLength={40}
                   className="h-10 pr-8"
@@ -155,7 +141,7 @@ export function ComparePanel({
         <div className="grid gap-2">
           <p className="text-caption text-fg-muted">Often confused</p>
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {POPULAR.map((set) => (
+            {KINDS[kind].compare.map((set) => (
               <Chip key={set.join("|")} onClick={() => run(set)}>
                 {set.join(" · ")}
               </Chip>

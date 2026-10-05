@@ -9,7 +9,10 @@ import {
   ChartLine,
   GraduationCap,
   House,
+  Library,
+  Link2,
   ListChecks,
+  Quote,
   Settings,
   Sparkles,
   SpellCheck,
@@ -46,10 +49,21 @@ export const skillIcons: Record<string, LucideIcon> = {
   listening: Headphones,
 };
 
+/**
+ * Lexicon: the three kinds of things a learner learns as units — single words, fixed phrases
+ * (phrasal verbs, idioms) and collocations (words that naturally go together) — folded under
+ * one row like Skills.
+ */
+export const lexiconNav: NavItem = { href: "/app/vocabulary", label: "Lexicon", icon: Library };
+export const lexiconItems: NavItem[] = [
+  { href: "/app/vocabulary", label: "Vocabulary", icon: SpellCheck },
+  { href: "/app/phrases", label: "Phrases", icon: Quote },
+  { href: "/app/collocations", label: "Collocations", icon: Link2 },
+];
+
 export const primaryNav: NavItem[] = [
   { href: "/app/ielts", label: "IELTS", icon: GraduationCap },
   { href: "/app/ai-coach", label: "AI Coach", icon: Sparkles },
-  { href: "/app/vocabulary", label: "Vocabulary", icon: SpellCheck },
   { href: "/app/progress", label: "Progress", icon: ChartLine },
   { href: "/app/mistakes", label: "Mistakes", icon: ListChecks },
 ];

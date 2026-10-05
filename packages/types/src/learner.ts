@@ -87,6 +87,19 @@ export interface MistakeSummary {
 // ---- Vocabulary ----------------------------------------------------------------------
 // Grammar has its own module: see ./grammar.
 
+/** word: a single word; phrase: phrasal verb, idiom, fixed phrase; collocation: words that go together. */
+export type LexiconKind = "word" | "phrase" | "collocation";
+
+/** Another meaning of an entry, at the level a learner meets it. */
+export interface WordSense {
+  definition: string;
+  level: string;
+  example: string;
+}
+
+/** list: from a level word list; ai_checked: confirmed by a second check; ai: unverified; curated: set by an editor. */
+export type LevelSource = "list" | "ai_checked" | "ai" | "curated";
+
 /** A word's status in the learner's own deck. */
 export type DeckStatus = "new" | "learning" | "reviewing" | "mastered";
 
@@ -94,6 +107,7 @@ export type DeckStatus = "new" | "learning" | "reviewing" | "mastered";
 export interface LibraryWord {
   id: UUID;
   term: string;
+  kind: LexiconKind;
   part_of_speech: string;
   pronunciation_ipa: string;
   /** How hard the word itself is. */
@@ -101,6 +115,12 @@ export interface LibraryWord {
   tags: string[];
   translations: { uz?: string; ru?: string; ru_pron?: string };
   level_content: Partial<Record<string, VocabularyLevelText>>;
+  /** The explanation at the entry's own level. */
+  definition: string;
+  examples: string[];
+  /** Other meanings, each at its own level. */
+  senses: WordSense[];
+  level_source: LevelSource;
   /** neutral | formal | informal | …; empty when not known yet. */
   register: string;
   /** Near-synonyms: the words worth comparing it with. */
@@ -123,6 +143,7 @@ export interface VocabularyLibrary {
     levels: VocabularyFacet[];
     topics: VocabularyFacet[];
     parts_of_speech: VocabularyFacet[];
+    registers: VocabularyFacet[];
   };
 }
 
@@ -132,6 +153,8 @@ export interface VocabularyLibraryQuery {
   level: string;
   topic: string;
   pos: string;
+  kind: LexiconKind;
+  register: string;
   sort: "level" | "az" | "newest";
   show: "all" | "new" | "mine";
 }
@@ -226,11 +249,27 @@ export interface VocabularyCard {
   level: string | null;
   tags: string[];
   collocations?: string[];
+  kind?: LexiconKind;
   status: DeckStatus;
   /** 0–100, computed by the API */
   mastery: number;
   due_at: Timestamp;
   last_reviewed_at: Timestamp | null;
+}
+
+/** One meaning of a word, climbed level by level; an empty term means no word of its own there. */
+export interface LevelLadder {
+  term: string;
+  meaning_uz: string;
+  summary_uz: string;
+  rungs: { level: string; term: string; register: string; nuance_uz: string; example: string }[];
+}
+
+export interface LadderResponse {
+  ladder: LevelLadder;
+  /** Rung words in the library, by lower-case term. */
+  library: Record<string, UUID>;
+  cached: boolean;
 }
 
 export interface VocabularyDeck {

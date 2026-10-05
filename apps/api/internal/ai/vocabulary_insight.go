@@ -350,3 +350,135 @@ func metaFor(res *AnalysisResponse) *EvaluationMeta {
 		AIRequestID: res.AIRequestID,
 	}
 }
+
+// Level ladders.
+//
+// "big → large → huge → enormous → immense → colossal": one meaning, and the word a learner
+// would use for it at each level. It answers the question a learner moving from B1 to B2
+// actually has — what do I say instead? A level with no natural word is left empty rather
+// than filled with the same word again.
+
+const (
+	VocabularyLadderPrompt = "vocabulary_ladder.v1"
+	SchemaVocabularyLadder = "vocabulary_ladder"
+
+	TaskVocabularyLadder Task = "vocabulary_ladder"
+)
+
+// LadderRung is the word for the meaning at one level; Term is empty when there is none.
+type LadderRung struct {
+	Level    string `json:"level"`
+	Term     string `json:"term"`
+	Register string `json:"register"`
+	/** What this word adds over the one below, in Uzbek. */
+	NuanceUz string `json:"nuance_uz"`
+	Example  string `json:"example"`
+}
+
+// Ladder is a word's meaning, climbed level by level.
+type Ladder struct {
+	Term string `json:"term"`
+	/** The meaning the ladder follows, in Uzbek: "katta (o'lchami)". */
+	MeaningUz string `json:"meaning_uz"`
+	/** How to use the ladder, in Uzbek: one or two sentences. */
+	SummaryUz string       `json:"summary_uz"`
+	Rungs     []LadderRung `json:"rungs"`
+	Invalid   bool         `json:"invalid"`
+}
+
+var ladderSchema = json.RawMessage(`{
+  "type": "object", "additionalProperties": false,
+  "required": ["is_english", "meaning_uz", "summary_uz", "rungs"],
+  "properties": {
+    "is_english": {"type": "boolean", "description": "False when the given term is not an English word or phrase."},
+    "meaning_uz": {"type": "string", "description": "The meaning the ladder follows, in Uzbek (Latin), a few words."},
+    "summary_uz": {"type": "string", "description": "In Uzbek (Latin), one or two sentences on how the words differ as the level rises."},
+    "rungs": {"type": "array", "description": "Exactly one entry per level, A1 to C2, in order.", "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["level", "term", "register", "nuance_uz", "example"],
+      "properties": {
+        "level": {"type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]},
+        "term": {"type": "string", "description": "The word or short phrase for this meaning that a learner meets at this level; empty when no natural one exists. Never repeat a word used at another level."},
+        "register": {"type": "string", "enum": ["", "neutral", "formal", "informal", "spoken", "written", "technical", "literary", "slang"]},
+        "nuance_uz": {"type": "string", "description": "In Uzbek (Latin): what this word means or adds compared with the one below. Empty when term is empty."},
+        "example": {"type": "string", "description": "One natural English sentence with the word. Empty when term is empty."}
+      }
+    }}
+  }
+}`)
+
+// WriteLadder climbs one meaning of a word through the levels.
+func (s *GrammarTutorService) WriteLadder(ctx context.Context, term string, userID *uuid.UUID) (*Ladder, *EvaluationMeta, error) {
+	instructions := "You are an English teacher for learners who speak Uzbek. Given an English word, take its main meaning and give, " +
+		"for each CEFR level A1 to C2, the word or short phrase a learner meets for that same meaning at that level, by the English " +
+		"Vocabulary Profile — from the plainest to the most precise or literary (big → large → huge → enormous → immense → colossal). " +
+		"The given word sits at its own level. Every word appears once: when a level has no natural word of its own, leave that rung empty " +
+		"rather than repeating one. Explanations are in Uzbek (Latin script); examples in English."
+	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
+		Task:          TaskVocabularyLadder,
+		UserID:        userID,
+		PromptVersion: VocabularyLadderPrompt,
+		Metadata:      map[string]any{"kind": "vocabulary_ladder", "term": term},
+	}, AnalysisRequest{
+		Model: s.mainModel, Instructions: instructions, Input: "WORD: " + term + "\n",
+		SchemaName: SchemaVocabularyLadder, Schema: ladderSchema,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	var raw struct {
+		IsEnglish bool         `json:"is_english"`
+		MeaningUz string       `json:"meaning_uz"`
+		SummaryUz string       `json:"summary_uz"`
+		Rungs     []LadderRung `json:"rungs"`
+	}
+	if err := json.Unmarshal(res.Output, &raw); err != nil {
+		return nil, nil, fmt.Errorf("ladder is not valid JSON: %w", err)
+	}
+	meta := &EvaluationMeta{
+		Versions:    Versions{ModelVersion: res.Model, PromptVersion: VocabularyLadderPrompt},
+		AIRequestID: res.AIRequestID,
+	}
+	if !raw.IsEnglish {
+		return &Ladder{Term: term, Invalid: true, Rungs: []LadderRung{}}, meta, nil
+	}
+	ladder := CleanLadder(term, raw.MeaningUz, raw.SummaryUz, raw.Rungs)
+	filled := 0
+	for _, r := range ladder.Rungs {
+		if r.Term != "" {
+			filled++
+		}
+	}
+	if filled < 2 {
+		return nil, nil, fmt.Errorf("no usable ladder came back")
+	}
+	return ladder, meta, nil
+}
+
+// CleanLadder puts the rungs in level order, one per level, and empties any rung that repeats
+// a word already used lower down — the ladder exists to show different words.
+func CleanLadder(term, meaningUz, summaryUz string, rungs []LadderRung) *Ladder {
+	byLevel := map[string]LadderRung{}
+	for _, r := range rungs {
+		if _, ok := byLevel[r.Level]; !ok {
+			byLevel[r.Level] = r
+		}
+	}
+	out := &Ladder{Term: term, MeaningUz: strings.TrimSpace(meaningUz), SummaryUz: strings.TrimSpace(summaryUz), Rungs: []LadderRung{}}
+	used := map[string]bool{}
+	for _, code := range cefrCodes {
+		r := byLevel[code]
+		r.Level = code
+		r.Term = strings.TrimSpace(r.Term)
+		key := strings.ToLower(r.Term)
+		if r.Term == "" || used[key] {
+			r = LadderRung{Level: code}
+		} else {
+			used[key] = true
+			r.NuanceUz = strings.TrimSpace(r.NuanceUz)
+			r.Example = strings.TrimSpace(r.Example)
+		}
+		out.Rungs = append(out.Rungs, r)
+	}
+	return out
+}

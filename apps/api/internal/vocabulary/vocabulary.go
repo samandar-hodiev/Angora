@@ -33,6 +33,7 @@ type Card struct {
 	Level          *string              `json:"level"`
 	Tags           []string             `json:"tags"`
 	Collocations   []string             `json:"collocations"`
+	Kind           string               `json:"kind"`
 	Status         string               `json:"status"`
 	Mastery        int                  `json:"mastery"`
 	DueAt          time.Time            `json:"due_at"`
@@ -71,6 +72,7 @@ func Mastery(status string, repetitions int) int {
 type Writer interface {
 	EnrichWord(ctx context.Context, req ai.EnrichRequest) (ai.WordUsage, *ai.EvaluationMeta, error)
 	CompareWords(ctx context.Context, req ai.CompareRequest) (*ai.WordComparison, *ai.EvaluationMeta, error)
+	WriteLadder(ctx context.Context, term string, userID *uuid.UUID) (*ai.Ladder, *ai.EvaluationMeta, error)
 }
 
 // Entitlements is the slice of the subscription service that meters comparisons.
@@ -123,9 +125,12 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	v.GET("/review", m.reviewQueue)
 	v.POST("/review/:id", m.review)
 	if m.redis != nil {
-		v.POST("/compare", m.userLimit(ratelimit.NewRedisLimiter(m.redis), "vocabulary_compare", comparePerHour), m.compare)
+		limiter := ratelimit.NewRedisLimiter(m.redis)
+		v.POST("/compare", m.userLimit(limiter, "vocabulary_compare", comparePerHour), m.compare)
+		v.POST("/ladder", m.userLimit(limiter, "vocabulary_ladder", comparePerHour), m.ladder)
 	} else {
 		v.POST("/compare", m.compare)
+		v.POST("/ladder", m.ladder)
 	}
 }
 
@@ -181,6 +186,8 @@ func (m *Module) learnerLevel(ctx context.Context, userID uuid.UUID) string {
 type deckQuery struct {
 	/** due | new | learning | mastered; empty is every word. */
 	Filter string `form:"filter" binding:"omitempty,oneof=due new learning mastered"`
+	/** word | phrase | collocation; empty is every kind. */
+	Kind string `form:"kind" binding:"omitempty,oneof=word phrase collocation"`
 	httpx.Pagination
 }
 
@@ -207,8 +214,10 @@ func (m *Module) deck(c *gin.Context) {
 		       count(*) FILTER (WHERE status = 'learning')::int,
 		       count(*) FILTER (WHERE status = 'reviewing')::int,
 		       count(*) FILTER (WHERE status = 'mastered')::int,
-		       (SELECT count(*)::int FROM vocabulary_reviews r WHERE r.user_id = $1 AND r.reviewed_at >= date_trunc('day', now()))
-		FROM user_vocabulary WHERE user_id = $1`, p.UserID,
+		       (SELECT count(*)::int FROM vocabulary_reviews r JOIN vocabulary v ON v.id = r.vocabulary_id
+		        WHERE r.user_id = $1 AND r.reviewed_at >= date_trunc('day', now()) AND ($2 = '' OR v.kind = $2))
+		FROM user_vocabulary uv WHERE uv.user_id = $1
+		  AND ($2 = '' OR EXISTS (SELECT 1 FROM vocabulary v WHERE v.id = uv.vocabulary_id AND v.kind = $2))`, p.UserID, q.Kind,
 	).Scan(&deck.Summary.Total, &deck.Summary.Due, &deck.Summary.New, &deck.Summary.Learning,
 		&deck.Summary.Reviewing, &deck.Summary.Mastered, &deck.Summary.ReviewedToday)
 	if err != nil {
@@ -227,14 +236,15 @@ func (m *Module) deck(c *gin.Context) {
 	case "mastered":
 		filter = `uv.status = 'mastered'`
 	}
+	filter += ` AND ($2 = '' OR v.kind = $2)`
 	var total int64
-	if err := m.pool.QueryRow(ctx, `SELECT count(*) FROM user_vocabulary uv WHERE uv.user_id = $1 AND `+filter,
-		p.UserID).Scan(&total); err != nil {
+	if err := m.pool.QueryRow(ctx, `SELECT count(*) FROM user_vocabulary uv JOIN vocabulary v ON v.id = uv.vocabulary_id
+		WHERE uv.user_id = $1 AND `+filter, p.UserID, q.Kind).Scan(&total); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	cards, err := m.cards(ctx, p.UserID, filter+` ORDER BY uv.due_at ASC, v.term ASC OFFSET $2 LIMIT $3`,
-		q.Offset(), q.PageSize)
+	cards, err := m.cards(ctx, p.UserID, filter+` ORDER BY uv.due_at ASC, v.term ASC OFFSET $3 LIMIT $4`,
+		q.Kind, q.Offset(), q.PageSize)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -243,11 +253,11 @@ func (m *Module) deck(c *gin.Context) {
 	httpx.OKWithMeta(c, deck, httpx.Meta{Page: q.Page, PageSize: q.PageSize, Total: total})
 }
 
-// cards reads the learner's cards matching the SQL tail, which may use $2 and $3.
+// cards reads the learner's cards matching the SQL tail, which may use $2 onwards.
 func (m *Module) cards(ctx context.Context, userID uuid.UUID, tail string, args ...any) ([]Card, error) {
 	rows, err := m.pool.Query(ctx, `
 		SELECT v.id, v.term, v.part_of_speech, v.definition, v.examples, v.pronunciation_ipa, v.translations,
-		       v.level_content, l.code, v.tags, v.collocations,
+		       v.level_content, l.code, v.tags, v.collocations, v.kind,
 		       uv.status, uv.repetitions, uv.due_at, uv.last_reviewed_at
 		FROM user_vocabulary uv
 		JOIN vocabulary v ON v.id = uv.vocabulary_id
@@ -262,7 +272,7 @@ func (m *Module) cards(ctx context.Context, userID uuid.UUID, tail string, args 
 		var card Card
 		var repetitions int
 		if err := rows.Scan(&card.ID, &card.Term, &card.PartOfSpeech, &card.Definition, &card.Examples,
-			&card.PronunciationIPA, &card.Translations, &card.LevelContent, &card.Level, &card.Tags, &card.Collocations,
+			&card.PronunciationIPA, &card.Translations, &card.LevelContent, &card.Level, &card.Tags, &card.Collocations, &card.Kind,
 			&card.Status, &repetitions, &card.DueAt, &card.LastReviewedAt); err != nil {
 			return nil, err
 		}

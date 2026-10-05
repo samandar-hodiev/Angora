@@ -62,8 +62,6 @@ func (m *Module) word(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	var w WordDetail
-	var definition string
-	var examples []string
 	var enrichedAt *time.Time
 	var deckStatus *string
 	var repetitions *int
@@ -73,14 +71,14 @@ func (m *Module) word(c *gin.Context) {
 		SELECT v.id, v.term, v.part_of_speech, v.pronunciation_ipa, l.code, v.tags, v.translations, v.level_content,
 		       v.definition, v.examples, v.usage_note, v.register, v.collocations, v.synonyms, v.antonyms,
 		       v.word_family, v.common_mistake, v.enriched_at,
-		       uv.status, uv.repetitions, uv.due_at, uv.last_reviewed_at
+		       uv.status, uv.repetitions, uv.due_at, uv.last_reviewed_at, v.kind, v.senses, v.level_source
 		FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id
 		LEFT JOIN user_vocabulary uv ON uv.vocabulary_id = v.id AND uv.user_id = $2
 		WHERE v.id = $1 AND v.status = 'published'`, id, p.UserID,
 	).Scan(&w.ID, &w.Term, &w.PartOfSpeech, &w.PronunciationIPA, &w.Level, &w.Tags, &w.Translations, &w.LevelContent,
-		&definition, &examples, &w.Usage.UsageNote, &w.Usage.Register, &w.Usage.Collocations, &w.Usage.Synonyms,
+		&w.Definition, &w.Examples, &w.Usage.UsageNote, &w.Usage.Register, &w.Usage.Collocations, &w.Usage.Synonyms,
 		&w.Usage.Antonyms, &w.Usage.WordFamily, &w.Usage.CommonMistake, &enrichedAt,
-		&deckStatus, &repetitions, &dueAt, &lastReviewed)
+		&deckStatus, &repetitions, &dueAt, &lastReviewed, &w.Kind, &w.Senses, &w.LevelSource)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, apperr.NotFound("Word"))
 		return
@@ -89,14 +87,11 @@ func (m *Module) word(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	w.LevelContent = withOwnLevel(w.LevelContent, w.Level, definition, examples)
+	w.settle()
 	w.LearnerLevel = m.learnerLevel(ctx, p.UserID)
-	if w.Tags == nil {
-		w.Tags = []string{}
-	}
 
 	if enrichedAt == nil && w.Usage.Empty() {
-		if usage, ok := m.enrich(ctx, w, definition); ok {
+		if usage, ok := m.enrich(ctx, w, w.Definition); ok {
 			w.Usage = usage
 		}
 	}

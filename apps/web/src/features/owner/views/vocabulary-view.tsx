@@ -38,9 +38,12 @@ import type { CEFRLevel, JobState } from "../types";
  * beside the English definition, because that is who is learning it.
  */
 
+type Kind = "word" | "phrase" | "collocation";
+
 interface Word {
   id: string;
   term: string;
+  kind: Kind;
   part_of_speech: string;
   definition: string;
   examples: string[];
@@ -50,6 +53,10 @@ interface Word {
   translations: { uz?: string; ru?: string; ru_pron?: string };
   /** The word explained per CEFR level. */
   level_content: Partial<Record<CEFRLevel, LevelText>>;
+  senses: { definition: string; level: string; example: string }[];
+  register: string;
+  /** list: from a level word list; ai_checked: confirmed by a second check; ai: unverified; curated: set by an editor. */
+  level_source: "list" | "ai_checked" | "ai" | "curated";
   status: "draft" | "review" | "published" | "archived";
   source: "ai" | "curated";
   learners: number;
@@ -63,22 +70,10 @@ interface LevelText {
   same_as?: string;
 }
 
-/** "A1–B1 · C1 · C2": the levels a word is explained for, shared explanations folded together. */
-function explainedFor(content: Partial<Record<CEFRLevel, LevelText>>): string {
-  const groups: string[][] = [];
-  for (const code of cefrLevels) {
-    const text = content[code];
-    if (!text?.definition) continue;
-    const last = groups[groups.length - 1];
-    if (text.same_as && last && last[0] === text.same_as) last.push(code);
-    else groups.push([code]);
-  }
-  return groups.map((g) => (g.length > 1 ? `${g[0]}–${g[g.length - 1]}` : g[0])).join(" · ");
-}
-
 interface VocabularyPage {
   items: Word[];
   summary: {
+    unverified: number;
     total: number;
     draft: number;
     published: number;
@@ -90,19 +85,71 @@ interface VocabularyPage {
 type StatusFilter = "all" | "draft" | "published" | "archived";
 type LevelFilter = "all" | CEFRLevel;
 
-const partsOfSpeech = [
-  "noun",
-  "verb",
-  "adjective",
-  "adverb",
-  "phrasal verb",
-  "idiom",
-  "phrase",
-  "preposition",
-  "conjunction",
-  "pronoun",
-  "determiner",
+/** What part_of_speech holds for each kind: a word class, a phrase type, a collocation's pattern. */
+const partsOfSpeechByKind: Record<Kind, string[]> = {
+  word: ["noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "determiner"],
+  phrase: ["phrasal verb", "idiom", "phrase"],
+  collocation: [
+    "verb + noun",
+    "adjective + noun",
+    "adverb + adjective",
+    "adverb + verb",
+    "noun + noun",
+    "verb + preposition",
+    "noun + preposition",
+    "verb + adverb",
+  ],
+};
+const partsOfSpeech = Object.values(partsOfSpeechByKind).flat();
+
+const KIND_LABEL: Record<Kind, { tab: string; one: string; many: string }> = {
+  word: { tab: "Words", one: "word", many: "words" },
+  phrase: { tab: "Phrases", one: "phrase", many: "phrases" },
+  collocation: { tab: "Collocations", one: "collocation", many: "collocations" },
+};
+
+/** The topics a generation offers; an owner may add their own. */
+const TOPICS = [
+  "nature",
+  "animals",
+  "plants",
+  "weather",
+  "environment",
+  "work",
+  "business",
+  "money",
+  "travel",
+  "transport",
+  "city",
+  "home",
+  "family",
+  "people",
+  "feelings",
+  "personality",
+  "food",
+  "health",
+  "body",
+  "sport",
+  "education",
+  "science",
+  "technology",
+  "media",
+  "art",
+  "music",
+  "shopping",
+  "clothes",
+  "society",
+  "time",
 ];
+
+const REGISTERS = ["formal", "neutral", "informal", "spoken", "written", "technical", "literary", "slang"];
+
+const LEVEL_SOURCE: Record<Word["level_source"], { label: string; title: string; variant: "success" | "outline" | "warning" }> = {
+  list: { label: "Listed", title: "Level taken from a level word list", variant: "success" },
+  ai_checked: { label: "Checked", title: "Level written by the AI and confirmed by a second, independent check", variant: "outline" },
+  ai: { label: "Unconfirmed", title: "The two AI checks disagreed — confirm or correct the level", variant: "warning" },
+  curated: { label: "Set by you", title: "Level set by an editor", variant: "outline" },
+};
 
 const PAGE_SIZE = 25;
 const JOB_KEY = "engora-vocabulary-generation";
@@ -113,15 +160,24 @@ const vocabularyApi = {
   create: (input: WordInput) => apiClient.post<Word>("/admin/vocabulary", input),
   update: (id: string, input: WordInput) => apiClient.patch<Word>(`/admin/vocabulary/${id}`, input),
   status: (id: string, status: Word["status"]) => apiClient.post<Word>(`/admin/vocabulary/${id}/status`, { status }),
-  publish: (input: { level?: string; ids?: string[] }) =>
+  setLevel: (id: string, level: CEFRLevel) => apiClient.post<Word>(`/admin/vocabulary/${id}/level`, { level }),
+  publish: (input: { level?: string; ids?: string[]; kind?: Kind }) =>
     apiClient.post<{ published: number }>("/admin/vocabulary/publish", input),
-  generate: (input: { count: number; levels: string[]; theme?: string }) =>
+  generate: (input: GenerateInput) =>
     apiClient.post<{ job_id?: string; added?: number }>("/admin/vocabulary/generate", input),
   job: (id: string) =>
     apiClient.get<
       JobState & { result?: { added?: number; requested?: number; skipped_duplicates?: number; failed_batches?: number } }
     >(`/jobs/${id}`),
 };
+
+interface GenerateInput {
+  count: number;
+  kind: Kind;
+  topics: string[];
+  min_level?: CEFRLevel;
+  max_level?: CEFRLevel;
+}
 
 interface WordInput {
   term: string;
@@ -140,7 +196,8 @@ interface RunningJob {
   /** Words in the library when it started; the new ones are everything above this. */
   startTotal: number;
   count: number;
-  levels: string[];
+  kind?: Kind;
+  topics?: string[];
   startedAt: number;
 }
 
@@ -166,7 +223,11 @@ function writeJob(job: RunningJob | null) {
 
 export function VocabularyView() {
   const client = useQueryClient();
+  const [kind, setKind] = useState<Kind>("word");
   const [search, setSearch] = useState("");
+  const [topic, setTopic] = useState("all");
+  const [register, setRegister] = useState("all");
+  const [check, setCheck] = useState<"all" | "unverified">("all");
   const [level, setLevel] = useState<LevelFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [editing, setEditing] = useState<Word | "new" | null>(null);
@@ -182,8 +243,8 @@ export function VocabularyView() {
 
   // The library at a glance: the counts the header, the tiles and each level's section show.
   const list = useQuery({
-    queryKey: ["owner", "vocabulary", "summary"],
-    queryFn: () => vocabularyApi.list({ page: 1, page_size: 1 }),
+    queryKey: ["owner", "vocabulary", "summary", kind],
+    queryFn: () => vocabularyApi.list({ page: 1, page_size: 1, kind }),
     placeholderData: (previous) => previous,
     // While words are being written they are saved batch by batch: polling the counts is
     // what moves the progress bar.
@@ -206,7 +267,7 @@ export function VocabularyView() {
       const total = r.added ?? 0;
       const short = (r.requested ?? total) - total;
       toast({
-        title: `${total} new ${total === 1 ? "word" : "words"} written as drafts`,
+        title: `${total} new ${KIND_LABEL[running?.kind ?? "word"][total === 1 ? "one" : "many"]} written as drafts`,
         description:
           (r.skipped_duplicates ? `${r.skipped_duplicates} already in the library were skipped. ` : "") +
           (short > 0 ? `${short} fewer than asked — generate again for the rest.` : "Read them, then publish."),
@@ -215,6 +276,7 @@ export function VocabularyView() {
       // Shows the new drafts: the reason to look at the list now.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus("draft");
+      if (running?.kind) setKind(running.kind);
     } else {
       toast({ title: "AI vocabulary generation failed", description: "Nothing was changed. Please try again.", variant: "error" });
     }
@@ -224,14 +286,21 @@ export function VocabularyView() {
   }, [jobId, jobStatus, job.isError]);
 
   const generate = useMutation({
-    mutationFn: vocabularyApi.generate,
-    onSuccess: (started, input) => {
+    // The progress bar counts entries of the kind being written, from how many there were first.
+    mutationFn: async (input: GenerateInput) => {
+      const before = await vocabularyApi.list({ page: 1, page_size: 1, kind: input.kind });
+      const started = await vocabularyApi.generate(input);
+      return { started, startTotal: before.data.summary.total };
+    },
+    onSuccess: ({ started, startTotal }, input) => {
+      setKind(input.kind);
       if (started.job_id) {
         const run: RunningJob = {
           id: started.job_id,
-          startTotal: list.data?.data.summary.total ?? 0,
+          startTotal,
           count: input.count,
-          levels: input.levels,
+          kind: input.kind,
+          topics: input.topics,
           startedAt: Date.now(),
         };
         writeJob(run);
@@ -242,6 +311,10 @@ export function VocabularyView() {
     },
     onError: (error) =>
       toast({ title: "Generation could not start", description: isApiError(error) ? error.message : undefined, variant: "error" }),
+  });
+  const setWordLevel = useMutation({
+    mutationFn: ({ id, level }: { id: string; level: CEFRLevel }) => vocabularyApi.setLevel(id, level),
+    onSuccess: refresh,
   });
   const setWordStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Word["status"] }) => vocabularyApi.status(id, status),
@@ -256,7 +329,14 @@ export function VocabularyView() {
   });
 
   const summary = list.data?.data.summary;
-  const filters = { q: search, status: status === "all" ? "" : status };
+  const filters = {
+    q: search,
+    status: status === "all" ? "" : status,
+    kind,
+    topic: topic === "all" ? "" : topic,
+    register: register === "all" ? "" : register,
+    check: check === "all" ? "" : check,
+  };
   const shownLevels = level === "all" ? cefrLevels : [level];
   const busy = Boolean(jobId) || generate.isPending;
 
@@ -269,10 +349,12 @@ export function VocabularyView() {
         <div className="grid gap-0.5">
           <span className="font-medium">{w.term}</span>
           <span className="text-caption text-fg-muted">
-            {w.level && w.level !== shownLevel && `${w.level} word · `}
+            {w.level && w.level !== shownLevel && `${w.level} · `}
             {w.part_of_speech}
+            {w.register && w.register !== "neutral" && ` · ${w.register}`}
             {w.pronunciation_ipa && ` · ${w.pronunciation_ipa}`}
           </span>
+          {w.tags.length > 0 && <span className="text-caption text-fg-muted capitalize">{w.tags.join(", ")}</span>}
         </div>
       ),
     },
@@ -282,10 +364,10 @@ export function VocabularyView() {
       hideBelow: "md",
       cell: (w) => (
         <div className="grid max-w-md gap-0.5">
-          <span className="line-clamp-2 text-body-sm">{w.level_content[shownLevel]?.definition || w.definition}</span>
-          {Object.keys(w.level_content).length > 1 && (
+          <span className="line-clamp-2 text-body-sm">{w.definition || w.level_content[shownLevel]?.definition}</span>
+          {w.senses.length > 0 && (
             <span className="text-caption text-fg-muted">
-              Explained for {explainedFor(w.level_content)}
+              +{w.senses.length} more {w.senses.length === 1 ? "meaning" : "meanings"} ({w.senses.map((x) => x.level).join(", ")})
             </span>
           )}
           {(w.translations.uz || w.translations.ru) && (
@@ -305,9 +387,12 @@ export function VocabularyView() {
         <span className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={w.status} />
           {w.source === "ai" && w.status !== "published" && <Badge variant="outline">AI</Badge>}
+          <Badge variant={LEVEL_SOURCE[w.level_source].variant} title={LEVEL_SOURCE[w.level_source].title}>
+            {LEVEL_SOURCE[w.level_source].label}
+          </Badge>
         </span>
       ),
-      width: "9rem",
+      width: "12rem",
     },
     { key: "learners", header: "Learners", hideBelow: "lg", align: "right", cell: (w) => w.learners, width: "6rem" },
     {
@@ -321,6 +406,9 @@ export function VocabularyView() {
           label={`Actions for ${w.term}`}
           items={[
             { label: "Edit", icon: Pencil, onSelect: () => setEditing(w) },
+            ...(w.level && w.level_source === "ai"
+              ? [{ label: `Confirm ${w.level}`, icon: Check, onSelect: () => setWordLevel.mutate({ id: w.id, level: w.level! }) }]
+              : []),
             w.status === "published"
               ? { label: "Unpublish", icon: Undo2, onSelect: () => setWordStatus.mutate({ id: w.id, status: "draft" }) }
               : { label: "Publish", icon: Send, onSelect: () => setWordStatus.mutate({ id: w.id, status: "published" }) },
@@ -340,8 +428,8 @@ export function VocabularyView() {
   return (
     <>
       <OwnerPageHeader
-        title="Vocabulary"
-        description="Every word learners can be given — written by hand or by AI for each level, and live once you publish it."
+        title="Lexicon"
+        description="Words, phrases and collocations — each at one checked level, written by hand or by AI from the topics you pick, and live once you publish it."
         breadcrumbs={[
           { label: "Owner", href: "/owner/dashboard" },
           { label: "Content CMS", href: "/owner/content" },
@@ -350,7 +438,7 @@ export function VocabularyView() {
         actions={
           <>
             <Button variant="outline" onClick={() => setEditing("new")}>
-              <Plus aria-hidden /> Add word
+              <Plus aria-hidden /> Add {KIND_LABEL[kind].one}
             </Button>
             <Button variant="outline" disabled={busy} loading={busy} onClick={() => setGenerating(true)}>
               <Sparkles aria-hidden /> Generate with AI
@@ -358,7 +446,7 @@ export function VocabularyView() {
             <Button
               disabled={!summary || summary.draft === 0 || publishAll.isPending}
               loading={publishAll.isPending}
-              onClick={() => publishAll.mutate({ level: level === "all" ? undefined : level })}
+              onClick={() => publishAll.mutate({ kind, level: level === "all" ? undefined : level })}
             >
               <Send aria-hidden />
               Publish {level === "all" ? "all" : level} drafts
@@ -372,18 +460,47 @@ export function VocabularyView() {
 
       {running && <GeneratingPanel run={running} written={Math.max(0, (summary?.total ?? running.startTotal) - running.startTotal)} />}
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div role="tablist" aria-label="Kind" className="mb-4 inline-flex gap-1 rounded-xl border bg-surface p-1">
+        {(Object.keys(KIND_LABEL) as Kind[]).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={kind === k}
+            onClick={() => {
+              setKind(k);
+              setLevel("all");
+            }}
+            className={cn(
+              "rounded-lg px-4 py-1.5 text-label outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+              kind === k ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-secondary hover:text-foreground",
+            )}
+          >
+            {KIND_LABEL[k].tab}
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryTile label="In the library" value={summary?.total} />
         <SummaryTile label="Waiting to publish" value={summary?.draft} tone={summary && summary.draft > 0 ? "warning" : undefined} />
         <SummaryTile label="Live for learners" value={summary?.published} tone="success" />
+        <SummaryTile
+          label="Level not confirmed"
+          value={summary?.unverified}
+          tone={summary && summary.unverified > 0 ? "warning" : undefined}
+        />
       </div>
 
       <FilterBar
-        resultLabel={summary ? `${summary.total} ${summary.total === 1 ? "word" : "words"}` : undefined}
+        resultLabel={summary ? `${summary.total} ${KIND_LABEL[kind][summary.total === 1 ? "one" : "many"]}` : undefined}
         onReset={() => {
           setSearch("");
           setLevel("all");
           setStatus("all");
+          setTopic("all");
+          setRegister("all");
+          setCheck("all");
         }}
       >
         <SearchInput
@@ -416,12 +533,35 @@ export function VocabularyView() {
             { value: "archived", label: "Archived" },
           ]}
         />
+        <FilterSelect
+          label="Topic"
+          value={topic}
+          onChange={setTopic}
+          options={[{ value: "all", label: "Every topic" }, ...TOPICS.map((t) => ({ value: t, label: t }))]}
+        />
+        <FilterSelect
+          label="Formality"
+          value={register}
+          onChange={setRegister}
+          options={[{ value: "all", label: "Any formality" }, ...REGISTERS.map((r) => ({ value: r, label: r }))]}
+        />
+        <FilterSelect
+          label="Level check"
+          value={check}
+          onChange={setCheck}
+          options={[
+            { value: "all", label: "Any level check" },
+            { value: "unverified", label: `Not confirmed${summary?.unverified ? ` · ${summary.unverified}` : ""}` },
+          ]}
+        />
       </FilterBar>
 
       <div className="mt-4 grid gap-3">
         {shownLevels.map((code, i) => (
           <LevelSection
-            key={code}
+            // A new kind or narrowing filter starts every section afresh, open, so each one counts
+            // what matches instead of showing the kind's totals.
+            key={`${code}|${kind}|${filters.topic}|${filters.register}|${filters.check}`}
             level={code}
             filters={filters}
             count={summary?.by_level[code] ?? 0}
@@ -431,7 +571,7 @@ export function VocabularyView() {
             // level with drafts waiting does — that is where the work is.
             defaultOpen={
               level !== "all" ||
-              Boolean(search) ||
+              Boolean(search || filters.topic || filters.register || filters.check) ||
               code === (cefrLevels.find((c) => (summary?.drafts_by_level?.[c] ?? 0) > 0) ?? (i === 0 ? code : ""))
             }
             onEdit={setEditing}
@@ -456,6 +596,7 @@ export function VocabularyView() {
         open={generating}
         onOpenChange={setGenerating}
         libraryTotal={summary?.total ?? 0}
+        initialKind={kind}
         onGenerate={(input) => {
           setGenerating(false);
           generate.mutate(input);
@@ -480,7 +621,7 @@ function LevelSection({
   onAdd,
 }: {
   level: CEFRLevel;
-  filters: { q: string; status: string };
+  filters: { q: string; status: string; kind: Kind; topic: string; register: string; check: string };
   count: number;
   drafts: number;
   columns: Column<Word>[];
@@ -508,7 +649,7 @@ function LevelSection({
   // status filter as an open one, or "Drafts" would show 100 in one section and 110 in the next.
   const counted = filters.status === "draft" ? drafts : filters.status === "published" ? count - drafts : count;
   const total = list.data?.meta?.total ?? counted;
-  const searching = Boolean(filters.q || filters.status);
+  const searching = Boolean(filters.q || filters.status || filters.topic || filters.register || filters.check);
   // While searching, a level with nothing matching gets out of the way.
   if (searching && open && list.data && total === 0) return null;
 
@@ -594,11 +735,12 @@ function GeneratingPanel({ run, written }: { run: RunningJob; written: number })
         </span>
         <div className="grid min-w-0 flex-1 gap-0.5">
           <p className="text-body font-medium">
-            Writing {run.count} new words <span className="text-fg-muted">· {done} done</span>
+            Writing {run.count} new {KIND_LABEL[run.kind ?? "word"].many} <span className="text-fg-muted">· {done} done</span>
           </p>
           <p className="text-caption text-fg-muted">
-            Each one explained for {run.levels.join(" · ")}, with examples, pronunciation, Uzbek and Russian. You can leave
-            this page — it keeps going.
+            {run.topics?.length ? `From ${run.topics.join(", ")}. ` : "Mixed topics. "}
+            Each at its own checked level, with other meanings, examples, pronunciation, Uzbek and Russian. You can leave this
+            page — it keeps going.
           </p>
         </div>
         <span className="text-h4 tabular-nums text-primary">{pct}%</span>
@@ -610,13 +752,6 @@ function GeneratingPanel({ run, written }: { run: RunningJob; written: number })
         {placeholderWidths.map((width, i) => (
           <li key={i} className="flex items-center gap-3 rounded-lg border bg-surface px-3 py-2.5" style={{ animationDelay: `${i * 150}ms` }}>
             <Skeleton className={cn("h-4 rounded", width)} />
-            <div className="flex gap-1">
-              {run.levels.map((code) => (
-                <span key={code} className="animate-pulse rounded bg-surface-active px-1 text-[0.625rem] text-fg-muted">
-                  {code}
-                </span>
-              ))}
-            </div>
             <Skeleton className="ml-auto hidden h-3 w-1/3 rounded sm:block" />
           </li>
         ))}
@@ -867,39 +1002,82 @@ function GenerateWordsDialog({
   open,
   onOpenChange,
   libraryTotal,
+  initialKind,
   onGenerate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   libraryTotal: number;
-  onGenerate: (input: { count: number; levels: string[]; theme?: string }) => void;
+  initialKind: Kind;
+  onGenerate: (input: GenerateInput) => void;
 }) {
-  const [levels, setLevels] = useState<CEFRLevel[]>([...cefrLevels]);
+  const [kind, setKind] = useState<Kind>(initialKind);
   const [count, setCount] = useState<number>(20);
-  const [theme, setTheme] = useState("");
-  const toggle = (code: CEFRLevel) => setLevels(levels.includes(code) ? levels.filter((l) => l !== code) : [...levels, code]);
-  const valid = levels.length > 0 && count >= 10 && count <= 100;
+  const [topics, setTopics] = useState<string[]>([]);
+  const [custom, setCustom] = useState("");
+  const [minLevel, setMinLevel] = useState<CEFRLevel | "">("");
+  const [maxLevel, setMaxLevel] = useState<CEFRLevel | "">("");
+  const toggle = (t: string) => setTopics(topics.includes(t) ? topics.filter((x) => x !== t) : [...topics, t].slice(-8));
+  const addCustom = () => {
+    const t = custom.trim().toLowerCase();
+    if (t.length >= 2 && !topics.includes(t)) setTopics([...topics, t].slice(-8));
+    setCustom("");
+  };
+  const valid = count >= 10 && count <= 100;
+  const names = KIND_LABEL[kind];
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
       className="sm:max-w-2xl"
-      title="Generate vocabulary with AI"
-      description="New words, each explained separately for every level you pick, with examples, pronunciation and the word in Uzbek and Russian — as drafts for you to read."
+      title="Generate with AI"
+      description="New entries from the topics you pick, each explained once at its own level, with its other meanings, formality, examples, pronunciation and the meaning in Uzbek and Russian — as drafts for you to read."
       confirmLabel="Generate"
       disabled={!valid}
-      onConfirm={() => onGenerate({ count, levels, theme: theme.trim() || undefined })}
+      onConfirm={() =>
+        onGenerate({
+          count,
+          kind,
+          topics,
+          min_level: minLevel || undefined,
+          max_level: maxLevel || undefined,
+        })
+      }
       footerStart={
         valid
-          ? `${count} new words × ${levels.length} ${levels.length === 1 ? "level" : "levels"} of explanation`
-          : "Pick at least one level and 10–100 words"
+          ? `${count} new ${names.many}${topics.length ? ` · ${topics.join(", ")}` : " · mixed topics"}`
+          : "Choose 10–100"
       }
     >
       <div className="grid gap-5">
         <section className="grid gap-2">
+          <h3 className="text-label">What to write</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {(Object.keys(KIND_LABEL) as Kind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={kind === k}
+                onClick={() => setKind(k)}
+                className={cn(
+                  "grid gap-0.5 rounded-lg border px-3 py-2 text-left outline-none transition-colors duration-micro",
+                  "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+                  kind === k ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
+                )}
+              >
+                <span className="text-body-sm font-semibold">{KIND_LABEL[k].tab}</span>
+                <span className="text-caption text-fg-muted">
+                  {k === "word" ? "decision, huge" : k === "phrase" ? "look after, break the ice" : "make a decision, heavy rain"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-2">
           <div className="flex items-baseline justify-between gap-3">
-            <Label htmlFor="vocab-count">How many new words</Label>
+            <Label htmlFor="vocab-count">How many new {names.many}</Label>
             <span className="text-caption text-fg-muted">10 – 100</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -927,60 +1105,90 @@ function GenerateWordsDialog({
               value={count}
               onChange={(e) => setCount(Math.round(Number(e.target.value) || 0))}
               className="w-24 tabular-nums"
-              aria-describedby="vocab-count-hint"
             />
           </div>
-          <p id="vocab-count-hint" className={cn("text-caption", valid || levels.length === 0 ? "text-fg-muted" : "text-error")}>
-            {count < 10 || count > 100 ? "Choose between 10 and 100 words." : "Each word is one entry, with its own explanation for every level below."}
-          </p>
+          {!valid && <p className="text-caption text-error">Choose between 10 and 100.</p>}
         </section>
 
         <section className="grid gap-2">
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-label">Explain each word for</h3>
-            <button
-              type="button"
-              className="text-caption font-medium text-primary hover:underline"
-              onClick={() => setLevels(levels.length === cefrLevels.length ? [] : [...cefrLevels])}
-            >
-              {levels.length === cefrLevels.length ? "Clear all" : "Select all"}
-            </button>
+            <h3 className="text-label">Topics — pick any, or none for a mix</h3>
+            {topics.length > 0 && (
+              <button type="button" className="text-caption font-medium text-primary hover:underline" onClick={() => setTopics([])}>
+                Clear
+              </button>
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {cefrLevels.map((code) => {
-              const on = levels.includes(code);
+          <div className="flex flex-wrap gap-1.5">
+            {[...TOPICS, ...topics.filter((t) => !TOPICS.includes(t))].map((t) => {
+              const on = topics.includes(t);
               return (
                 <button
-                  key={code}
+                  key={t}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => toggle(code)}
+                  onClick={() => toggle(t)}
                   className={cn(
-                    "rounded-lg border px-2 py-2 text-body font-semibold outline-none transition-colors duration-micro",
+                    "rounded-full border px-3 py-1 text-body-sm capitalize outline-none transition-colors duration-micro",
                     "focus-visible:ring-[3px] focus-visible:ring-ring/40",
-                    on ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:bg-surface-hover",
+                    on ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "bg-surface text-fg-secondary hover:bg-surface-hover",
                   )}
                 >
-                  {code}
+                  {t}
                 </button>
               );
             })}
           </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Your own topic — e.g. airport, cooking, job interview"
+              value={custom}
+              maxLength={40}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustom();
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={addCustom} disabled={custom.trim().length < 2}>
+              <Plus aria-hidden /> Add
+            </Button>
+          </div>
         </section>
 
-        <section className="grid gap-1.5">
-          <Label htmlFor="vocab-theme">Theme — optional</Label>
-          <Input
-            id="vocab-theme"
-            placeholder="travel, work, feelings… leave empty for a mix"
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-          />
+        <section className="grid gap-2">
+          <h3 className="text-label">Level range — optional</h3>
+          <div className="flex flex-wrap items-center gap-2 text-body-sm">
+            <NativeSelect value={minLevel} onChange={(e) => setMinLevel(e.target.value as CEFRLevel | "")} aria-label="Lowest level">
+              <option value="">Any</option>
+              {cefrLevels.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </NativeSelect>
+            <span className="text-fg-muted">to</span>
+            <NativeSelect value={maxLevel} onChange={(e) => setMaxLevel(e.target.value as CEFRLevel | "")} aria-label="Highest level">
+              <option value="">Any</option>
+              {cefrLevels.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+          <p className="text-caption text-fg-muted">
+            Leave both on Any and the AI writes whatever fits the topic; every entry is still labelled with its own level.
+          </p>
         </section>
 
         <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary-subtle/40 px-3 py-2 text-caption">
           <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-          Never repeats a word: all {libraryTotal} words already in the library are left out, and no word appears twice in one run.
+          Each level is checked: taken from the level word list where it is listed, otherwise confirmed by a second, independent AI
+          check — anything the two disagree on is marked “Unconfirmed” for you. Nothing already in the library ({libraryTotal}{" "}
+          entries) is written again.
         </p>
       </div>
     </ConfirmDialog>

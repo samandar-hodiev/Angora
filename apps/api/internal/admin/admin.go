@@ -156,6 +156,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.POST("/vocabulary/publish", content, m.publishWords)
 	g.PATCH("/vocabulary/:id", content, m.updateWord)
 	g.POST("/vocabulary/:id/status", content, m.setWordStatus)
+	g.POST("/vocabulary/:id/level", content, m.setWordLevel)
 
 	g.GET("/grammar/categories", content, m.grammarCategories)
 	g.GET("/grammar/topics", content, m.grammarTopics)

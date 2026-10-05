@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -28,28 +29,40 @@ import (
 // level — and slips in one word that is already in the library, to be skipped.
 type wordAuthor struct {
 	stubAuthor
-	stamp string
-	mu    sync.Mutex
-	n     int
+	stamp  string
+	mu     sync.Mutex
+	n      int
+	topics []string
 }
 
 func (a *wordAuthor) WriteVocabulary(_ context.Context, req ai.VocabularyRequest) ([]ai.GeneratedWord, *ai.EvaluationMeta, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.topics = append(a.topics, req.Topics...)
 	out := []ai.GeneratedWord{{Term: "zz" + a.stamp + "manual", PartOfSpeech: "noun",
 		LevelContent: map[string]ai.LevelText{"A1": {Definition: "already there"}}}}
 	for i := 0; i < req.Count; i++ {
 		a.n++
-		content := map[string]ai.LevelText{}
-		for _, l := range req.Levels {
-			content[l.BaseCode()] = ai.LevelText{Definition: "meaning at " + l.BaseCode(), Examples: []string{"An example."}}
-		}
 		out = append(out, ai.GeneratedWord{
 			Term: fmt.Sprintf("zz%sword%d", a.stamp, a.n), PartOfSpeech: "noun", Level: "B1",
-			Translations: map[string]string{"uz": "so'z"}, LevelContent: content,
+			Translations: map[string]string{"uz": "so'z"},
+			LevelContent: map[string]ai.LevelText{"B1": {Definition: "meaning", Examples: []string{"An example."}}},
+			Senses:       []ai.Sense{{Definition: "another meaning", Level: "C1", Example: "Another."}},
 		})
 	}
 	return ai.UsableWords(out, map[string]bool{}), &ai.EvaluationMeta{}, nil
+}
+
+// CheckLevels agrees with every word but those whose number is a multiple of three, which it
+// puts at A2: those must come out unverified, at A2.
+func (a *wordAuthor) CheckLevels(_ context.Context, items []ai.LevelCheckItem) (map[string]string, error) {
+	out := map[string]string{}
+	for _, it := range items {
+		var n int
+		_, _ = fmt.Sscanf(it.Term[len("zz"+a.stamp+"word"):], "%d", &n)
+		out[strings.ToLower(it.Term)] = map[bool]string{true: "A2", false: "B1"}[n%3 == 0]
+	}
+	return out, nil
 }
 
 func TestVocabularyAuthoringPostgres(t *testing.T) {
@@ -79,13 +92,14 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, owner.ID)
 	})
 
+	author := &wordAuthor{stamp: stamp}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.Errors(observability.LogReporter{Log: slog.New(slog.DiscardHandler)}), func(c *gin.Context) {
 		authz.SetPrincipal(c, authz.Principal{UserID: owner.ID, Role: authz.RoleAdmin, SessionID: uuid.New()})
 		c.Next()
 	})
-	NewModule(pool, &recordingAudit{}).WithAuthor(&wordAuthor{stamp: stamp}).RegisterRoutes(r.Group("/api/v1"))
+	NewModule(pool, &recordingAudit{}).WithAuthor(author).RegisterRoutes(r.Group("/api/v1"))
 
 	call := func(method, path string, body any) *httptest.ResponseRecorder {
 		var buf bytes.Buffer
@@ -123,8 +137,8 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		}
 	})
 
-	t.Run("generate writes the count asked for, each word explained per level, never a word twice", func(t *testing.T) {
-		w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"count": 12, "levels": []string{"A1", "B2", "C2"}})
+	t.Run("generate writes the count asked for, from the topics, each level checked, never a word twice", func(t *testing.T) {
+		w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"count": 12, "kind": "word", "topics": []string{"Animals", "plants"}})
 		if w.Code != http.StatusOK {
 			t.Fatalf("generate status = %d body = %s", w.Code, w.Body.String())
 		}
@@ -138,15 +152,39 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		if res.Data.Added != 12 || res.Data.Skipped == 0 {
 			t.Errorf("added %d skipped %d, want 12 added and the existing word skipped", res.Data.Added, res.Data.Skipped)
 		}
-		var levels int
+		var checked, unverified, atA2, withSenses int
 		_ = pool.QueryRow(ctx, `
-			SELECT count(*) FROM vocabulary
-			WHERE term LIKE $1 AND source = 'ai' AND level_content ?& array['A1','B2','C2']`, "zz"+stamp+"word%").Scan(&levels)
-		if levels != 12 {
-			t.Errorf("words explained for A1, B2 and C2 = %d, want all 12", levels)
+			SELECT count(*) FILTER (WHERE v.level_source = 'ai_checked'),
+			       count(*) FILTER (WHERE v.level_source = 'ai'),
+			       count(*) FILTER (WHERE l.code = 'A2' AND v.level_content ? 'A2' AND NOT v.level_content ? 'B1'),
+			       count(*) FILTER (WHERE jsonb_array_length(v.senses) = 1 AND v.kind = 'word')
+			FROM vocabulary v JOIN levels l ON l.id = v.level_id
+			WHERE v.term LIKE $1 AND v.source = 'ai'`, "zz"+stamp+"word%").Scan(&checked, &unverified, &atA2, &withSenses)
+		if checked+unverified != 12 || unverified == 0 || atA2 != unverified || withSenses != 12 {
+			t.Errorf("checked %d unverified %d at A2 %d with senses %d", checked, unverified, atA2, withSenses)
 		}
-		if w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"count": 5, "levels": []string{"A1"}}); w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
+		author.mu.Lock()
+		topics := strings.Join(author.topics, ",")
+		author.mu.Unlock()
+		if !strings.Contains(topics, "animals") || !strings.Contains(topics, "plants") {
+			t.Errorf("batches were asked for topics %q, want both animals and plants", topics)
+		}
+		if w := call(http.MethodPost, "/vocabulary/generate", map[string]any{"count": 5}); w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
 			t.Errorf("count 5 status = %d, want refused (10 is the least)", w.Code)
+		}
+	})
+
+	t.Run("confirming a level makes it curated and moves its explanation", func(t *testing.T) {
+		var id uuid.UUID
+		_ = pool.QueryRow(ctx, `SELECT id FROM vocabulary WHERE term LIKE $1 AND level_source = 'ai' LIMIT 1`, "zz"+stamp+"word%").Scan(&id)
+		if w := call(http.MethodPost, "/vocabulary/"+id.String()+"/level", map[string]any{"level": "B1"}); w.Code != http.StatusOK {
+			t.Fatalf("level status = %d body = %s", w.Code, w.Body.String())
+		}
+		var source string
+		var hasB1 bool
+		_ = pool.QueryRow(ctx, `SELECT level_source, level_content ? 'B1' FROM vocabulary WHERE id = $1`, id).Scan(&source, &hasB1)
+		if source != "curated" || !hasB1 {
+			t.Errorf("source %q, B1 explanation %v", source, hasB1)
 		}
 	})
 
@@ -155,12 +193,12 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("publish status = %d body = %s", w.Code, w.Body.String())
 		}
-		var live, draft int
+		var wrong int
 		_ = pool.QueryRow(ctx, `
-			SELECT count(*) FILTER (WHERE status = 'published'), count(*) FILTER (WHERE status = 'draft')
-			FROM vocabulary WHERE term LIKE $1`, "zz"+stamp+"%").Scan(&live, &draft)
-		if live != 12 || draft != 1 {
-			t.Errorf("live/draft = %d/%d, want the 12 B1 words live and the A2 word still a draft", live, draft)
+			SELECT count(*) FROM vocabulary v JOIN levels l ON l.id = v.level_id
+			WHERE v.term LIKE $1 AND (v.status = 'published') <> (l.code = 'B1')`, "zz"+stamp+"%").Scan(&wrong)
+		if wrong != 0 {
+			t.Errorf("%d words where live is not the same as being at B1", wrong)
 		}
 	})
 }

@@ -9,11 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Meter } from "@/components/ui/data-display";
 import { Sheet, SheetContent } from "@/components/ui/overlay";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import type { RelatedWord, WordDetail } from "@engora/types";
 
 import { useAddToDeck, useMarkKnown, useRemoveFromDeck, useVocabularyWord } from "../../hooks";
-import { Chip, DeckBadge, LEVEL_NAMES, LEVELS, LevelTag, SpeakButton, Translations, explanationAt, speak } from "./shared";
+import { Chip, DeckBadge, LEVEL_NAMES, LevelTag, RegisterTag, SpeakButton, Translations, speak } from "./shared";
 
 /**
  * One word, all of it: what it means at every level, how it sounds, how it is used, what it is
@@ -74,9 +73,7 @@ function WordBody({
           <h2 className="text-h2">{word.term}</h2>
           <LevelTag level={word.level} />
           <span className="text-body-sm text-fg-muted">{word.part_of_speech}</span>
-          {usage.register && usage.register !== "neutral" && (
-            <span className="rounded border px-1.5 py-px text-[0.6875rem] text-fg-secondary">{usage.register}</span>
-          )}
+          <RegisterTag register={usage.register || word.register} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {word.pronunciation_ipa && <span className="font-mono text-body-sm text-fg-secondary">{word.pronunciation_ipa}</span>}
@@ -140,7 +137,7 @@ function WordBody({
           >
             {word.synonyms.length > 0 && (
               <div className="grid gap-2">
-                <p className="text-label text-fg-muted">Similar words — what is the difference?</p>
+                <p className="text-label text-fg-muted">Similar — what is the difference?</p>
                 <ul className="grid gap-1.5">
                   {word.synonyms.map((s) => (
                     <li key={s.term} className="flex items-center gap-2 rounded-lg border bg-surface px-3 py-2">
@@ -204,63 +201,54 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   );
 }
 
-/** The word explained at one level at a time — the learner's own first, any other a tap away. */
+/**
+ * What the entry means: its main meaning at its own level, then any other meanings, each at the
+ * level a learner meets it — "run" moves fast at A1 and runs a company at B2.
+ */
 function Meaning({ word }: { word: WordDetail }) {
-  const start = explanationAt(word.level_content, word.learner_level)?.level ?? word.learner_level;
-  const [level, setLevel] = useState(start);
-  const text = word.level_content[level];
-  const shownLevel = text?.same_as ?? level;
   return (
     <Section title="Meaning">
-      <div role="tablist" aria-label="Explained for level" className="grid grid-cols-6 gap-1 rounded-xl border bg-surface p-1">
-        {LEVELS.map((code) => {
-          const has = !!word.level_content[code]?.definition;
-          return (
-            <button
-              key={code}
-              type="button"
-              role="tab"
-              aria-selected={level === code}
-              disabled={!has}
-              onClick={() => setLevel(code)}
-              title={has ? LEVEL_NAMES[code] : "Not explained at this level"}
-              className={cn(
-                "relative rounded-lg py-1.5 text-label outline-none transition-colors duration-micro",
-                "focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-35",
-                level === code ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-secondary hover:text-foreground",
-              )}
-            >
-              {code}
-              {code === word.learner_level && (
-                <span className="absolute top-1 right-1.5 size-1.5 rounded-full bg-primary" aria-label="your level" />
-              )}
-            </button>
-          );
-        })}
+      <div className="grid gap-3 rounded-xl border bg-surface p-4">
+        <p className="flex flex-wrap items-center gap-2 text-caption text-fg-muted">
+          <LevelTag level={word.level} />
+          {word.level && LEVEL_NAMES[word.level]}
+          {word.level === word.learner_level && <span className="text-primary">your level</span>}
+          {word.level_source === "ai" && <span title="This level has not been confirmed by an editor yet">· level not confirmed yet</span>}
+        </p>
+        <p className="text-body-lg">{word.definition || "—"}</p>
+        {word.examples.length > 0 && (
+          <ul className="grid gap-2">
+            {word.examples.map((example) => (
+              <li key={example} className="flex items-start gap-2 border-l-2 border-primary/40 pl-3">
+                <p className="text-body-sm text-fg-secondary italic">
+                  <Highlight text={example} term={word.term} />
+                </p>
+                <SpeakButton text={example} className="ml-auto" />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {text ? (
-        <div className="grid gap-3 rounded-xl border bg-surface p-4">
-          <p className="flex items-center gap-2 text-caption text-fg-muted">
-            Explained for {level} · {LEVEL_NAMES[level]}
-            {level === word.learner_level && <span className="text-primary">your level</span>}
-            {shownLevel !== level && <span>(same as {shownLevel})</span>}
-          </p>
-          <p className="text-body-lg">{text.definition}</p>
-          {text.examples.length > 0 && (
-            <ul className="grid gap-2">
-              {text.examples.map((example) => (
-                <li key={example} className="flex items-start gap-2 border-l-2 border-primary/40 pl-3">
-                  <p className="text-body-sm text-fg-secondary italic">
-                    <Highlight text={example} term={word.term} />
+      {word.senses.length > 0 && (
+        <div className="grid gap-2">
+          <p className="text-label text-fg-muted">Other meanings</p>
+          <ul className="grid gap-2">
+            {word.senses.map((sense) => (
+              <li key={sense.definition} className="grid gap-1 rounded-lg border bg-surface px-4 py-3">
+                <p className="flex items-start gap-2 text-body">
+                  <LevelTag level={sense.level} className="mt-0.5" />
+                  {sense.definition}
+                </p>
+                {sense.example && (
+                  <p className="flex items-start gap-2 pl-9 text-body-sm text-fg-secondary italic">
+                    <Highlight text={sense.example} term={word.term} />
+                    <SpeakButton text={sense.example} className="ml-auto" />
                   </p>
-                  <SpeakButton text={example} className="ml-auto" />
-                </li>
-              ))}
-            </ul>
-          )}
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : (
-        <p className="text-body-sm text-fg-muted">Not explained at this level yet.</p>
       )}
     </Section>
   );
@@ -268,22 +256,25 @@ function Meaning({ word }: { word: WordDetail }) {
 
 /** The sentence with the word in it picked out, so the eye finds it. */
 function Highlight({ text, term }: { text: string; term: string }) {
-  const stem = term.toLowerCase().slice(0, Math.max(3, term.length - 2));
+  // Each word of the entry by its stem, so "made a decision" lights up for "make a decision".
+  const stems = term
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2)
+    .map((w) => w.slice(0, Math.max(3, w.length - 2)));
   const parts = text.split(/(\s+)/);
   return (
     <>
-      {parts.map((part, i) =>
-        part
-          .toLowerCase()
-          .replace(/[^a-z'-]/g, "")
-          .startsWith(stem) ? (
+      {parts.map((part, i) => {
+        const bare = part.toLowerCase().replace(/[^a-z'-]/g, "");
+        return bare && stems.some((stem) => bare.startsWith(stem)) ? (
           <mark key={i} className="rounded bg-primary-subtle px-0.5 text-primary-subtle-foreground not-italic">
             {part}
           </mark>
         ) : (
           <span key={i}>{part}</span>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -333,7 +324,7 @@ function DeckActions({ word }: { word: WordDetail }) {
     return (
       <div className="flex flex-wrap gap-2">
         <Button size="sm" loading={add.isPending} onClick={() => add.mutate(word.id)}>
-          <Plus aria-hidden /> Add to my words
+          <Plus aria-hidden /> Add to my list
         </Button>
         <Button size="sm" variant="outline" loading={known.isPending} onClick={() => known.mutate(word.id)}>
           <CheckCheck aria-hidden /> I already know it
@@ -346,7 +337,7 @@ function DeckActions({ word }: { word: WordDetail }) {
     <div className="grid gap-2 rounded-lg border bg-surface-hover/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Check className="size-4 text-success" aria-hidden />
-        <span className="text-label">In my words</span>
+        <span className="text-label">In my list</span>
         <DeckBadge status={word.deck.status} />
         <span className="text-caption text-fg-muted">
           {word.deck.reviews} review{word.deck.reviews === 1 ? "" : "s"} · next{" "}

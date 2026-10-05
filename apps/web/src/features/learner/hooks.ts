@@ -97,10 +97,10 @@ export function useMarkKnown() {
   return useDeckMutation(learnerApi.markKnown);
 }
 
-export function useVocabularyDeck(page = 1, filter = "") {
+export function useVocabularyDeck(page = 1, filter = "", kind = "") {
   return useQuery({
-    queryKey: queryKeys.vocabulary.deck(page, filter),
-    queryFn: () => learnerApi.vocabularyDeck(page, filter),
+    queryKey: queryKeys.vocabulary.deck(page, filter, kind),
+    queryFn: () => learnerApi.vocabularyDeck(page, filter, kind),
     enabled: useAuthed(),
     placeholderData: keepPreviousData,
   });
@@ -115,6 +115,10 @@ export function useReviewWord() {
 
 export function useCompareWords() {
   return useMutation({ mutationFn: learnerApi.compareWords });
+}
+
+export function useLadder() {
+  return useMutation({ mutationFn: learnerApi.ladder });
 }
 
 export function useRecommendations() {
