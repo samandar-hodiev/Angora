@@ -106,7 +106,10 @@ func (g *Gateway) route(task Task) Route {
 	if !ok || r.Provider == "" {
 		r.Provider = g.cfg.DefaultProvider
 	}
-	if r.Model == "" && r.Provider == g.cfg.DefaultProvider {
+	// The default model is a text model. Speech-to-text needs a model of its own, so with no
+	// route for it the provider picks its own transcription default — sent gpt-4.1-mini, the
+	// transcription endpoint refuses every recording.
+	if r.Model == "" && r.Provider == g.cfg.DefaultProvider && task != TaskTranscription {
 		r.Model = g.cfg.DefaultModel
 	}
 	return r

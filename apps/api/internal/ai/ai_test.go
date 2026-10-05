@@ -170,3 +170,33 @@ func TestEvaluationResultValidation(t *testing.T) {
 		}
 	}
 }
+
+// modelRecorder remembers the model it was asked to transcribe with.
+type modelRecorder struct{ model string }
+
+func (p *modelRecorder) Name() string { return "rec" }
+func (p *modelRecorder) GenerateText(context.Context, ai.TextRequest) (*ai.TextResponse, error) {
+	return nil, ai.ErrUnsupported
+}
+func (p *modelRecorder) AnalyzeText(context.Context, ai.AnalysisRequest) (*ai.AnalysisResponse, error) {
+	return nil, ai.ErrUnsupported
+}
+func (p *modelRecorder) TranscribeAudio(_ context.Context, req ai.TranscriptionRequest) (*ai.TranscriptionResponse, error) {
+	p.model = req.Model
+	return &ai.TranscriptionResponse{}, nil
+}
+
+// Transcription must not inherit the default text model: the transcription endpoint refuses it.
+func TestTranscriptionDoesNotUseTheTextModel(t *testing.T) {
+	p := &modelRecorder{}
+	gw, err := ai.NewGateway(ai.GatewayConfig{DefaultProvider: "rec", DefaultModel: "gpt-4.1-mini"}, ai.NopRecorder{}, logger.Discard(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gw.TranscribeAudio(context.Background(), ai.CallMeta{Task: ai.TaskTranscription}, ai.TranscriptionRequest{Audio: strings.NewReader("x")}); err != nil {
+		t.Fatal(err)
+	}
+	if p.model != "" {
+		t.Fatalf("transcription was sent model %q; want the provider's own default", p.model)
+	}
+}
