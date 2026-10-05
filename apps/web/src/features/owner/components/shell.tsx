@@ -24,6 +24,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { startEdgeDrag } from "@/components/layout/sidebar-resize";
 import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import {
@@ -179,33 +180,20 @@ function OwnerShellBody({ children }: { children: ReactNode }) {
   }
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const handle = event.currentTarget;
-    handle.setPointerCapture(event.pointerId);
     // The sidebar starts at the window's left edge, so the pointer's x is the width.
     const widthAt = (x: number) => Math.min(Math.max(x, SIDEBAR_ICONS), SIDEBAR_MAX);
     let latest = widthAt(event.clientX);
-    setDragWidth(latest);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const move = (e: PointerEvent) => {
-      latest = widthAt(e.clientX);
-      setDragWidth(latest);
-    };
-    const end = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      settleWidth(latest);
-      setDragWidth(null);
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
+    const started = startEdgeDrag(event, {
+      onMove: (x) => {
+        latest = widthAt(x);
+        setDragWidth(latest);
+      },
+      onEnd: () => {
+        settleWidth(latest);
+        setDragWidth(null);
+      },
+    });
+    if (started) setDragWidth(latest);
   }
 
   function resizeByKey(event: ReactKeyboardEvent<HTMLDivElement>) {

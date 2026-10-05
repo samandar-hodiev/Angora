@@ -59,6 +59,57 @@ function write(key: string, value: number) {
   listeners.forEach((listener) => listener());
 }
 
+/**
+ * Follows a drag that starts on a resize edge until the button is let go — wherever that
+ * happens.
+ *
+ * Listening for pointerup on the edge alone left a drag running: release the button outside
+ * the window, or let the sidebar collapse and redraw the edge mid-drag, and the pointerup
+ * never reached it — the sidebar then followed the cursor with no button held. So the drag
+ * ends on whichever comes first: pointerup or pointercancel anywhere, the edge losing pointer
+ * capture, the window losing focus, or a move that arrives with no button pressed.
+ * Returns false when the press is not one that starts a drag.
+ */
+export function startEdgeDrag(
+  event: ReactPointerEvent<HTMLElement>,
+  { onMove, onEnd }: { onMove: (clientX: number) => void; onEnd: () => void },
+): boolean {
+  if (event.button !== 0) return false;
+  event.preventDefault();
+  const handle = event.currentTarget;
+  try {
+    handle.setPointerCapture(event.pointerId);
+  } catch {
+    /* capture is a nicety; the window listeners below carry the drag without it */
+  }
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+
+  let done = false;
+  const move = (e: PointerEvent) => {
+    if (e.buttons === 0) return end();
+    onMove(e.clientX);
+  };
+  const end = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    window.removeEventListener("blur", end);
+    handle.removeEventListener("lostpointercapture", end);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    onEnd();
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+  window.addEventListener("blur", end);
+  handle.addEventListener("lostpointercapture", end);
+  return true;
+}
+
 export function useSidebarWidth(storageKey: string, size: SidebarSize) {
   const stored = useSyncExternalStore(
     subscribe,
@@ -78,33 +129,20 @@ export function useSidebarWidth(storageKey: string, size: SidebarSize) {
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const handle = event.currentTarget;
-    handle.setPointerCapture(event.pointerId);
     // The sidebar starts at the window's left edge, so the pointer's x is the width.
     const at = (x: number) => Math.min(Math.max(x, size.icons), size.max);
     let latest = at(event.clientX);
-    setDrag(latest);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const move = (e: PointerEvent) => {
-      latest = at(e.clientX);
-      setDrag(latest);
-    };
-    const end = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      settle(latest);
-      setDrag(null);
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
+    const started = startEdgeDrag(event, {
+      onMove: (x) => {
+        latest = at(x);
+        setDrag(latest);
+      },
+      onEnd: () => {
+        settle(latest);
+        setDrag(null);
+      },
+    });
+    if (started) setDrag(latest);
   }
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
