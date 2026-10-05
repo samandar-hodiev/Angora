@@ -122,6 +122,8 @@ type generatedWords struct {
 		Uz               string    `json:"uz"`
 		Ru               string    `json:"ru"`
 		RuPronunciation  string    `json:"ru_pronunciation"`
+		UzDefinition     string    `json:"uz_definition"`
+		RuDefinition     string    `json:"ru_definition"`
 		Topics           []string  `json:"topics"`
 		Definition       string    `json:"definition"`
 		Examples         []string  `json:"examples"`
@@ -149,7 +151,7 @@ func vocabularySchema(kind string) json.RawMessage {
 				"type": "array",
 				"items": map[string]any{
 					"type": "object", "additionalProperties": false,
-					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation",
+					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation", "uz_definition", "ru_definition",
 						"topics", "definition", "examples", "other_senses", "usage"},
 					"properties": map[string]any{
 						"term":              map[string]any{"type": "string", "description": "The entry, lower case unless it is a proper noun."},
@@ -159,6 +161,8 @@ func vocabularySchema(kind string) json.RawMessage {
 						"uz":                map[string]any{"type": "string", "description": "The entry in Uzbek (Latin script)."},
 						"ru":                map[string]any{"type": "string", "description": "The entry in Russian."},
 						"ru_pronunciation":  map[string]any{"type": "string", "description": "How the Russian is said, in Uzbek Latin letters with the stressed vowel marked by an acute accent, e.g. dastích for достичь."},
+						"uz_definition":     map[string]any{"type": "string", "description": "The definition, translated into plain Uzbek (Latin script)."},
+						"ru_definition":     map[string]any{"type": "string", "description": "The definition, translated into plain Russian."},
 						"topics":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "One or two topics from the requested ones, lower case."},
 						"definition":        map[string]any{"type": "string", "description": "The main meaning only, in English a learner at the entry's level can read."},
 						"examples":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Two natural sentences at that level."},
@@ -277,6 +281,12 @@ func (g generatedWords) words(kind string) []GeneratedWord {
 			if r := strings.TrimSpace(w.RuPronunciation); r != "" {
 				word.Translations["ru_pron"] = r
 			}
+		}
+		if t := strings.TrimSpace(w.UzDefinition); t != "" {
+			word.Translations["def_uz"] = t
+		}
+		if t := strings.TrimSpace(w.RuDefinition); t != "" {
+			word.Translations["def_ru"] = t
 		}
 		out = append(out, word)
 	}

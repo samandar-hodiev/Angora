@@ -73,6 +73,7 @@ type Writer interface {
 	EnrichWord(ctx context.Context, req ai.EnrichRequest) (ai.WordUsage, *ai.EvaluationMeta, error)
 	CompareWords(ctx context.Context, req ai.CompareRequest) (*ai.WordComparison, *ai.EvaluationMeta, error)
 	WriteLadder(ctx context.Context, term string, userID *uuid.UUID) (*ai.Ladder, *ai.EvaluationMeta, error)
+	TranslateDefinitions(ctx context.Context, items []ai.DefinitionItem) (map[string]map[string]string, error)
 }
 
 // Entitlements is the slice of the subscription service that meters comparisons.

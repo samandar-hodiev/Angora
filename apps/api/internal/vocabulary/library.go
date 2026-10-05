@@ -1,6 +1,9 @@
 package vocabulary
 
 import (
+	"context"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -137,6 +140,7 @@ func (m *Module) library(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	m.backfillDefinitions(c.Request.Context(), out.Items)
 	if out.Facets, err = m.facets(c, q.Kind); err != nil {
 		httpx.Fail(c, err)
 		return
@@ -225,4 +229,46 @@ func (m *Module) facets(c *gin.Context, kind string) (LibraryFacets, error) {
 		return f, err
 	}
 	return f, nil
+}
+
+// backfillDefinitions translates, in the background, the definitions of entries on this page
+// that were written before definitions came in Uzbek and Russian. The page is answered at
+// once; the translations are there the next time it is read. One batch runs at a time.
+func (m *Module) backfillDefinitions(ctx context.Context, items []LibraryWord) {
+	if m.ai == nil {
+		return
+	}
+	var todo []ai.DefinitionItem
+	for _, w := range items {
+		if w.Definition != "" && (w.Translations["def_uz"] == "" || w.Translations["def_ru"] == "") {
+			todo = append(todo, ai.DefinitionItem{ID: w.ID.String(), Term: w.Term, Definition: w.Definition})
+		}
+	}
+	if len(todo) == 0 {
+		return
+	}
+	if m.redis != nil {
+		if ok, err := m.redis.SetNX(ctx, "vocabulary:definitions", 1, 90*time.Second).Result(); err == nil && !ok {
+			return
+		}
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 80*time.Second)
+		defer cancel()
+		if m.redis != nil {
+			defer m.redis.Del(ctx, "vocabulary:definitions")
+		}
+		got, err := m.ai.TranslateDefinitions(ctx, todo)
+		if err != nil {
+			m.warn("vocabulary: translating definitions failed", "count", len(todo), "error", err.Error())
+			return
+		}
+		for id, t := range got {
+			if _, err := m.pool.Exec(ctx, `
+				UPDATE vocabulary SET translations = translations || jsonb_build_object('def_uz', $2::text, 'def_ru', $3::text)
+				WHERE id = $1::uuid`, id, t["uz"], t["ru"]); err != nil {
+				m.warn("vocabulary: storing a definition translation failed", "id", id, "error", err.Error())
+			}
+		}
+	}()
 }

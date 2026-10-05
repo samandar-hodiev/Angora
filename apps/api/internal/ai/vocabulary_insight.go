@@ -482,3 +482,77 @@ func CleanLadder(term, meaningUz, summaryUz string, rungs []LadderRung) *Ladder 
 	}
 	return out
 }
+
+// Definitions in the learner's languages.
+//
+// An entry's definition is written in English. The library shows it in Uzbek and Russian too,
+// hidden until the learner looks — so they can check what they think it means. Entries written
+// before that are translated in small batches as the library meets them.
+
+const (
+	DefinitionTranslatePrompt      = "vocabulary_definition_translate.v1"
+	TaskDefinitionTranslate   Task = "vocabulary_definition_translate"
+)
+
+// DefinitionItem is an entry whose definition is to be translated.
+type DefinitionItem struct {
+	ID         string
+	Term       string
+	Definition string
+}
+
+// TranslateDefinitions puts each definition into Uzbek and Russian: id → {"uz", "ru"}.
+func (s *GrammarTutorService) TranslateDefinitions(ctx context.Context, items []DefinitionItem) (map[string]map[string]string, error) {
+	out := map[string]map[string]string{}
+	if len(items) == 0 {
+		return out, nil
+	}
+	schema, _ := json.Marshal(map[string]any{
+		"type": "object", "additionalProperties": false, "required": []string{"items"},
+		"properties": map[string]any{"items": map[string]any{
+			"type": "array",
+			"items": map[string]any{
+				"type": "object", "additionalProperties": false, "required": []string{"id", "uz", "ru"},
+				"properties": map[string]any{
+					"id": map[string]any{"type": "string"},
+					"uz": map[string]any{"type": "string", "description": "The definition in plain Uzbek (Latin script)."},
+					"ru": map[string]any{"type": "string", "description": "The definition in plain Russian."},
+				},
+			},
+		}},
+	})
+	var in strings.Builder
+	for _, it := range items {
+		fmt.Fprintf(&in, "%s | %s | %s\n", it.ID, it.Term, it.Definition)
+	}
+	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
+		Task:          TaskDefinitionTranslate,
+		PromptVersion: DefinitionTranslatePrompt,
+		Metadata:      map[string]any{"kind": "vocabulary_definition_translate", "count": len(items)},
+	}, AnalysisRequest{
+		Model: s.fastModel,
+		Instructions: "Translate each English learner's-dictionary definition into plain Uzbek (Latin script) and plain Russian, " +
+			"keeping it as short and simple as the English. Each line is: id | entry | definition. Answer for every id.",
+		Input: in.String(), SchemaName: "vocabulary_definitions", Schema: schema,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var raw struct {
+		Items []struct {
+			ID string `json:"id"`
+			Uz string `json:"uz"`
+			Ru string `json:"ru"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(res.Output, &raw); err != nil {
+		return nil, fmt.Errorf("definition translations are not valid JSON: %w", err)
+	}
+	for _, it := range raw.Items {
+		uz, ru := strings.TrimSpace(it.Uz), strings.TrimSpace(it.Ru)
+		if uz != "" && ru != "" {
+			out[strings.TrimSpace(it.ID)] = map[string]string{"uz": uz, "ru": ru}
+		}
+	}
+	return out, nil
+}

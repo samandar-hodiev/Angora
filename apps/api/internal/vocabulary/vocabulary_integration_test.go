@@ -50,6 +50,14 @@ func (f *fakeWriter) WriteLadder(_ context.Context, term string, _ *uuid.UUID) (
 	return ai.CleanLadder(term, "katta", "", []ai.LadderRung{{Level: "A1", Term: term}, {Level: "B2", Term: "enormous"}}), &ai.EvaluationMeta{}, nil
 }
 
+func (f *fakeWriter) TranslateDefinitions(_ context.Context, items []ai.DefinitionItem) (map[string]map[string]string, error) {
+	out := map[string]map[string]string{}
+	for _, it := range items {
+		out[it.ID] = map[string]string{"uz": "ma'no", "ru": "значение"}
+	}
+	return out, nil
+}
+
 type countingPlans struct{ used, released atomic.Int32 }
 
 func (p *countingPlans) ConsumeUsage(context.Context, uuid.UUID, string, int) error {
@@ -156,6 +164,18 @@ func TestLearnerVocabularyPostgres(t *testing.T) {
 		}
 		if !found {
 			t.Fatalf("topic facet missing: %+v", page.Facets.Topics)
+		}
+		// Definitions without Uzbek and Russian are translated in the background.
+		var translated int
+		for range 40 {
+			_ = pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary WHERE term LIKE $1 AND translations ? 'def_uz'`, "zz"+stamp+"%").Scan(&translated)
+			if translated == 3 {
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		if translated != 3 {
+			t.Fatalf("definitions translated: %d of 3", translated)
 		}
 	})
 

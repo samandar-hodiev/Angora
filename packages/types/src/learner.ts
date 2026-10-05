@@ -113,7 +113,8 @@ export interface LibraryWord {
   /** How hard the word itself is. */
   level: string | null;
   tags: string[];
-  translations: { uz?: string; ru?: string; ru_pron?: string };
+  /** The entry in Uzbek and Russian, how the Russian is said, and the definition in each. */
+  translations: { uz?: string; ru?: string; ru_pron?: string; def_uz?: string; def_ru?: string };
   level_content: Partial<Record<string, VocabularyLevelText>>;
   /** The explanation at the entry's own level. */
   definition: string;
