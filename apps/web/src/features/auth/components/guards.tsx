@@ -1,16 +1,25 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { FullPageLoader } from "@/components/common/full-page-loader";
 
 import { useSession } from "../hooks";
 import { DEFAULT_LANDING_PATH, takePendingRedirect } from "../session";
 
+// TEMPORARY: the workspace loader stays up for at least this long, so its background can be
+// looked at. Remove once it has been reviewed — set to 0 or delete with the hold below.
+const LOADER_PREVIEW_MS = 5000;
+
 /** Renders children only for authenticated users; others are sent to /login. */
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { status } = useSession();
+  const [held, setHeld] = useState(LOADER_PREVIEW_MS > 0);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setHeld(false), LOADER_PREVIEW_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -20,7 +29,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     }
   }, [status, pathname, router]);
 
-  if (status !== "authenticated") return <FullPageLoader label="Loading your workspace" />;
+  if (status !== "authenticated" || held) return <FullPageLoader label="Loading your workspace" />;
   return children;
 }
 
