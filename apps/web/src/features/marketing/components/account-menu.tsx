@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage, initials } from "@/components/ui/overlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLogout, useSession } from "@/features/auth/hooks";
+import { OWNER_LANDING_PATH } from "@/features/auth/session";
+import { useConsoleAccess } from "@/features/owner/guard";
 import { useProfile } from "@/features/profile/hooks";
 import { apiAssetUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -21,7 +23,10 @@ function useAccount() {
   const p = profile.data;
   const email = session.user?.email ?? "";
   const name = [p?.first_name, p?.last_name].filter(Boolean).join(" ").trim() || p?.display_name || email;
-  return { session, name, email, avatar: apiAssetUrl(p?.avatar_url), loadingProfile: profile.isPending };
+  // The owner and staff run the platform from the console; they have no learner journey, so
+  // the learner dashboard would only send them to set up a learner profile.
+  const home = useConsoleAccess() ? OWNER_LANDING_PATH : "/app/dashboard";
+  return { session, name, email, home, avatar: apiAssetUrl(p?.avatar_url), loadingProfile: profile.isPending };
 }
 
 function AccountAvatar({ name, avatar, className }: { name: string; avatar: string | null; className?: string }) {
@@ -35,20 +40,20 @@ function AccountAvatar({ name, avatar, className }: { name: string; avatar: stri
 
 /**
  * Desktop header action for signed-in learners: name + avatar linking straight into the app
- * (today's plan on the dashboard — the journey guard sends unfinished learners to their
+ * (the Owner Console for the owner and staff; for learners, today's plan on the dashboard — the journey guard sends unfinished learners to their
  * current setup step). Signed-out visitors get the sign-in/sign-up buttons. While the session
  * is being restored a neutral placeholder avoids flashing the buttons.
  */
 export function HeaderAccount({ guest }: { guest: ReactNode }) {
   const { t } = useI18n();
-  const { session, name, avatar, loadingProfile } = useAccount();
+  const { session, name, home, avatar, loadingProfile } = useAccount();
 
   if (session.status === "loading") return <Skeleton className="h-9 w-36 rounded-lg" aria-hidden />;
   if (session.status !== "authenticated") return guest;
 
   return (
     <Link
-      href="/app/dashboard"
+      href={home}
       aria-label={`${t.nav.dashboard}: ${name}`}
       className="group flex h-9 max-w-60 items-center gap-2.5 px-1 text-body-sm font-medium text-fg-secondary outline-none transition-colors duration-micro hover:text-foreground focus-visible:text-foreground"
     >
@@ -65,7 +70,7 @@ export function HeaderAccount({ guest }: { guest: ReactNode }) {
 /** Mobile menu footer: the same account, or the sign-in/sign-up buttons. */
 export function MenuAccount({ guest, onNavigate }: { guest: ReactNode; onNavigate: () => void }) {
   const { t } = useI18n();
-  const { session, name, email, avatar } = useAccount();
+  const { session, name, email, home, avatar } = useAccount();
   const logout = useLogout();
 
   if (session.status === "loading") return <Skeleton className="h-24 rounded-xl" aria-hidden />;
@@ -81,7 +86,7 @@ export function MenuAccount({ guest, onNavigate }: { guest: ReactNode; onNavigat
         </span>
       </div>
       <Button asChild size="lg" variant="liquid">
-        <Link href="/app/dashboard" onClick={onNavigate}>
+        <Link href={home} onClick={onNavigate}>
           <LayoutDashboard aria-hidden /> {t.nav.dashboard}
         </Link>
       </Button>

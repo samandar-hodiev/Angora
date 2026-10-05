@@ -5,6 +5,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 import { FullPageLoader } from "@/components/common/full-page-loader";
 import { ErrorState } from "@/components/common/states";
+import { OWNER_LANDING_PATH } from "@/features/auth/session";
+import { useConsoleAccess } from "@/features/owner/guard";
 
 import { useOnboarding } from "../hooks";
 import { isJourneyPathAllowed, journeyPath } from "../routing";
@@ -13,10 +15,14 @@ import { isJourneyPathAllowed, journeyPath } from "../routing";
  * Keeps a signed-in learner on the step the server says is current: profile setup, then
  * onboarding, level, placement test, results, and finally the app. Closing the browser at any
  * point and signing in again resumes exactly there.
+ *
+ * The owner and staff have no learner journey — they run the platform from the console — so
+ * they are sent there rather than asked to set up a learner profile.
  */
 export function JourneyGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const staff = useConsoleAccess();
   const onboarding = useOnboarding();
   const { data: state, dataUpdatedAt, refetch } = onboarding;
   const allowed = state ? isJourneyPathAllowed(state, pathname) : false;
@@ -24,6 +30,10 @@ export function JourneyGuard({ children }: { children: ReactNode }) {
   const refetchRequestedAt = useRef(0);
 
   useEffect(() => {
+    if (staff) {
+      router.replace(OWNER_LANDING_PATH);
+      return;
+    }
     if (!target || allowed) return;
     // Waiting for the fresh state requested below.
     if (dataUpdatedAt <= refetchRequestedAt.current) return;
@@ -35,8 +45,9 @@ export function JourneyGuard({ children }: { children: ReactNode }) {
       return;
     }
     router.replace(target);
-  }, [allowed, target, dataUpdatedAt, refetch, router]);
+  }, [staff, allowed, target, dataUpdatedAt, refetch, router]);
 
+  if (staff) return <FullPageLoader label="Opening the Owner Console" />;
   if (onboarding.isError) {
     return (
       <div className="grid min-h-dvh place-items-center px-4">
