@@ -602,13 +602,19 @@ func (m *Module) storeGeneratedWord(ctx context.Context, w ai.GeneratedWord, req
 	examples, _ := json.Marshal(orEmptyStrings(w.Examples))
 	translations, _ := json.Marshal(w.Translations)
 	content, _ := json.Marshal(w.LevelContent)
+	u := w.Usage
 	tag, err := m.pool.Exec(ctx, `
 		INSERT INTO vocabulary (term, part_of_speech, definition, examples, pronunciation_ipa, level_id, tags,
-		                        translations, level_content, status, source, ai_request_id, created_by)
-		VALUES ($1, $2, $3, $4, $5, (SELECT id FROM levels WHERE code = $6), $7, $8, $9, 'draft', 'ai', $10, $11)
+		                        translations, level_content, status, source, ai_request_id, created_by,
+		                        usage_note, register, collocations, synonyms, antonyms, word_family, common_mistake,
+		                        enriched_at)
+		VALUES ($1, $2, $3, $4, $5, (SELECT id FROM levels WHERE code = $6), $7, $8, $9, 'draft', 'ai', $10, $11,
+		        $12, $13, $14, $15, $16, $17, $18, CASE WHEN $19 THEN now() END)
 		ON CONFLICT (lower(term), part_of_speech) DO NOTHING`,
 		w.Term, w.PartOfSpeech, w.Definition, examples, w.PronunciationIPA, w.Level,
-		orEmptyStrings(w.Tags), translations, content, requestID, actor)
+		orEmptyStrings(w.Tags), translations, content, requestID, actor,
+		u.UsageNote, u.Register, orEmptyStrings(u.Collocations), orEmptyStrings(u.Synonyms), orEmptyStrings(u.Antonyms),
+		orEmptyStrings(u.WordFamily), u.CommonMistake, !u.Empty())
 	if err != nil {
 		return false, fmt.Errorf("store word %q: %w", w.Term, err)
 	}

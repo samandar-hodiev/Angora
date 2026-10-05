@@ -45,8 +45,10 @@ export const queryKeys = {
     list: (group: string, page: number) => ["mistakes", "list", group, page] as const,
   },
   vocabulary: {
-    deck: (page: number) => ["vocabulary", "deck", page] as const,
-    library: (page: number, q: string, level: string) => ["vocabulary", "library", page, q, level] as const,
+    deck: (page: number, filter: string) => ["vocabulary", "deck", page, filter] as const,
+    library: (query: object) => ["vocabulary", "library", query] as const,
+    word: (id: string) => ["vocabulary", "word", id] as const,
+    review: ["vocabulary", "review"] as const,
   },
   practice: {
     all: ["practice"] as const,

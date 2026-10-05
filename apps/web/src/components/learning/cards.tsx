@@ -1,15 +1,12 @@
 "use client";
 
-import type { VocabularyCard as VocabularyCardData } from "@engora/types";
-import { ArrowRight, Check, Sparkles, Volume2, X } from "lucide-react";
+import { ArrowRight, Check, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { LiquidBackground } from "@/components/common/liquid-background";
 import { Badge } from "@/components/ui/badge";
-import { Button, IconButton } from "@/components/ui/button";
 import { Meter } from "@/components/ui/data-display";
-import { Tooltip } from "@/components/ui/overlay";
 import { formatCategory, severityTone } from "@/lib/learning-format";
 import { cn } from "@/lib/utils";
 
@@ -168,64 +165,6 @@ export function MistakeCard({
       </p>
       {explanation && <p className="text-body-sm text-fg-muted">{explanation}</p>}
       {action && <div className="pt-1">{action}</div>}
-    </article>
-  );
-}
-
-// ---- VocabularyCard ------------------------------------------------------------------------------
-
-function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-GB";
-  utterance.rate = 0.9;
-  window.speechSynthesis.speak(utterance);
-}
-
-export function VocabularyCard({ card, reviewEnabled = false }: { card: VocabularyCardData; reviewEnabled?: boolean }) {
-  const reviewHint = "Spaced-repetition reviews arrive with the vocabulary release.";
-  return (
-    <article className="grid gap-4 rounded-xl border bg-surface p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="grid gap-1">
-          <h3 className="text-h3">{card.term}</h3>
-          <p className="flex flex-wrap items-center gap-2 text-body-sm text-fg-muted">
-            {card.pronunciation_ipa && <span className="font-mono">{card.pronunciation_ipa}</span>}
-            {card.part_of_speech && <span>{card.part_of_speech}</span>}
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          {card.level && <Badge variant="outline">{card.level}</Badge>}
-          <IconButton label={`Pronounce ${card.term}`} size="icon-sm" onClick={() => speak(card.term)}>
-            <Volume2 />
-          </IconButton>
-        </div>
-      </div>
-      <p className="text-body">{card.definition}</p>
-      {card.examples[0] && (
-        <blockquote className="border-l-2 border-primary/40 pl-3 text-body-sm text-fg-secondary italic">
-          &ldquo;{card.examples[0]}&rdquo;
-        </blockquote>
-      )}
-      <Meter label="Mastery" value={card.mastery} />
-      <div className="flex gap-2">
-        {(["I know it", "Review"] as const).map((label, i) =>
-          reviewEnabled ? (
-            <Button key={label} variant={i === 0 ? "outline" : "default"} size="sm" className="flex-1">
-              {label}
-            </Button>
-          ) : (
-            <Tooltip key={label} content={reviewHint}>
-              <span className="flex-1" tabIndex={0}>
-                <Button variant={i === 0 ? "outline" : "default"} size="sm" className="w-full" disabled>
-                  {label}
-                </Button>
-              </span>
-            </Tooltip>
-          ),
-        )}
-      </div>
     </article>
   );
 }

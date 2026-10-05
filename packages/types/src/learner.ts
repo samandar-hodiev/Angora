@@ -22,7 +22,11 @@ export interface ProgressOverview {
   target_level: string | null;
   daily_goal_minutes: number;
   overall_score: number | null;
-  streak: { current_days: number; longest_days: number; last_activity_date: Timestamp | null };
+  streak: {
+    current_days: number;
+    longest_days: number;
+    last_activity_date: Timestamp | null;
+  };
   skills: SkillProgress[];
 }
 
@@ -83,6 +87,9 @@ export interface MistakeSummary {
 // ---- Vocabulary ----------------------------------------------------------------------
 // Grammar has its own module: see ./grammar.
 
+/** A word's status in the learner's own deck. */
+export type DeckStatus = "new" | "learning" | "reviewing" | "mastered";
+
 /** A published word as the learner browses the whole library. */
 export interface LibraryWord {
   id: UUID;
@@ -94,13 +101,39 @@ export interface LibraryWord {
   tags: string[];
   translations: { uz?: string; ru?: string; ru_pron?: string };
   level_content: Partial<Record<string, VocabularyLevelText>>;
+  /** neutral | formal | informal | …; empty when not known yet. */
+  register: string;
+  /** Near-synonyms: the words worth comparing it with. */
+  synonyms: string[];
   in_deck: boolean;
+  deck_status: DeckStatus | null;
+}
+
+/** One value a library filter can take, with how many words have it. */
+export interface VocabularyFacet {
+  value: string;
+  count: number;
 }
 
 export interface VocabularyLibrary {
   items: LibraryWord[];
   /** The learner's level: the explanation the page opens on. */
   learner_level: string;
+  facets: {
+    levels: VocabularyFacet[];
+    topics: VocabularyFacet[];
+    parts_of_speech: VocabularyFacet[];
+  };
+}
+
+export interface VocabularyLibraryQuery {
+  page: number;
+  q: string;
+  level: string;
+  topic: string;
+  pos: string;
+  sort: "level" | "az" | "newest";
+  show: "all" | "new" | "mine";
 }
 
 /** A word explained for one CEFR level. */
@@ -109,6 +142,74 @@ export interface VocabularyLevelText {
   examples: string[];
   /** The lower level whose explanation this one shares; the text is the same. */
   same_as?: string;
+}
+
+/** How a word is used, beyond what it means. */
+export interface WordUsage {
+  usage_note: string;
+  register: string;
+  collocations: string[];
+  synonyms: string[];
+  antonyms: string[];
+  word_family: string[];
+  /** The mistake an Uzbek or Russian speaker typically makes with it. */
+  common_mistake: string;
+}
+
+/** A word named on another word's page; id is set when it is in the library. */
+export interface RelatedWord {
+  term: string;
+  id: UUID | null;
+  level: string | null;
+  uz?: string;
+}
+
+/** Everything about one word. */
+export interface WordDetail extends Omit<LibraryWord, "synonyms"> {
+  usage: WordUsage;
+  synonyms: RelatedWord[];
+  antonyms: RelatedWord[];
+  same_topic: RelatedWord[];
+  deck: {
+    status: DeckStatus;
+    mastery: number;
+    due_at: Timestamp;
+    last_reviewed_at: Timestamp | null;
+    reviews: number;
+  } | null;
+  learner_level: string;
+}
+
+export interface ComparedWord {
+  term: string;
+  part_of_speech: string;
+  meaning: string;
+  when_to_use: string;
+  register: string;
+  collocations: string[];
+  examples: string[];
+  translations: { uz?: string; ru?: string };
+}
+
+/** "What is the difference between job and occupation?" */
+export interface WordComparison {
+  verdict: string;
+  interchangeable: "never" | "sometimes" | "often";
+  words: ComparedWord[];
+  /** Each aspect has one point per word, in the order of words. */
+  differences: { aspect: string; points: string[] }[];
+  tip: string;
+  native_note: { uz?: string; ru?: string };
+  quiz: { sentence: string; answer: string; explanation: string }[];
+}
+
+export interface ComparisonResponse {
+  terms: string[];
+  level: string;
+  comparison: WordComparison;
+  /** Words of the comparison that are in the library, by lower-case term. */
+  library: Record<string, UUID>;
+  cached: boolean;
 }
 
 export interface VocabularyCard {
@@ -124,7 +225,8 @@ export interface VocabularyCard {
   level_content?: Partial<Record<string, VocabularyLevelText>>;
   level: string | null;
   tags: string[];
-  status: "new" | "learning" | "reviewing" | "mastered";
+  collocations?: string[];
+  status: DeckStatus;
   /** 0–100, computed by the API */
   mastery: number;
   due_at: Timestamp;
@@ -132,8 +234,32 @@ export interface VocabularyCard {
 }
 
 export interface VocabularyDeck {
-  summary: { total: number; due: number; new: number; learning: number; reviewing: number; mastered: number };
+  summary: {
+    total: number;
+    due: number;
+    new: number;
+    learning: number;
+    reviewing: number;
+    mastered: number;
+    reviewed_today: number;
+  };
   cards: VocabularyCard[];
+  /** The learner's level: the explanation each card shows. */
+  learner_level: string;
+}
+
+export type ReviewRating = "again" | "hard" | "good" | "easy";
+
+export interface ReviewQueue {
+  cards: VocabularyCard[];
+  remaining: number;
+}
+
+export interface ReviewResult {
+  status: DeckStatus;
+  mastery: number;
+  interval_days: number;
+  due_at: Timestamp;
 }
 
 // ---- Personalization -----------------------------------------------------------------
@@ -144,7 +270,12 @@ export interface Recommendation {
   reason: string;
   priority: number;
   source: "rule" | "ai" | "teacher";
-  content: { id: UUID; type: string; title: string; skill: string | null } | null;
+  content: {
+    id: UUID;
+    type: string;
+    title: string;
+    skill: string | null;
+  } | null;
   created_at: Timestamp;
   expires_at: Timestamp | null;
 }

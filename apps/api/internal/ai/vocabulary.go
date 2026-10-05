@@ -20,7 +20,7 @@ import (
 // the model does not hand back the same words every time it is asked.
 
 const (
-	VocabularyPrompt = "vocabulary_author.v3"
+	VocabularyPrompt = "vocabulary_author.v4"
 	SchemaVocabulary = "vocabulary_words"
 
 	// VocabularyBatch is how many words one call writes.
@@ -64,18 +64,21 @@ type GeneratedWord struct {
 	// that knows nothing of levels shows.
 	Definition string   `json:"definition"`
 	Examples   []string `json:"examples"`
+	/** How the word is used, beyond what it means. */
+	Usage WordUsage `json:"usage"`
 }
 
 type generatedWords struct {
 	Words []struct {
-		Term             string   `json:"term"`
-		PartOfSpeech     string   `json:"part_of_speech"`
-		Level            string   `json:"level"`
-		PronunciationIPA string   `json:"pronunciation_ipa"`
-		Uz               string   `json:"uz"`
-		Ru               string   `json:"ru"`
-		RuPronunciation  string   `json:"ru_pronunciation"`
-		Tags             []string `json:"tags"`
+		Term             string    `json:"term"`
+		PartOfSpeech     string    `json:"part_of_speech"`
+		Level            string    `json:"level"`
+		PronunciationIPA string    `json:"pronunciation_ipa"`
+		Uz               string    `json:"uz"`
+		Ru               string    `json:"ru"`
+		RuPronunciation  string    `json:"ru_pronunciation"`
+		Tags             []string  `json:"tags"`
+		Usage            WordUsage `json:"usage"`
 		Explanations     map[string]struct {
 			SameAsPrevious bool     `json:"same_as_previous"`
 			Definition     string   `json:"definition"`
@@ -113,7 +116,7 @@ func vocabularySchema(levels []string) json.RawMessage {
 				"type": "array",
 				"items": map[string]any{
 					"type": "object", "additionalProperties": false,
-					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation", "tags", "explanations"},
+					"required": []string{"term", "part_of_speech", "level", "pronunciation_ipa", "uz", "ru", "ru_pronunciation", "tags", "usage", "explanations"},
 					"properties": map[string]any{
 						"term":              map[string]any{"type": "string", "description": "The word or fixed phrase, lower case unless it is a proper noun."},
 						"part_of_speech":    map[string]any{"type": "string", "enum": PartsOfSpeech},
@@ -123,6 +126,7 @@ func vocabularySchema(levels []string) json.RawMessage {
 						"ru":                map[string]any{"type": "string", "description": "The word in Russian."},
 						"ru_pronunciation":  map[string]any{"type": "string", "description": "How the Russian word sounds, in Uzbek Latin letters with the stressed vowel marked by an acute accent, e.g. dastích for достичь."},
 						"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "One or two topic tags, e.g. travel, work."},
+						"usage":             wordUsageSchema,
 						"explanations": map[string]any{
 							"type": "object", "additionalProperties": false, "required": levels, "properties": perLevel,
 							"description": "The word explained separately for each of these levels.",
@@ -163,6 +167,7 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	b.WriteString(" a C1 or C2 word is one an advanced learner still meets as new — pick harder words for the higher levels, never an everyday word labelled higher.\n")
 	b.WriteString("- uz and ru: the usual translation of the word in its main sense — a word or two, not a definition; a wrong or loosely related word is worse than none.\n")
 	b.WriteString("- ru_pronunciation: how that Russian translation is said, written in Uzbek Latin letters as it sounds (unstressed o reads as a), with an acute accent on the stressed vowel and no mark for the soft sign — e.g. достичь → dastích, в конце концов → f kantsé kantsóf.\n")
+	b.WriteString("- usage: " + wordUsageGuide + "\n")
 	b.WriteString("Never include a word from the excluded list, in any form, and never the same word twice.\n")
 
 	input := fmt.Sprintf("COUNT: %d\nLEVELS: %s\n", count, strings.Join(levels, ", "))
@@ -225,7 +230,7 @@ func (g generatedWords) words() []GeneratedWord {
 	for _, w := range g.Words {
 		word := GeneratedWord{
 			Term: w.Term, PartOfSpeech: w.PartOfSpeech, Level: w.Level, PronunciationIPA: w.PronunciationIPA,
-			Tags: w.Tags, Translations: map[string]string{}, LevelContent: map[string]LevelText{},
+			Tags: w.Tags, Translations: map[string]string{}, LevelContent: map[string]LevelText{}, Usage: w.Usage,
 		}
 		if t := strings.TrimSpace(w.Uz); t != "" {
 			word.Translations["uz"] = t
@@ -317,6 +322,7 @@ func UsableWords(words []GeneratedWord, excluded map[string]bool) []GeneratedWor
 		if w.Translations == nil {
 			w.Translations = map[string]string{}
 		}
+		w.Usage = w.Usage.Clean(key)
 		kept = append(kept, w)
 	}
 	return kept
