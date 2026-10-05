@@ -581,7 +581,7 @@ function Question({
   };
 
   const field = (label: string, value: string, set: (v: string) => void, right: boolean | undefined, correct: string) => (
-    <label className="grid gap-1">
+    <label className="grid content-start gap-1">
       <span className="text-caption font-medium text-fg-muted">{label}</span>
       <Input
         value={value}
@@ -598,11 +598,14 @@ function Question({
           right === false && "border-error bg-error/10",
         )}
       />
-      {right === false && (
-        <span className="flex items-center gap-1 text-body-sm text-success">
-          <Check className="size-3.5" aria-hidden /> {correct}
-        </span>
-      )}
+      {/* Always the same height, so a correction appearing under one field moves nothing. */}
+      <span className="flex min-h-5 items-center gap-1 text-body-sm text-success">
+        {right === false && (
+          <>
+            <Check className="size-3.5" aria-hidden /> {correct}
+          </>
+        )}
+      </span>
     </label>
   );
 
