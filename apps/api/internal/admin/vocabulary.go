@@ -126,7 +126,7 @@ func (m *Module) vocabularyList(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	where := `WHERE ($1 = '' OR v.term ILIKE '%' || $1 || '%' OR v.definition ILIKE '%' || $1 || '%')
-	            AND ($2 = '' OR l.code = $2 OR jsonb_exists(v.level_content, $2))
+	            AND ($2 = '' OR l.code = $2)
 	            AND (CASE WHEN $3 = '' THEN v.status <> 'archived' ELSE v.status = $3 END)`
 	var total int64
 	if err := m.pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id `+where,
@@ -170,15 +170,12 @@ func (m *Module) vocabularySummary(ctx context.Context) (VocabularySummary, erro
 		return s, err
 	}
 	s.Draft = s.Total - s.Published
-	// A word counts under every level it is explained for — a word written for A1 to C2 is in
-	// all six — and under its own level, for a word written before explanations had levels.
+	// A word counts under its own level — how hard the word itself is — once. Counting it under
+	// every level it is explained for put one run of 100 words in all six levels, as if 600
+	// had been written.
 	rows, err := m.pool.Query(ctx, `
-		SELECT k.code, v.status, count(DISTINCT v.id)::int
-		FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id
-		CROSS JOIN LATERAL (
-			SELECT jsonb_object_keys(v.level_content) AS code
-			UNION SELECT l.code WHERE l.code IS NOT NULL
-		) k
+		SELECT l.code, v.status, count(*)::int
+		FROM vocabulary v JOIN levels l ON l.id = v.level_id
 		WHERE v.status <> 'archived' GROUP BY 1, 2`)
 	if err != nil {
 		return s, err
@@ -372,7 +369,7 @@ func (m *Module) publishWords(c *gin.Context) {
 		UPDATE vocabulary v SET status = 'published', published_at = COALESCE(v.published_at, now())
 		WHERE v.status IN ('draft', 'review')
 		  AND ($1::uuid[] IS NULL OR cardinality($1::uuid[]) = 0 OR v.id = ANY ($1))
-		  AND ($2 = '' OR v.level_id = (SELECT id FROM levels WHERE code = $2) OR jsonb_exists(v.level_content, $2))`, in.IDs, in.Level)
+		  AND ($2 = '' OR v.level_id = (SELECT id FROM levels WHERE code = $2))`, in.IDs, in.Level)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

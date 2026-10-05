@@ -361,7 +361,10 @@ export function VocabularyView() {
               onClick={() => publishAll.mutate({ level: level === "all" ? undefined : level })}
             >
               <Send aria-hidden />
-              Publish {level === "all" ? "all" : level} drafts{summary && summary.draft > 0 ? ` (${level === "all" ? summary.draft : "…"})` : ""}
+              Publish {level === "all" ? "all" : level} drafts
+              {summary && summary.draft > 0
+                ? ` (${level === "all" ? summary.draft : (summary.drafts_by_level?.[level] ?? 0)})`
+                : ""}
             </Button>
           </>
         }
@@ -501,7 +504,10 @@ function LevelSection({
     enabled: open,
     placeholderData: (previous) => previous,
   });
-  const total = list.data?.meta?.total ?? count;
+  // A closed section has not fetched its list, so it counts from the summary — under the same
+  // status filter as an open one, or "Drafts" would show 100 in one section and 110 in the next.
+  const counted = filters.status === "draft" ? drafts : filters.status === "published" ? count - drafts : count;
+  const total = list.data?.meta?.total ?? counted;
   const searching = Boolean(filters.q || filters.status);
   // While searching, a level with nothing matching gets out of the way.
   if (searching && open && list.data && total === 0) return null;
@@ -517,7 +523,7 @@ function LevelSection({
         <ChevronRight className={cn("size-4 shrink-0 text-fg-muted transition-transform duration-micro", open && "rotate-90")} aria-hidden />
         <LevelBadge level={level} />
         <span className="text-body-sm text-fg-secondary tabular-nums">
-          {searching && list.data ? `${total} matching` : `${count} ${count === 1 ? "word" : "words"}`}
+          {filters.q && list.data ? `${total} matching` : `${total} ${total === 1 ? "word" : "words"}`}
         </span>
         {drafts > 0 && <Badge variant="warning">{drafts} waiting to publish</Badge>}
       </button>
