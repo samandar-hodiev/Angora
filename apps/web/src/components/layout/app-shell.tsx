@@ -217,14 +217,10 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
   return (
     // Never scrolls sideways: a narrowed sidebar shortens its labels instead, and the lists are
     // minmax(0, 1fr) grids because a plain grid column will not shrink below its longest word.
-    <nav
-      aria-label="Main"
-      className={cn(
-        "scrollbar-slim relative flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-2.5 pb-4",
-        collapsed && "px-2",
-      )}
-    >
-      <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
+    // The places scroll; Settings and Profile stay put underneath, so an open Skills or Lexicon
+    // tree never pushes them out of reach — as in the owner console.
+    <nav aria-label="Main" className={cn("relative flex min-h-0 flex-1 flex-col gap-3 px-2.5 pb-4", collapsed && "px-2")}>
+      <ul className="scrollbar-slim -mx-1 grid min-h-0 flex-1 auto-rows-max grid-cols-[minmax(0,1fr)] gap-0.5 overflow-x-hidden overflow-y-auto px-1">
         <li>{link(homeNav)}</li>
         <li>{link(grammarNav)}</li>
         <NavTree root={learnNav} id="nav-skills" items={skillItems} link={link} collapsed={collapsed} />
@@ -233,7 +229,7 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
           <li key={item.href}>{link(item)}</li>
         ))}
       </ul>
-      <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-0.5 border-t pt-3">
+      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)] gap-0.5 border-t pt-3">
         {isAdmin && link({ href: "/admin", label: "Admin console", icon: Shield })}
         {secondaryNav.map((item) => (
           <div key={item.href}>{link(item)}</div>
