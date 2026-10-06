@@ -3,7 +3,8 @@
 import { ArrowLeftRight, BookOpen, Check, Lightbulb, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { FlagRU, FlagUZ } from "@/components/common/flags";
+import { FlagGB, FlagRU, FlagUZ } from "@/components/common/flags";
+import { useStoredLocale } from "@/features/marketing/i18n";
 import { ErrorState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -199,37 +200,7 @@ function ComparisonResult({ result, onOpenWord }: { result: ComparisonResponse; 
   const badge = INTERCHANGEABLE[c.interchangeable] ?? INTERCHANGEABLE.sometimes;
   return (
     <div className="grid gap-5">
-      {/* The answer first. */}
-      <section className="grid gap-3 rounded-xl border border-primary/40 bg-primary-subtle/30 p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-h3">{result.terms.join(" vs ")}</h3>
-          <span className={cn("rounded-full px-2.5 py-0.5 text-caption font-medium", badge.tone)}>{badge.label}</span>
-          <span className="ml-auto text-caption text-fg-muted">Explained for {result.level}</span>
-        </div>
-        <p className="text-body-lg">{c.verdict}</p>
-        {c.tip && (
-          <p className="flex items-start gap-2 text-body-sm text-fg-secondary">
-            <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-            {c.tip}
-          </p>
-        )}
-        {(c.native_note.uz || c.native_note.ru) && (
-          <div className="grid gap-2 border-t pt-3 sm:grid-cols-2">
-            {c.native_note.uz && (
-              <p className="flex items-start gap-2 text-body-sm">
-                <FlagUZ title="O'zbekcha" className="mt-0.5" />
-                {c.native_note.uz}
-              </p>
-            )}
-            {c.native_note.ru && (
-              <p className="flex items-start gap-2 text-body-sm">
-                <FlagRU title="Русский" className="mt-0.5" />
-                {c.native_note.ru}
-              </p>
-            )}
-          </div>
-        )}
-      </section>
+      <Verdict result={result} badge={badge} />
 
       {/* Each word on its own. */}
       <div className={cn("grid gap-3", c.words.length === 3 ? "lg:grid-cols-3" : "md:grid-cols-2")}>
@@ -332,6 +303,120 @@ function ComparisonResult({ result, onOpenWord }: { result: ComparisonResponse; 
       {c.quiz.length > 0 && <Quiz quiz={c.quiz} words={c.words.map((w) => w.term)} />}
     </div>
   );
+}
+
+type Lang = "en" | "uz" | "ru";
+
+/**
+ * The answer, in one language at a time: a one-line overview, then each word on its own line —
+ * the word itself picked out, and when to choose it. English by default, or the language the
+ * learner chose for the site; Uzbek and Russian a tap away.
+ */
+function Verdict({ result, badge }: { result: ComparisonResponse; badge: { label: string; tone: string } }) {
+  const c = result.comparison;
+  const site = useStoredLocale();
+  const [chosen, setChosen] = useState<Lang | null>(null);
+  const available: Lang[] = [
+    "en",
+    ...(c.native_note.uz ? (["uz"] as const) : []),
+    ...(c.native_note.ru ? (["ru"] as const) : []),
+  ];
+  const lang: Lang = chosen ?? (available.includes(site) ? site : "en");
+
+  const rows =
+    lang === "en"
+      ? { overview: c.verdict, notes: c.words.map((w) => ({ term: w.term, note: w.when_to_use })) }
+      : splitByTerms(
+          c.native_note[lang] ?? "",
+          c.words.map((w) => w.term),
+          c.words.map((w) => w.notes?.[lang]),
+        );
+
+  return (
+    <section className="grid gap-4 rounded-xl border border-primary/40 bg-primary-subtle/30 p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-h3">{result.terms.join(" vs ")}</h3>
+        <span className={cn("rounded-full px-2.5 py-0.5 text-caption font-medium", badge.tone)}>{badge.label}</span>
+        <span className="ml-auto flex items-center gap-3">
+          <span className="hidden text-caption text-fg-muted sm:inline">Explained for {result.level}</span>
+          <span role="tablist" aria-label="Language" className="inline-flex gap-0.5 rounded-lg border bg-surface p-0.5">
+            {available.map((l) => {
+              const Flag = l === "en" ? FlagGB : l === "uz" ? FlagUZ : FlagRU;
+              return (
+                <button
+                  key={l}
+                  type="button"
+                  role="tab"
+                  aria-selected={lang === l}
+                  onClick={() => setChosen(l)}
+                  title={l === "en" ? "English" : l === "uz" ? "O'zbekcha" : "Русский"}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-2 py-1 text-caption font-medium uppercase outline-none transition-colors duration-micro",
+                    "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+                    lang === l ? "bg-primary-subtle text-primary-subtle-foreground" : "text-fg-muted hover:text-foreground",
+                  )}
+                >
+                  <Flag /> {l}
+                </button>
+              );
+            })}
+          </span>
+        </span>
+      </div>
+      {rows.overview && <p className="text-body-lg">{rows.overview}</p>}
+      {rows.notes.length > 0 && (
+        <ul className="grid gap-2.5">
+          {rows.notes.map(({ term, note }) => (
+            <li key={term} className="grid gap-0.5 sm:grid-cols-[minmax(7rem,auto)_minmax(0,1fr)] sm:gap-x-4">
+              <span className="w-fit font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4">
+                {term}
+              </span>
+              <span className="text-body text-fg-secondary">{note}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {lang === "en" && c.tip && (
+        <p className="flex items-start gap-2 border-t pt-3 text-body-sm text-fg-secondary">
+          <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          {c.tip}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * One language's explanation as an overview and a note per word. A comparison written with a
+ * note per word is used as it is; one written before (a single paragraph) is cut where each
+ * word begins — "Ask - …. Inquire - …." — so every word still starts its own line.
+ */
+export function splitByTerms(
+  text: string,
+  terms: string[],
+  notes: (string | undefined)[],
+): { overview: string; notes: { term: string; note: string }[] } {
+  if (notes.every((n) => n)) return { overview: text, notes: terms.map((term, i) => ({ term, note: notes[i]! })) };
+  const found = terms
+    .map((term) => {
+      const m = new RegExp(`(^|[.!?;]\\s+)["“'«]?${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["”'»]?\\s*[-—–:]`, "i").exec(
+        text,
+      );
+      return m ? { term, start: m.index + m[1]!.length, body: m.index + m[0].length } : null;
+    })
+    .filter((f): f is { term: string; start: number; body: number } => f !== null)
+    .sort((a, b) => a.start - b.start);
+  if (found.length < 2) return { overview: text, notes: [] };
+  return {
+    overview: text.slice(0, found[0]!.start).trim(),
+    notes: found.map((f, i) => ({
+      term: f.term,
+      note: text
+        .slice(f.body, found[i + 1]?.start ?? text.length)
+        .trim()
+        .replace(/^[-—–:\s]+/, ""),
+    })),
+  };
 }
 
 /** Fill the gap: each sentence takes exactly one of the words. */

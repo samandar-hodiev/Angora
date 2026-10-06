@@ -213,6 +213,8 @@ export interface ComparedWord {
   collocations: string[];
   examples: string[];
   translations: { uz?: string; ru?: string };
+  /** When to choose this word, in Uzbek and Russian; missing on comparisons written before. */
+  notes?: { uz?: string; ru?: string };
 }
 
 /** "What is the difference between job and occupation?" */

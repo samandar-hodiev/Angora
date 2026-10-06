@@ -19,7 +19,7 @@ import (
 
 const (
 	VocabularyEnrichPrompt  = "vocabulary_enrich.v1"
-	VocabularyComparePrompt = "vocabulary_compare.v2"
+	VocabularyComparePrompt = "vocabulary_compare.v3"
 	SchemaVocabularyEnrich  = "vocabulary_usage"
 	SchemaVocabularyCompare = "vocabulary_comparison"
 
@@ -191,6 +191,8 @@ type ComparedWord struct {
 	Collocations []string          `json:"collocations"`
 	Examples     []string          `json:"examples"`
 	Translations map[string]string `json:"translations"`
+	/** When to choose this word, in the learner's languages: {"uz": "...", "ru": "..."}. */
+	Notes map[string]string `json:"notes"`
 }
 
 type CompareAspect struct {
@@ -215,7 +217,7 @@ var compareSchema = json.RawMessage(`{
     "interchangeable": {"type": "string", "enum": ["never", "sometimes", "often"]},
     "words": {"type": "array", "items": {
       "type": "object", "additionalProperties": false,
-      "required": ["term", "part_of_speech", "meaning", "when_to_use", "register", "collocations", "examples", "uz", "ru"],
+      "required": ["term", "part_of_speech", "meaning", "when_to_use", "register", "collocations", "examples", "uz", "ru", "uz_note", "ru_note"],
       "properties": {
         "term": {"type": "string"},
         "part_of_speech": {"type": "string"},
@@ -225,7 +227,9 @@ var compareSchema = json.RawMessage(`{
         "collocations": {"type": "array", "items": {"type": "string"}, "description": "3 typical partnerships."},
         "examples": {"type": "array", "items": {"type": "string"}, "description": "2 natural sentences, each using the term as the part_of_speech you give it."},
         "uz": {"type": "string", "description": "The word in Uzbek (Latin script)."},
-        "ru": {"type": "string", "description": "The word in Russian."}
+        "ru": {"type": "string", "description": "The word in Russian."},
+        "uz_note": {"type": "string", "description": "In Uzbek (Latin): when to choose this word over the others, one short sentence, without repeating the word itself at the start."},
+        "ru_note": {"type": "string", "description": "In Russian: when to choose this word over the others, one short sentence, without repeating the word itself at the start."}
       }
     }},
     "differences": {"type": "array", "items": {
@@ -236,8 +240,8 @@ var compareSchema = json.RawMessage(`{
       }
     }},
     "tip": {"type": "string", "description": "One memorable rule of thumb for choosing."},
-    "uz": {"type": "string", "description": "The difference explained in Uzbek (Latin script), two or three sentences."},
-    "ru": {"type": "string", "description": "The difference explained in Russian, two or three sentences."},
+    "uz": {"type": "string", "description": "The difference in one sentence of Uzbek (Latin script) — the overview; each word's own note goes in its uz_note."},
+    "ru": {"type": "string", "description": "The difference in one sentence of Russian — the overview; each word's own note goes in its ru_note."},
     "quiz": {"type": "array", "items": {
       "type": "object", "additionalProperties": false, "required": ["sentence", "answer", "explanation"],
       "properties": {
@@ -284,8 +288,10 @@ func (s *GrammarTutorService) CompareWords(ctx context.Context, req CompareReque
 		Interchangeable string   `json:"interchangeable"`
 		Words           []struct {
 			ComparedWord
-			Uz string `json:"uz"`
-			Ru string `json:"ru"`
+			Uz     string `json:"uz"`
+			Ru     string `json:"ru"`
+			UzNote string `json:"uz_note"`
+			RuNote string `json:"ru_note"`
 		} `json:"words"`
 		Differences []CompareAspect   `json:"differences"`
 		Tip         string            `json:"tip"`
@@ -318,6 +324,13 @@ func (s *GrammarTutorService) CompareWords(ctx context.Context, req CompareReque
 		}
 		if t := strings.TrimSpace(w.Ru); t != "" {
 			cw.Translations["ru"] = t
+		}
+		cw.Notes = map[string]string{}
+		if t := strings.TrimSpace(w.UzNote); t != "" {
+			cw.Notes["uz"] = t
+		}
+		if t := strings.TrimSpace(w.RuNote); t != "" {
+			cw.Notes["ru"] = t
 		}
 		cw.Collocations = trimmedLines(cw.Collocations)
 		cw.Examples = trimmedLines(cw.Examples)
