@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Vocabulary moved under Content CMS → Lexicon; old links and bookmarks land there. */
+/** Lexicon is a group in the sidebar; its first page is Vocabulary. */
 export default function Page() {
   redirect("/owner/content/lexicon/vocabulary");
 }

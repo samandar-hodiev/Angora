@@ -53,6 +53,13 @@ func (a *wordAuthor) WriteVocabulary(_ context.Context, req ai.VocabularyRequest
 	return ai.UsableWords(out, map[string]bool{}), &ai.EvaluationMeta{}, nil
 }
 
+func (a *wordAuthor) WriteIrregularVerbs(_ context.Context, count int, _ []string, _, _ string) ([]ai.IrregularVerbDraft, error) {
+	return []ai.IrregularVerbDraft{
+		{Base: "zz" + a.stamp + "sing", Past: "zz" + a.stamp + "sang", Participle: "zz" + a.stamp + "sung", Level: "B1", Uz: "kuylamoq"},
+		{Base: "zz" + a.stamp + "fly", Past: "zz" + a.stamp + "flew", Participle: "zz" + a.stamp + "flown", Level: "C1"},
+	}, nil
+}
+
 // CheckLevels agrees with every word but those whose number is a multiple of three, which it
 // puts at A2: those must come out unverified, at A2.
 func (a *wordAuthor) CheckLevels(_ context.Context, items []ai.LevelCheckItem) (map[string]string, error) {
@@ -185,6 +192,38 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		_ = pool.QueryRow(ctx, `SELECT level_source, level_content ? 'B1' FROM vocabulary WHERE id = $1`, id).Scan(&source, &hasB1)
 		if source != "curated" || !hasB1 {
 			t.Errorf("source %q, B1 explanation %v", source, hasB1)
+		}
+	})
+
+	t.Run("irregular verbs: a regular verb is refused, drafts are added and published", func(t *testing.T) {
+		t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM irregular_verbs WHERE base LIKE $1`, "zz"+stamp+"%") })
+		if w := call(http.MethodPost, "/irregular-verbs", map[string]any{
+			"base": "work", "past": "worked", "past_participle": "worked", "level": "A1",
+		}); w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
+			t.Fatalf("a regular verb: status %d, want refused", w.Code)
+		}
+		w := call(http.MethodPost, "/irregular-verbs", map[string]any{
+			"base": "zz" + stamp + "go", "past": "zz" + stamp + "went", "past_participle": "zz" + stamp + "gone", "level": "A1",
+		})
+		var created struct{ Data AdminVerb }
+		_ = json.Unmarshal(w.Body.Bytes(), &created)
+		if w.Code != http.StatusOK || created.Data.Status != "draft" || created.Data.Pattern != "ABC" {
+			t.Fatalf("create: %d %+v", w.Code, created.Data)
+		}
+		if w := call(http.MethodPost, "/irregular-verbs/generate", map[string]any{"count": 5, "max_level": "B2"}); w.Code != http.StatusOK {
+			t.Fatalf("generate: %d %s", w.Code, w.Body.String())
+		}
+		var drafts, c1 int
+		_ = pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE status = 'draft'), count(*) FILTER (WHERE level_code = 'C1')
+			FROM irregular_verbs WHERE base LIKE $1`, "zz"+stamp+"%").Scan(&drafts, &c1)
+		if drafts != 2 || c1 != 0 {
+			t.Fatalf("drafts %d (want the hand-added verb and the B1 one), C1 above the range %d", drafts, c1)
+		}
+		call(http.MethodPost, "/irregular-verbs/publish", map[string]any{"ids": []string{created.Data.ID.String()}})
+		var status string
+		_ = pool.QueryRow(ctx, `SELECT status FROM irregular_verbs WHERE id = $1`, created.Data.ID).Scan(&status)
+		if status != "published" {
+			t.Fatalf("published: %s", status)
 		}
 	})
 

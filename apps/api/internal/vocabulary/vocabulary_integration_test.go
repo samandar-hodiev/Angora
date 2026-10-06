@@ -244,6 +244,18 @@ func TestLearnerVocabularyPostgres(t *testing.T) {
 		if code := call(http.MethodGet, "/irregular-verbs?pattern=ABA", nil, &page); code != http.StatusOK || len(page.Items) == 0 {
 			t.Fatalf("table: %d, %d verbs", code, len(page.Items))
 		}
+		// A draft the owner has not published is not part of the learner's table.
+		draft := "zz" + stamp + "draftverb"
+		if _, err := pool.Exec(ctx, `INSERT INTO irregular_verbs (base, past, past_participle, pattern, level_code, status)
+			VALUES ($1, 'x', 'y', 'ABC', 'A1', 'draft')`, draft); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM irregular_verbs WHERE base = $1`, draft) })
+		var search irregularPage
+		call(http.MethodGet, "/irregular-verbs?q="+draft, nil, &search)
+		if len(search.Items) != 0 {
+			t.Fatalf("a draft verb reached the learner: %+v", search.Items)
+		}
 		var goID uuid.UUID
 		if err := pool.QueryRow(ctx, `SELECT id FROM irregular_verbs WHERE base = 'go'`).Scan(&goID); err != nil {
 			t.Fatal(err)

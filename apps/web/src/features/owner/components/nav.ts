@@ -8,11 +8,15 @@ import {
   Headphones,
   LayoutDashboard,
   LayoutGrid,
+  Library,
   LineChart,
+  Link2,
   Mic,
   PenLine,
+  Quote,
   ScrollText,
   ShieldCheck,
+  Shuffle,
   Smartphone,
   Sparkles,
   SpellCheck,
@@ -81,7 +85,19 @@ export const ownerNav: OwnerNavSection[] = [
           { href: "/owner/content", label: "Overview", icon: LayoutGrid, exact: true },
           { href: "/owner/content/all", label: "All content", icon: Files },
           { href: "/owner/content/grammar", label: "Grammar", icon: SpellCheck },
-          { href: "/owner/content/vocabulary", label: "Vocabulary", icon: Type },
+          // Everything learned as a unit of language — words, fixed phrases, collocations,
+          // irregular verbs — under one tree, as the learner sees it under Lexicon.
+          {
+            href: "/owner/content/lexicon",
+            label: "Lexicon",
+            icon: Library,
+            children: [
+              { href: "/owner/content/lexicon/vocabulary", label: "Vocabulary", icon: Type },
+              { href: "/owner/content/lexicon/phrases", label: "Phrases", icon: Quote },
+              { href: "/owner/content/lexicon/collocations", label: "Collocations", icon: Link2 },
+              { href: "/owner/content/lexicon/irregular-verbs", label: "Irregular verbs", icon: Shuffle },
+            ],
+          },
           { href: "/owner/content/speaking", label: "Speaking", icon: Mic },
           { href: "/owner/content/writing", label: "Writing", icon: PenLine },
           { href: "/owner/content/reading", label: "Reading", icon: BookOpen },
@@ -129,7 +145,7 @@ export function isNavActive(pathname: string, search: string, item: OwnerNavItem
 /** Whether the current route is anywhere inside this item's tree. */
 export function isInsideTree(pathname: string, item: OwnerNavItem): boolean {
   if (!item.children) return false;
-  return item.children.some((child) => isNavActive(pathname, "", child));
+  return item.children.some((child) => isNavActive(pathname, "", child) || isInsideTree(pathname, child));
 }
 
 /** Every item the sidebar can show, nested ones included — used by the loading skeleton. */

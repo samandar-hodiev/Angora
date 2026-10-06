@@ -469,12 +469,12 @@ function OwnerNav({ collapsed = false, inSheet = false }: { collapsed?: boolean;
   );
 }
 
-function navLinkClass(active: boolean, collapsed: boolean, depth: 0 | 1) {
+function navLinkClass(active: boolean, collapsed: boolean, depth: 0 | 1 | 2) {
   return cn(
     "flex min-w-0 items-center gap-2.5 rounded-md text-body-sm transition-colors duration-micro",
     // Children are a step quieter than their parent: smaller row, indented, so the tree
     // reads as one thing rather than eleven more top-level destinations.
-    depth === 0 ? "px-2.5 py-2" : "py-1.5 pr-2.5 pl-8",
+    depth === 0 ? "px-2.5 py-2" : depth === 1 ? "py-1.5 pr-2.5 pl-8" : "py-1.5 pr-2.5 pl-14",
     collapsed && "justify-center px-0",
     active
       ? "bg-primary-subtle font-medium text-primary-subtle-foreground"
@@ -499,7 +499,7 @@ function NavLink({
   active: boolean;
   collapsed?: boolean;
   inSheet?: boolean;
-  depth?: 0 | 1;
+  depth?: 0 | 1 | 2;
   current?: boolean;
 }) {
   const link = (
@@ -535,11 +535,14 @@ function NavTree({
   pathname,
   collapsed,
   inSheet,
+  depth = 0,
 }: {
   item: OwnerNavItem;
   pathname: string;
   collapsed: boolean;
   inSheet: boolean;
+  /** 1 for a tree inside a tree — Lexicon inside Content CMS. */
+  depth?: 0 | 1;
 }) {
   const inside = isInsideTree(pathname, item) || isNavActive(pathname, "", item);
   const [expanded, setExpanded] = useState(inside);
@@ -571,14 +574,22 @@ function NavTree({
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="w-56">
             <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
-            {children.map((child) => (
-              <DropdownMenuItem key={child.href} asChild>
-                <Link href={child.href} aria-current={isNavActive(pathname, "", child) ? "page" : undefined}>
-                  <child.icon aria-hidden />
-                  {child.label}
-                </Link>
-              </DropdownMenuItem>
-            ))}
+            {/* A tree inside the tree is listed flat here, its rows under its own name. */}
+            {children.flatMap((child) =>
+              (child.children ? [{ ...child, children: undefined, label: `${child.label}:` }, ...child.children] : [child]).map(
+                (row) =>
+                  row.label.endsWith(":") ? (
+                    <DropdownMenuLabel key={`${row.href}-label`}>{row.label.slice(0, -1)}</DropdownMenuLabel>
+                  ) : (
+                    <DropdownMenuItem key={row.href} asChild>
+                      <Link href={row.href} aria-current={isNavActive(pathname, "", row) ? "page" : undefined}>
+                        <row.icon aria-hidden />
+                        {row.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ),
+              ),
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </li>
@@ -596,7 +607,7 @@ function NavTree({
         onClick={() => setExpanded((open) => !open)}
         aria-expanded={expanded}
         aria-controls={panelId}
-        className={cn(navLinkClass(inside, false, 0), "w-full text-left")}
+        className={cn(navLinkClass(inside && depth === 0, false, depth), "w-full text-left", inside && depth > 0 && "text-foreground")}
       >
         <item.icon className={cn("size-4 shrink-0", inside ? "text-primary-text" : "text-fg-muted")} aria-hidden />
         <span className="truncate">{item.label}</span>
@@ -607,16 +618,20 @@ function NavTree({
       </button>
       {expanded && (
         <ul id={panelId} className="mt-0.5 grid grid-cols-[minmax(0,1fr)] gap-0.5">
-          {children.map((child) => (
-            <li key={child.href}>
-              <NavLink
-                item={child}
-                active={isNavActive(pathname, "", child)}
-                inSheet={inSheet}
-                depth={1}
-              />
-            </li>
-          ))}
+          {children.map((child) =>
+            child.children ? (
+              <NavTree key={child.href} item={child} pathname={pathname} collapsed={false} inSheet={inSheet} depth={1} />
+            ) : (
+              <li key={child.href}>
+                <NavLink
+                  item={child}
+                  active={isNavActive(pathname, "", child)}
+                  inSheet={inSheet}
+                  depth={(depth + 1) as 1 | 2}
+                />
+              </li>
+            ),
+          )}
         </ul>
       )}
     </li>

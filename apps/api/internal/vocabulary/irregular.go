@@ -109,7 +109,7 @@ func (m *Module) irregularVerbs(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
-	where := `WHERE ($2 = '' OR v.base ILIKE $2 || '%' OR v.past ILIKE '%' || $2 || '%' OR v.past_participle ILIKE '%' || $2 || '%'
+	where := `WHERE v.status = 'published' AND ($2 = '' OR v.base ILIKE $2 || '%' OR v.past ILIKE '%' || $2 || '%' OR v.past_participle ILIKE '%' || $2 || '%'
 	                 OR v.uz ILIKE '%' || $2 || '%' OR v.ru ILIKE '%' || $2 || '%')
 	            AND ($3 = '' OR v.level_code = $3)
 	            AND ($4 = '' OR v.pattern = $4)
@@ -142,12 +142,12 @@ func (m *Module) irregularVerbs(c *gin.Context) {
 	if err := m.pool.QueryRow(ctx, `
 		SELECT count(*)::int, count(u.verb_id)::int,
 		       count(*) FILTER (WHERE u.streak >= 3)::int,
-		       count(*) FILTER (WHERE u.wrong > 0 AND u.streak = 0)::int`+verbFrom, p.UserID,
+		       count(*) FILTER (WHERE u.wrong > 0 AND u.streak = 0)::int`+verbFrom+`WHERE v.status = 'published'`, p.UserID,
 	).Scan(&out.Summary.Total, &out.Summary.Practiced, &out.Summary.Known, &out.Summary.Mistakes); err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	levels, err := m.pool.Query(ctx, `SELECT level_code, count(*)::int FROM irregular_verbs GROUP BY 1 ORDER BY 1`)
+	levels, err := m.pool.Query(ctx, `SELECT level_code, count(*)::int FROM irregular_verbs WHERE status = 'published' GROUP BY 1 ORDER BY 1`)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -185,7 +185,7 @@ func (m *Module) irregularPractice(c *gin.Context) {
 		q.Count = 10
 	}
 	rows, err := m.pool.Query(c.Request.Context(), `SELECT `+verbColumns+verbFrom+`
-		WHERE ($2 = '' OR v.level_code = $2) AND ($3 = '' OR v.pattern = $3)
+		WHERE v.status = 'published' AND ($2 = '' OR v.level_code = $2) AND ($3 = '' OR v.pattern = $3)
 		  AND ($4 <> 'mistakes' OR (u.wrong > 0 AND u.streak = 0))`, p.UserID, q.Level, q.Pattern, q.Show)
 	if err != nil {
 		httpx.Fail(c, err)
@@ -263,7 +263,7 @@ func (m *Module) irregularAnswer(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 	var out VerbCheck
-	err = m.pool.QueryRow(ctx, `SELECT past, past_participle FROM irregular_verbs WHERE id = $1`, id).Scan(&out.Past, &out.PastParticiple)
+	err = m.pool.QueryRow(ctx, `SELECT past, past_participle FROM irregular_verbs WHERE id = $1 AND status = 'published'`, id).Scan(&out.Past, &out.PastParticiple)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, apperr.NotFound("Verb"))
 		return
