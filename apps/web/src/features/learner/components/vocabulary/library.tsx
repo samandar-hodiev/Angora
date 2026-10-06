@@ -5,28 +5,31 @@ import {
   ArrowLeftRight,
   ArrowUp,
   Check,
+  ChevronDown,
   ChevronRight,
   Columns3,
   Eye,
   EyeOff,
+  Layers,
   Plus,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   SpellCheck,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FlagGB, FlagRU, FlagUZ } from "@/components/common/flags";
 import { EmptyState, ErrorState } from "@/components/common/states";
 import { Button, IconButton } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/overlay";
@@ -45,7 +48,6 @@ import {
   LEVELS,
   LevelTag,
   RegisterTag,
-  Segmented,
   SpeakButton,
   registerLabel,
 } from "./shared";
@@ -85,6 +87,7 @@ export function Library({
   const facets = data?.facets;
   const filtered = query.q || query.level || query.topic || query.pos || query.register || query.show !== "all";
 
+  const extraFilters = [query.register, query.pos, query.show !== "all", query.sort !== "level"].filter(Boolean).length;
   const levelCount = (code: string) => facets?.levels.find((f) => f.value === code)?.count ?? 0;
   const allCount = facets?.levels.reduce((n, f) => n + f.count, 0) ?? 0;
 
@@ -108,75 +111,80 @@ export function Library({
   return (
     <div className="grid gap-4">
       <div className="grid gap-3">
-        <Segmented
-          label="Level"
-          value={query.level}
-          onChange={(level) => set({ level })}
-          options={[
-            { value: "", label: <LevelLabel code="All" count={allCount} /> },
-            ...LEVELS.map((code) => ({
-              value: code as string,
-              label: <LevelLabel code={code} count={levelCount(code)} />,
-              disabled: !!facets && levelCount(code) === 0,
-            })),
-          ]}
-        />
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-          <Input
-            type="search"
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
             value={query.q}
-            onChange={(e) => set({ q: e.target.value })}
-            placeholder={`Search ${names.plural} in English, Uzbek or Russian`}
-            aria-label={`Search ${names.plural}`}
-            className="h-10 pr-9 pl-9"
+            onChange={(q) => set({ q })}
+            placeholder={`Search ${names.plural} — English, Uzbek or Russian`}
+            label={`Search ${names.plural}`}
           />
-          {query.q && (
-            <button
-              type="button"
-              aria-label="Clear search"
-              onClick={() => set({ q: "" })}
-              className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-fg-muted hover:text-foreground"
+          <FilterMenu
+            icon={Layers}
+            label="Level"
+            value={query.level ? `${query.level} · ${LEVEL_NAMES[query.level]}` : "All levels"}
+            active={!!query.level}
+          >
+            <DropdownMenuRadioGroup value={query.level} onValueChange={(level) => set({ level })}>
+              <DropdownMenuRadioItem value="">
+                All levels <MenuCount n={allCount} />
+              </DropdownMenuRadioItem>
+              <DropdownMenuSeparator />
+              {LEVELS.map((code) => (
+                <DropdownMenuRadioItem key={code} value={code} disabled={!!facets && levelCount(code) === 0}>
+                  <LevelTag level={code} />
+                  <span className="text-fg-secondary">{LEVEL_NAMES[code]}</span>
+                  <MenuCount n={levelCount(code)} />
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </FilterMenu>
+          <FilterMenu
+            icon={SlidersHorizontal}
+            label="Filters"
+            value={extraFilters > 0 ? `${extraFilters} on` : "None"}
+            active={extraFilters > 0}
+            wide
+          >
+            <DropdownMenuLabel>Formality</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={query.register} onValueChange={(register) => set({ register })}>
+              <DropdownMenuRadioItem value="">Formal and informal</DropdownMenuRadioItem>
+              {facets?.registers.map((f) => (
+                <DropdownMenuRadioItem key={f.value} value={f.value}>
+                  {registerLabel(f.value)} <MenuCount n={f.count} />
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{kind === "word" ? "Part of speech" : "Type"}</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={query.pos} onValueChange={(pos) => set({ pos })}>
+              <DropdownMenuRadioItem value="">{kind === "word" ? "Every part of speech" : "Every type"}</DropdownMenuRadioItem>
+              {facets?.parts_of_speech.map((f) => (
+                <DropdownMenuRadioItem key={f.value} value={f.value}>
+                  <span className="capitalize">{f.value}</span> <MenuCount n={f.count} />
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Show</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={query.show}
+              onValueChange={(show) => set({ show: show as VocabularyLibraryQuery["show"] })}
             >
-              <X className="size-4" aria-hidden />
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <NativeSelect value={query.register} onChange={(e) => set({ register: e.target.value })} aria-label="Formality">
-            <option value="">Formal and informal</option>
-            {facets?.registers.map((f) => (
-              <option key={f.value} value={f.value}>
-                {registerLabel(f.value)} ({f.count})
-              </option>
-            ))}
-          </NativeSelect>
-          <NativeSelect value={query.pos} onChange={(e) => set({ pos: e.target.value })} aria-label="Type">
-            <option value="">{kind === "word" ? "Every part of speech" : "Every type"}</option>
-            {facets?.parts_of_speech.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.value} ({f.count})
-              </option>
-            ))}
-          </NativeSelect>
-          <NativeSelect
-            value={query.show}
-            onChange={(e) => set({ show: e.target.value as VocabularyLibraryQuery["show"] })}
-            aria-label="Show"
-          >
-            <option value="all">All {names.plural}</option>
-            <option value="new">Not in my list</option>
-            <option value="mine">In my list</option>
-          </NativeSelect>
-          <NativeSelect
-            value={query.sort}
-            onChange={(e) => set({ sort: e.target.value as VocabularyLibraryQuery["sort"] })}
-            aria-label="Sort"
-          >
-            <option value="level">By level</option>
-            <option value="az">A–Z</option>
-            <option value="newest">Newest</option>
-          </NativeSelect>
+              <DropdownMenuRadioItem value="all">All {names.plural}</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="new">Not in my list</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="mine">In my list</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Sort</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={query.sort}
+              onValueChange={(sort) => set({ sort: sort as VocabularyLibraryQuery["sort"] })}
+            >
+              <DropdownMenuRadioItem value="level">By level, easiest first</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="az">A–Z</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="newest">Newest first</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </FilterMenu>
         </div>
         {facets && facets.topics.length > 0 && (
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Topics">
@@ -196,6 +204,24 @@ export function Library({
           </div>
         )}
       </div>
+
+      {filtered && (
+        <div className="-mt-1 flex flex-wrap items-center gap-1.5" aria-label="Filters on">
+          {query.q && <ActiveChip label={`“${query.q.trim()}”`} onClear={() => set({ q: "" })} />}
+          {query.level && (
+            <ActiveChip label={`${query.level} · ${LEVEL_NAMES[query.level]}`} onClear={() => set({ level: "" })} />
+          )}
+          {query.topic && <ActiveChip label={query.topic} onClear={() => set({ topic: "" })} />}
+          {query.register && <ActiveChip label={registerLabel(query.register)} onClear={() => set({ register: "" })} />}
+          {query.pos && <ActiveChip label={query.pos} onClear={() => set({ pos: "" })} />}
+          {query.show !== "all" && (
+            <ActiveChip label={query.show === "new" ? "Not in my list" : "In my list"} onClear={() => set({ show: "all" })} />
+          )}
+          <Button variant="link" size="sm" className="h-auto px-1 text-caption" onClick={reset}>
+            Clear all
+          </Button>
+        </div>
+      )}
 
       {library.isPending ? (
         <div className="grid gap-2">
@@ -225,7 +251,7 @@ export function Library({
           <ListHeader
             count={total}
             names={names}
-            filtered={Boolean(filtered)}
+            filtered={false}
             onReset={reset}
             columns={columns}
             setColumns={setColumns}
@@ -274,15 +300,6 @@ export function Library({
         />
       )}
     </div>
-  );
-}
-
-function LevelLabel({ code, count }: { code: string; count: number }) {
-  return (
-    <>
-      {code}
-      {count > 0 && <span className="text-[0.6875rem] text-fg-muted tabular-nums">{count}</span>}
-    </>
   );
 }
 
@@ -345,6 +362,130 @@ function gridFor(count: number) {
   return count === 3
     ? "md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
     : "md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_auto]";
+}
+
+/**
+ * The search box, made to look like one: a search mark in its own tile, the field, and a "/"
+ * hint that it can be reached from the keyboard — "/" anywhere on the page puts the cursor in it.
+ */
+function SearchField({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label: string;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.key !== "/" || target?.closest("input, textarea, [contenteditable=true]")) return;
+      e.preventDefault();
+      input.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  return (
+    <label
+      className={cn(
+        "group flex h-11 min-w-64 flex-1 items-center gap-2 rounded-xl border bg-surface pr-2 pl-1.5 transition-[border-color,box-shadow] duration-micro",
+        "focus-within:border-primary focus-within:ring-[3px] focus-within:ring-ring/30 hover:border-primary/40",
+      )}
+    >
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary-subtle-foreground">
+        <Search className="size-4" aria-hidden />
+      </span>
+      <input
+        ref={input}
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        className="h-full min-w-0 flex-1 bg-transparent text-body-sm outline-none placeholder:text-fg-muted [&::-webkit-search-cancel-button]:hidden"
+      />
+      {value ? (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => onChange("")}
+          className="grid size-7 place-items-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-foreground"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      ) : (
+        <kbd className="hidden rounded border px-1.5 text-[0.6875rem] text-fg-muted sm:block" title="Press / to search">
+          /
+        </kbd>
+      )}
+    </label>
+  );
+}
+
+/** A filter as a button that says what it is set to, opening a menu of its choices. */
+function FilterMenu({
+  icon: Icon,
+  label,
+  value,
+  active,
+  wide,
+  children,
+}: {
+  icon: typeof Layers;
+  label: string;
+  value: string;
+  active: boolean;
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex h-11 items-center gap-2 rounded-xl border px-3 text-body-sm outline-none transition-colors duration-micro",
+            "focus-visible:ring-[3px] focus-visible:ring-ring/40 data-[state=open]:border-primary",
+            active ? "border-primary/60 bg-primary-subtle text-primary-subtle-foreground" : "bg-surface hover:border-primary/40",
+          )}
+        >
+          <Icon className="size-4 shrink-0" aria-hidden />
+          <span className="text-fg-muted">{label}:</span>
+          <span className="font-medium whitespace-nowrap">{value}</span>
+          <ChevronDown className="size-4 shrink-0 text-fg-muted" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className={cn("max-h-[70vh] overflow-y-auto", wide ? "w-72" : "w-64")}>
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function MenuCount({ n }: { n: number }) {
+  return <span className="ml-auto text-caption text-fg-muted tabular-nums">{n}</span>;
+}
+
+/** A filter that is on, with a way to turn it off. */
+function ActiveChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary-subtle py-0.5 pr-1 pl-2.5 text-caption text-primary-subtle-foreground capitalize">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label={`Remove ${label}`}
+        className="grid size-4 place-items-center rounded-full hover:bg-primary/20"
+      >
+        <X className="size-3" aria-hidden />
+      </button>
+    </span>
+  );
 }
 
 /**
@@ -458,7 +599,7 @@ function ListHeader({
               className="flex min-w-0 items-center gap-1.5 text-caption font-medium whitespace-nowrap text-fg-muted"
             >
               <Flag title={name} />
-              <span className="truncate">{name}</span>
+              <span className="whitespace-nowrap">{name}</span>
               {i > 0 && !revealAll && <EyeOff className="size-3 shrink-0 opacity-70" aria-label="meanings hidden" />}
             </span>
           );
