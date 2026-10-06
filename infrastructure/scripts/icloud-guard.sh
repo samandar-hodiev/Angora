@@ -1,5 +1,5 @@
 #!/bin/sh
-# Keep generated folders out of iCloud Drive.
+# Keep the project out of iCloud Drive's reach.
 #
 # Why this exists: with "Desktop & Documents" in iCloud, macOS offloads files it thinks are
 # unused. node_modules and .next are tens of thousands of such files, and once they are
@@ -8,17 +8,31 @@
 # folder lives in "<name>.nosync" with a symlink in its place. npm replaces the symlink with a
 # real folder on install; this moves it back. It does nothing outside iCloud Drive.
 #
+# Offloading did not stop at generated folders: one morning the sources, .env and .git were
+# cloud-only too, so the site answered 500 and git failed with "mmap failed". The lasting fix is
+# the whole checkout in a *.nosync folder — ~/Desktop/Angora.nosync, with ~/Desktop/Angora a
+# symlink to it, so every path keeps working. A checkout already there needs nothing more.
+#
 # Usage: infrastructure/scripts/icloud-guard.sh   (make dev runs it)
 
 set -eu
 
-ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+ROOT=$(cd "$(dirname "$0")/../.." && pwd -P)
 cd "$ROOT"
+
+# Inside a *.nosync folder iCloud never touches any of it.
+case "$ROOT" in
+  *.nosync | *.nosync/*) exit 0 ;;
+esac
 
 case "$ROOT" in
   "$HOME/Desktop"/* | "$HOME/Documents"/* | "$HOME/Library/Mobile Documents"/*) ;;
   *) exit 0 ;;
 esac
+
+echo "icloud-guard: this checkout is synced by iCloud, which can offload its source and .git files."
+echo "icloud-guard: to stop it for good, once, with the dev servers stopped:"
+echo "icloud-guard:   mv \"$ROOT\" \"$ROOT.nosync\" && ln -s \"$(basename "$ROOT").nosync\" \"$ROOT\""
 
 for dir in node_modules apps/web/.next; do
   target="$dir.nosync"
