@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftRight, BookOpen, Check, Lightbulb, Plus, RotateCcw, Sparkles, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { FlagRU, FlagUZ } from "@/components/common/flags";
 import { ErrorState } from "@/components/common/states";
@@ -55,11 +55,14 @@ export function ComparePanel({
   // The tab is only drawn after a click, never on the server, so storage can be read at once.
   const [recent, setRecent] = useState<string[][]>(readRecent);
   const compare = useCompareWords();
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const run = (words: string[]) => {
     const clean = words.map((w) => w.trim()).filter(Boolean);
     if (clean.length < 2) return;
     setTerms(clean);
+    // Down to where the answer is being written, so the learner sees it arrive.
+    requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     compare.mutate(clean, {
       onSuccess: (res) => {
         rememberRecent(res.terms);
@@ -134,7 +137,7 @@ export function ComparePanel({
               </Button>
             )}
             <Button type="submit" disabled={filled < 2} loading={compare.isPending} className="flex-1 sm:flex-none">
-              <Sparkles aria-hidden /> Compare
+              {!compare.isPending && <Sparkles aria-hidden />} Compare
             </Button>
           </div>
         </div>
@@ -163,6 +166,7 @@ export function ComparePanel({
         )}
       </form>
 
+      <div ref={resultRef} className="scroll-mt-24" />
       {compare.isPending ? (
         <div className="grid gap-3" aria-busy>
           <Skeleton className="h-24 rounded-xl" />
@@ -351,7 +355,8 @@ function Quiz({ quiz, words }: { quiz: WordComparison["quiz"]; words: string[] }
       <ol className="grid gap-2">
         {quiz.map((q, i) => {
           const picked = answers[i];
-          const [before, after] = q.sentence.split("___");
+          // Any run of underscores is the gap: the model writes three, or four, or more.
+          const [before, after = ""] = q.sentence.split(/_{2,}/);
           return (
             <li key={i} className="grid gap-2 rounded-xl border bg-surface p-4">
               <p className="text-body">

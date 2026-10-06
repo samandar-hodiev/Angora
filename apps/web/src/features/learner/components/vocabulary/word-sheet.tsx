@@ -1,9 +1,9 @@
 "use client";
 
-import { AlertTriangle, ArrowLeftRight, Check, CheckCheck, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Check, CheckCheck, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { FlagGB } from "@/components/common/flags";
+import { FlagGB, FlagRU, FlagUZ } from "@/components/common/flags";
 import { ErrorState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Meter } from "@/components/ui/data-display";
@@ -88,8 +88,7 @@ function WordBody({
           </SpeakButton>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-body">
-          <Translations translations={word.translations} />
-          {word.translations.ru && <SpeakButton text={word.translations.ru} lang="ru-RU" label="Listen to the Russian" />}
+          <Translations translations={word.translations} speak />
         </div>
         <DeckActions word={word} />
       </header>
@@ -213,7 +212,6 @@ function Meaning({ word }: { word: WordDetail }) {
           <LevelTag level={word.level} />
           {word.level && LEVEL_NAMES[word.level]}
           {word.level === word.learner_level && <span className="text-primary">your level</span>}
-          {word.level_source === "ai" && <span title="This level has not been confirmed by an editor yet">· level not confirmed yet</span>}
         </p>
         <p className="text-body-lg">{word.definition || "—"}</p>
         {word.examples.length > 0 && (
@@ -228,6 +226,7 @@ function Meaning({ word }: { word: WordDetail }) {
             ))}
           </ul>
         )}
+        <TranslatedMeaning translations={word.translations} />
       </div>
       {word.senses.length > 0 && (
         <div className="grid gap-2">
@@ -254,6 +253,42 @@ function Meaning({ word }: { word: WordDetail }) {
   );
 }
 
+/**
+ * The definition in Uzbek and Russian, hidden until asked for — read the English first, then
+ * check you understood it.
+ */
+function TranslatedMeaning({ translations }: { translations: WordDetail["translations"] }) {
+  const [open, setOpen] = useState(false);
+  if (!translations.def_uz && !translations.def_ru) return null;
+  return (
+    <div className="grid gap-1.5 border-t pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-fit items-center gap-1.5 rounded text-caption text-fg-muted outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      >
+        {open ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
+        {open ? "Hide the meaning in Uzbek and Russian" : "Check: the meaning in Uzbek and Russian"}
+      </button>
+      {open && (
+        <div className="grid gap-1 text-body-sm">
+          {translations.def_uz && (
+            <p className="flex items-start gap-2">
+              <FlagUZ title="O'zbekcha" className="mt-1" /> {translations.def_uz}
+            </p>
+          )}
+          {translations.def_ru && (
+            <p className="flex items-start gap-2">
+              <FlagRU title="Русский" className="mt-1" /> {translations.def_ru}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The sentence with the word in it picked out, so the eye finds it. */
 function Highlight({ text, term }: { text: string; term: string }) {
   // Each word of the entry by its stem, so "made a decision" lights up for "make a decision".
@@ -263,8 +298,10 @@ function Highlight({ text, term }: { text: string; term: string }) {
     .filter((w) => w.length > 2)
     .map((w) => w.slice(0, Math.max(3, w.length - 2)));
   const parts = text.split(/(\s+)/);
+  // One inline box: inside a flex chip, loose pieces would each become a flex item and the
+  // chip's gap would open up between the words.
   return (
-    <>
+    <span>
       {parts.map((part, i) => {
         const bare = part.toLowerCase().replace(/[^a-z'-]/g, "");
         return bare && stems.some((stem) => bare.startsWith(stem)) ? (
@@ -275,7 +312,7 @@ function Highlight({ text, term }: { text: string; term: string }) {
           <span key={i}>{part}</span>
         );
       })}
-    </>
+    </span>
   );
 }
 

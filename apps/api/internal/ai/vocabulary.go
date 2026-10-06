@@ -165,7 +165,7 @@ func vocabularySchema(kind string) json.RawMessage {
 						"ru_definition":     map[string]any{"type": "string", "description": "The definition, translated into plain Russian."},
 						"topics":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "One or two topics from the requested ones, lower case."},
 						"definition":        map[string]any{"type": "string", "description": "The main meaning only, in English a learner at the entry's level can read."},
-						"examples":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Two natural sentences at that level."},
+						"examples":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Two natural sentences at that level, each using the entry as the part of speech given — love as a noun is \"Love is patient\", never \"I love you\"."},
 						"other_senses": map[string]any{
 							"type": "array", "description": "0 to 3 other common meanings, each at the level a learner meets it.",
 							"items": map[string]any{
@@ -204,6 +204,7 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	b.WriteString("You choose lexicon for an English-learning app whose learners speak Uzbek or Russian. ")
 	fmt.Fprintf(&b, "Write exactly %d useful %s.\n", count, kindGuide[kind])
 	b.WriteString("- Each entry is explained once, at its own level: definition is the main meaning only (no example in it), in English a learner at that level can read; examples are two natural sentences at that level.\n")
+	b.WriteString("- The definition, examples, other_senses and usage all describe the entry as the part_of_speech you give it. A word used as two parts of speech (love as noun and verb) is two entries: pick one, and never illustrate a noun with verb sentences or the other way round.\n")
 	b.WriteString("- level: the level a learner usually meets the entry at in its main sense, by the English Vocabulary Profile. Be strict and honest: everyday concrete words (bed, eat, house) are A1–A2 whatever topic they come from; never label an easy entry higher to look advanced.\n")
 	b.WriteString("- other_senses: other common meanings that differ from the main one, each with the level it is met at (run: A1 move fast; B2 manage a business). Empty when there are none — never restate the main meaning.\n")
 	b.WriteString("- usage.register: formal, informal, neutral and so on — how formal the entry is. " + wordUsageGuide + "\n")

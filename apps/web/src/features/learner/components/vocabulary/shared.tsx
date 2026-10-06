@@ -66,7 +66,8 @@ export const KINDS: Record<
     title: "Collocations",
     singular: "collocation",
     plural: "collocations",
-    description: "Words that naturally go together — make a decision, heavy rain — so your English sounds natural, not translated.",
+    description:
+      "Words that naturally go together — make a decision, heavy rain — so your English sounds natural, not translated.",
     search: "Search a collocation, or its Uzbek or Russian meaning",
     compare: [
       ["make a mistake", "do a mistake"],
@@ -164,9 +165,12 @@ export function SpeakButton({
 export function Translations({
   translations,
   className,
+  speak,
 }: {
   translations: { uz?: string; ru?: string; ru_pron?: string };
   className?: string;
+  /** A listen button beside the Russian, on the same line. */
+  speak?: boolean;
 }) {
   if (!translations.uz && !translations.ru) return null;
   return (
@@ -182,6 +186,7 @@ export function Translations({
           <span className="flex min-w-0 items-center gap-1.5">
             <FlagRU title="Русский" />
             <span className="font-medium">{translations.ru}</span>
+            {speak && <SpeakButton text={translations.ru} lang="ru-RU" label={`Listen to “${translations.ru}”`} />}
           </span>
           {translations.ru_pron && <span className="pl-[1.5rem] text-[0.6875rem] text-fg-muted">[{translations.ru_pron}]</span>}
         </span>

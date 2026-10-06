@@ -19,7 +19,7 @@ import (
 
 const (
 	VocabularyEnrichPrompt  = "vocabulary_enrich.v1"
-	VocabularyComparePrompt = "vocabulary_compare.v1"
+	VocabularyComparePrompt = "vocabulary_compare.v2"
 	SchemaVocabularyEnrich  = "vocabulary_usage"
 	SchemaVocabularyCompare = "vocabulary_comparison"
 
@@ -130,7 +130,7 @@ func (s *GrammarTutorService) EnrichWord(ctx context.Context, req EnrichRequest)
 		"properties": map[string]any{"usage": wordUsageSchema},
 	})
 	instructions := "You write vocabulary notes for an English-learning app whose learners speak Uzbek or Russian. " +
-		"For the word given, describe how it is used. " + wordUsageGuide + " Write for the sense given by the definition."
+		"For the word given, describe how it is used. " + wordUsageGuide + " Write for the sense given by the definition and the part of speech given — collocations and the common mistake use the word as that part of speech."
 	input := fmt.Sprintf("WORD: %s\nPART OF SPEECH: %s\nLEVEL: %s\nDEFINITION: %s\n", req.Term, req.PartOfSpeech, req.Level, req.Definition)
 	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
 		Task:          TaskVocabularyEnrich,
@@ -223,7 +223,7 @@ var compareSchema = json.RawMessage(`{
         "when_to_use": {"type": "string", "description": "The situations this word is the right choice in."},
         "register": {"type": "string", "enum": ["neutral", "formal", "informal", "spoken", "written", "technical", "literary", "slang"]},
         "collocations": {"type": "array", "items": {"type": "string"}, "description": "3 typical partnerships."},
-        "examples": {"type": "array", "items": {"type": "string"}, "description": "2 natural sentences."},
+        "examples": {"type": "array", "items": {"type": "string"}, "description": "2 natural sentences, each using the term as the part_of_speech you give it."},
         "uz": {"type": "string", "description": "The word in Uzbek (Latin script)."},
         "ru": {"type": "string", "description": "The word in Russian."}
       }
@@ -259,7 +259,7 @@ func (s *GrammarTutorService) CompareWords(ctx context.Context, req CompareReque
 	b.WriteString("You are an English teacher for learners who speak Uzbek or Russian. A learner asks how these words differ. ")
 	b.WriteString("Often they translate to the same Uzbek or Russian word, which is exactly why the learner is confused.\n")
 	fmt.Fprintf(&b, "- Write every English text so a %s learner can read it: short sentences, simple words at A1–A2, more nuance at C1–C2.\n", level)
-	b.WriteString("- words: one entry per given term, in the given order, in the sense in which the terms are near each other.\n")
+	b.WriteString("- words: one entry per given term, in the given order, in the sense in which the terms are near each other. Each word's part_of_speech, meaning, collocations and examples must agree: if you call love a noun, its examples use the noun (Love is patient), never the verb (I love you).\n")
 	b.WriteString("- differences: 3 to 5 aspects where they genuinely differ (meaning, formality, typical context, countability, grammar patterns, connotation); never invent a difference.\n")
 	b.WriteString("- quiz: 4 sentences, each with ___ where exactly one of the words fits best and the others sound wrong or odd; use every word as an answer at least once.\n")
 	b.WriteString("- uz and ru: the same difference told in the learner's language, so it cannot be misunderstood.\n")
