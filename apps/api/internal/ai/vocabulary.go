@@ -208,6 +208,7 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	b.WriteString("- level: the level a learner usually meets the entry at in its main sense, by the English Vocabulary Profile. Be strict and honest: everyday concrete words (bed, eat, house) are A1–A2 whatever topic they come from; never label an easy entry higher to look advanced.\n")
 	b.WriteString("- other_senses: other common meanings that differ from the main one, each with the level it is met at (run: A1 move fast; B2 manage a business). Empty when there are none — never restate the main meaning.\n")
 	b.WriteString("- usage.register: formal, informal, neutral and so on — how formal the entry is. " + wordUsageGuide + "\n")
+	b.WriteString("- " + UzbekOrthography + "\n")
 	b.WriteString("- uz and ru: the usual translation in the main sense — a word or two, not a definition; a wrong or loosely related word is worse than none.\n")
 	b.WriteString("- ru_pronunciation: how that Russian translation is said, in Uzbek Latin letters as it sounds (unstressed o reads as a), acute accent on the stressed vowel — e.g. достичь → dastích.\n")
 	if req.MinLevel != "" || req.MaxLevel != "" {
@@ -274,7 +275,7 @@ func (g generatedWords) words(kind string) []GeneratedWord {
 			Tags: w.Topics, Translations: map[string]string{}, Usage: w.Usage, Senses: w.Senses,
 			LevelContent: map[string]LevelText{level: {Definition: w.Definition, Examples: w.Examples}},
 		}
-		if t := strings.TrimSpace(w.Uz); t != "" {
+		if t := NormalizeUzbek(w.Uz); t != "" {
 			word.Translations["uz"] = t
 		}
 		if t := strings.TrimSpace(w.Ru); t != "" {
@@ -283,7 +284,7 @@ func (g generatedWords) words(kind string) []GeneratedWord {
 				word.Translations["ru_pron"] = r
 			}
 		}
-		if t := strings.TrimSpace(w.UzDefinition); t != "" {
+		if t := NormalizeUzbek(w.UzDefinition); t != "" {
 			word.Translations["def_uz"] = t
 		}
 		if t := strings.TrimSpace(w.RuDefinition); t != "" {

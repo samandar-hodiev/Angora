@@ -263,6 +263,16 @@ func (m *Module) backfillDefinitions(ctx context.Context, items []LibraryWord) {
 			m.warn("vocabulary: translating definitions failed", "count", len(todo), "error", err.Error())
 			return
 		}
+		// The Uzbek is checked before it is stored, as every Uzbek string in the lexicon is.
+		var uz []ai.UzbekText
+		for id, t := range got {
+			uz = append(uz, ai.UzbekText{Key: id, Text: t["uz"]})
+		}
+		if fixed, err := m.ai.ProofreadUzbek(ctx, uz); err == nil {
+			for id, t := range fixed {
+				got[id]["uz"] = t
+			}
+		}
 		for id, t := range got {
 			if _, err := m.pool.Exec(ctx, `
 				UPDATE vocabulary SET translations = translations || jsonb_build_object('def_uz', $2::text, 'def_ru', $3::text)

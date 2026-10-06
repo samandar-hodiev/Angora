@@ -259,8 +259,11 @@ func (in wordInput) clean() (ai.GeneratedWord, error) {
 		Translations: map[string]string{}, LevelContent: content, Senses: in.Senses,
 		Usage: ai.WordUsage{Register: in.Register},
 	}
-	for _, lang := range []string{"uz", "ru", "ru_pron"} {
+	for _, lang := range []string{"uz", "ru", "ru_pron", "def_uz", "def_ru"} {
 		if t := strings.TrimSpace(in.Translations[lang]); t != "" {
+			if lang == "uz" || lang == "def_uz" {
+				t = ai.NormalizeUzbek(t)
+			}
 			w.Translations[lang] = t
 		}
 	}
@@ -348,7 +351,9 @@ func (m *Module) updateWord(c *gin.Context) {
 	// Saving is the owner's word on the level: from here it is curated, not the model's guess.
 	tag, err := m.pool.Exec(c.Request.Context(), `
 		UPDATE vocabulary SET term = $2, part_of_speech = $3, definition = $4, examples = $5, pronunciation_ipa = $6,
-		       level_id = (SELECT id FROM levels WHERE code = $7), tags = $8, translations = $9, level_content = $10,
+		       level_id = (SELECT id FROM levels WHERE code = $7), tags = $8,
+		       -- Merged, not replaced: the form does not carry the Uzbek and Russian definitions.
+		       translations = translations || $9, level_content = $10,
 		       source = 'curated', kind = $11, senses = COALESCE($12::jsonb, senses),
 		       register = COALESCE(NULLIF($13, ''), register), level_source = 'curated'
 		WHERE id = $1`, id, w.Term, w.PartOfSpeech, w.Definition, examples, w.PronunciationIPA, w.Level,
@@ -685,7 +690,9 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 				if meta != nil && meta.AIRequestID != uuid.Nil {
 					requestID = &meta.AIRequestID
 				}
-				if err := store(m.checkLevels(ctx, words), requestID); err != nil {
+				checked := m.checkLevels(ctx, words)
+				m.proofreadWords(ctx, checked)
+				if err := store(checked, requestID); err != nil {
 					mu.Lock()
 					storeErr = err
 					mu.Unlock()

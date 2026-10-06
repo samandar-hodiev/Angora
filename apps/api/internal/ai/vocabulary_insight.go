@@ -266,7 +266,7 @@ func (s *GrammarTutorService) CompareWords(ctx context.Context, req CompareReque
 	b.WriteString("- words: one entry per given term, in the given order, in the sense in which the terms are near each other. Each word's part_of_speech, meaning, collocations and examples must agree: if you call love a noun, its examples use the noun (Love is patient), never the verb (I love you).\n")
 	b.WriteString("- differences: 3 to 5 aspects where they genuinely differ (meaning, formality, typical context, countability, grammar patterns, connotation); never invent a difference.\n")
 	b.WriteString("- quiz: 4 sentences, each with ___ where exactly one of the words fits best and the others sound wrong or odd; use every word as an answer at least once.\n")
-	b.WriteString("- uz and ru: the same difference told in the learner's language, so it cannot be misunderstood.\n")
+	b.WriteString("- uz and ru: the same difference told in the learner's language, so it cannot be misunderstood. " + UzbekOrthography + "\n")
 	b.WriteString("- invalid: any term that is not an English word or phrase (misspelt, another language, nonsense). If any term is invalid, leave everything else empty.\n")
 
 	input := "TERMS: " + strings.Join(req.Terms, " | ") + "\nLEVEL: " + level + "\n"
@@ -310,7 +310,7 @@ func (s *GrammarTutorService) CompareWords(ctx context.Context, req CompareReque
 	if len(out.Invalid) > 0 {
 		return out, metaFor(res), nil
 	}
-	if t := strings.TrimSpace(raw.Uz); t != "" {
+	if t := NormalizeUzbek(raw.Uz); t != "" {
 		out.NativeNote["uz"] = t
 	}
 	if t := strings.TrimSpace(raw.Ru); t != "" {
@@ -319,14 +319,14 @@ func (s *GrammarTutorService) CompareWords(ctx context.Context, req CompareReque
 	for _, w := range raw.Words {
 		cw := w.ComparedWord
 		cw.Translations = map[string]string{}
-		if t := strings.TrimSpace(w.Uz); t != "" {
+		if t := NormalizeUzbek(w.Uz); t != "" {
 			cw.Translations["uz"] = t
 		}
 		if t := strings.TrimSpace(w.Ru); t != "" {
 			cw.Translations["ru"] = t
 		}
 		cw.Notes = map[string]string{}
-		if t := strings.TrimSpace(w.UzNote); t != "" {
+		if t := NormalizeUzbek(w.UzNote); t != "" {
 			cw.Notes["uz"] = t
 		}
 		if t := strings.TrimSpace(w.RuNote); t != "" {
@@ -426,7 +426,7 @@ func (s *GrammarTutorService) WriteLadder(ctx context.Context, term string, user
 		"for each CEFR level A1 to C2, the word or short phrase a learner meets for that same meaning at that level, by the English " +
 		"Vocabulary Profile — from the plainest to the most precise or literary (big → large → huge → enormous → immense → colossal). " +
 		"The given word sits at its own level. Every word appears once: when a level has no natural word of its own, leave that rung empty " +
-		"rather than repeating one. Explanations are in Uzbek (Latin script); examples in English."
+		"rather than repeating one. Explanations are in Uzbek (Latin script); examples in English. " + UzbekOrthography
 	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
 		Task:          TaskVocabularyLadder,
 		UserID:        userID,
@@ -477,7 +477,7 @@ func CleanLadder(term, meaningUz, summaryUz string, rungs []LadderRung) *Ladder 
 			byLevel[r.Level] = r
 		}
 	}
-	out := &Ladder{Term: term, MeaningUz: strings.TrimSpace(meaningUz), SummaryUz: strings.TrimSpace(summaryUz), Rungs: []LadderRung{}}
+	out := &Ladder{Term: term, MeaningUz: NormalizeUzbek(meaningUz), SummaryUz: NormalizeUzbek(summaryUz), Rungs: []LadderRung{}}
 	used := map[string]bool{}
 	for _, code := range cefrCodes {
 		r := byLevel[code]
@@ -488,7 +488,7 @@ func CleanLadder(term, meaningUz, summaryUz string, rungs []LadderRung) *Ladder 
 			r = LadderRung{Level: code}
 		} else {
 			used[key] = true
-			r.NuanceUz = strings.TrimSpace(r.NuanceUz)
+			r.NuanceUz = NormalizeUzbek(r.NuanceUz)
 			r.Example = strings.TrimSpace(r.Example)
 		}
 		out.Rungs = append(out.Rungs, r)
@@ -545,7 +545,7 @@ func (s *GrammarTutorService) TranslateDefinitions(ctx context.Context, items []
 	}, AnalysisRequest{
 		Model: s.fastModel,
 		Instructions: "Translate each English learner's-dictionary definition into plain Uzbek (Latin script) and plain Russian, " +
-			"keeping it as short and simple as the English. Each line is: id | entry | definition. Answer for every id.",
+			"keeping it as short and simple as the English. " + UzbekOrthography + " Each line is: id | entry | definition. Answer for every id.",
 		Input: in.String(), SchemaName: "vocabulary_definitions", Schema: schema,
 	})
 	if err != nil {
@@ -562,7 +562,7 @@ func (s *GrammarTutorService) TranslateDefinitions(ctx context.Context, items []
 		return nil, fmt.Errorf("definition translations are not valid JSON: %w", err)
 	}
 	for _, it := range raw.Items {
-		uz, ru := strings.TrimSpace(it.Uz), strings.TrimSpace(it.Ru)
+		uz, ru := NormalizeUzbek(it.Uz), strings.TrimSpace(it.Ru)
 		if uz != "" && ru != "" {
 			out[strings.TrimSpace(it.ID)] = map[string]string{"uz": uz, "ru": ru}
 		}

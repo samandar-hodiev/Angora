@@ -75,6 +75,7 @@ type Writer interface {
 	WriteLadder(ctx context.Context, term string, userID *uuid.UUID) (*ai.Ladder, *ai.EvaluationMeta, error)
 	TranslateDefinitions(ctx context.Context, items []ai.DefinitionItem) (map[string]map[string]string, error)
 	WriteVerbExamples(ctx context.Context, verbs []ai.VerbForms) (map[string]map[string]string, error)
+	ProofreadUzbek(ctx context.Context, items []ai.UzbekText) (map[string]string, error)
 }
 
 // Entitlements is the slice of the subscription service that meters comparisons.

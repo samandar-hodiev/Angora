@@ -16,6 +16,7 @@ func RegisterJobHandlers(w *jobs.Worker, c *Container) {
 	// Grammar generation writes six levels and translates them: minutes, not a request.
 	w.Handle(admin.JobGrammarGenerate, admin.NewModule(c.DB, c.Audit).WithAuthor(c.GrammarAuthor).HandleGenerateJob)
 	w.Handle(admin.JobVocabularyGenerate, admin.NewModule(c.DB, c.Audit).WithAuthor(c.GrammarAuthor).HandleVocabularyJob)
+	w.Handle(admin.JobLexiconProofread, admin.NewModule(c.DB, c.Audit).WithAuthor(c.GrammarAuthor).HandleProofreadJob)
 }
 
 // StartScheduler runs the sweeps that are about time passing rather than about anything a

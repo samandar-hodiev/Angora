@@ -130,7 +130,7 @@ func (in *verbInput) clean() error {
 	in.Base = strings.ToLower(strings.TrimSpace(in.Base))
 	in.Past = strings.Join(ai.VerbFormsOf(in.Past), " / ")
 	in.PastParticiple = strings.Join(ai.VerbFormsOf(in.PastParticiple), " / ")
-	in.Uz, in.Ru, in.Note = strings.TrimSpace(in.Uz), strings.TrimSpace(in.Ru), strings.TrimSpace(in.Note)
+	in.Uz, in.Ru, in.Note = ai.NormalizeUzbek(in.Uz), strings.TrimSpace(in.Ru), ai.NormalizeUzbek(in.Note)
 	if in.Base == "" || in.Past == "" || in.PastParticiple == "" {
 		return apperr.Validation(map[string]any{"fields": map[string]any{"base": "all three forms are needed"}})
 	}
@@ -295,6 +295,7 @@ func (m *Module) generateIrregularVerbs(c *gin.Context) {
 		httpx.Fail(c, apperr.Wrap(err, apperr.CodeUnavailable, "AI generation failed. Please try again."))
 		return
 	}
+	m.proofreadVerbs(ctx, drafts)
 	added := 0
 	for _, d := range drafts {
 		if !inRange(d.Level, in.MinLevel, in.MaxLevel) || levelRank(d.Level) < 0 {

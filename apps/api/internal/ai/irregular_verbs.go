@@ -121,6 +121,7 @@ func (s *GrammarTutorService) WriteIrregularVerbs(ctx context.Context, count int
 	if minLevel != "" || maxLevel != "" {
 		fmt.Fprintf(&b, "Only verbs whose level is between %s and %s. ", orDefault(minLevel, "A1"), orDefault(maxLevel, "C2"))
 	}
+	b.WriteString(UzbekOrthography + " ")
 	b.WriteString("Each example is one short natural sentence: the base form, the past simple, and the present perfect or passive with the participle.")
 	res, err := s.gateway.AnalyzeText(ctx, CallMeta{
 		Task:          TaskIrregularVerbs,
@@ -158,7 +159,7 @@ func (s *GrammarTutorService) WriteIrregularVerbs(ctx context.Context, count int
 			continue
 		}
 		known[d.Base] = true
-		d.Uz, d.Ru, d.Note = strings.TrimSpace(d.Uz), strings.TrimSpace(d.Ru), strings.TrimSpace(d.Note)
+		d.Uz, d.Ru, d.Note = NormalizeUzbek(d.Uz), strings.TrimSpace(d.Ru), NormalizeUzbek(d.Note)
 		d.Examples = map[string]string{}
 		if v.BaseExample != "" && v.PastExample != "" && v.ParticipleExample != "" {
 			d.Examples = map[string]string{"base": v.BaseExample, "past": v.PastExample, "participle": v.ParticipleExample}

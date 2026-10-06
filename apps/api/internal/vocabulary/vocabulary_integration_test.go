@@ -66,6 +66,10 @@ func (f *fakeWriter) WriteVerbExamples(_ context.Context, verbs []ai.VerbForms) 
 	return out, nil
 }
 
+func (f *fakeWriter) ProofreadUzbek(_ context.Context, items []ai.UzbekText) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 type countingPlans struct{ used, released atomic.Int32 }
 
 func (p *countingPlans) ConsumeUsage(context.Context, uuid.UUID, string, int) error {

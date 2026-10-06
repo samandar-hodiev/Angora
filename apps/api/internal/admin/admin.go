@@ -157,6 +157,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.PATCH("/vocabulary/:id", content, m.updateWord)
 	g.POST("/vocabulary/:id/status", content, m.setWordStatus)
 	g.POST("/vocabulary/:id/level", content, m.setWordLevel)
+	g.POST("/lexicon/proofread", content, m.proofreadLexicon)
 	// Irregular verbs: a curated table the owner extends by hand or with the AI.
 	g.GET("/irregular-verbs", content, m.irregularVerbList)
 	g.POST("/irregular-verbs", content, m.createIrregularVerb)

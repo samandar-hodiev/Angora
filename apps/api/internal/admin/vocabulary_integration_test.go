@@ -196,7 +196,9 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 	})
 
 	t.Run("irregular verbs: a regular verb is refused, drafts are added and published", func(t *testing.T) {
-		t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM irregular_verbs WHERE base LIKE $1`, "zz"+stamp+"%") })
+		t.Cleanup(func() {
+			_, _ = pool.Exec(context.Background(), `DELETE FROM irregular_verbs WHERE base LIKE $1`, "zz"+stamp+"%")
+		})
 		if w := call(http.MethodPost, "/irregular-verbs", map[string]any{
 			"base": "work", "past": "worked", "past_participle": "worked", "level": "A1",
 		}); w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
