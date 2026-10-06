@@ -39,18 +39,9 @@ import type { LexiconKind, LibraryWord, VocabularyLibraryQuery } from "@engora/t
 
 import { useAddToDeck, useVocabularyLibrary } from "../../hooks";
 import { Pagination } from "../pagination";
+import { useHints } from "./hints";
 import { type Columns, DEFAULT_COLUMNS, type Lang, moved, shown, toggled, useColumns } from "./columns";
-import {
-  Chip,
-  DeckBadge,
-  KINDS,
-  LEVEL_NAMES,
-  LEVELS,
-  LevelTag,
-  RegisterTag,
-  SpeakButton,
-  registerLabel,
-} from "./shared";
+import { Chip, DeckBadge, KINDS, LEVEL_NAMES, LEVELS, LevelTag, RegisterTag, SpeakButton, registerLabel } from "./shared";
 
 const PAGE_SIZE = 30;
 
@@ -74,6 +65,7 @@ export function Library({
   onCompare: (terms: string[]) => void;
 }) {
   const names = KINDS[kind];
+  const h = useHints();
   const [query, setQuery] = useState<VocabularyLibraryQuery>(() => emptyQuery(kind));
   const [picked, setPicked] = useState<LibraryWord[]>([]);
   const [columns, setColumns] = useColumns();
@@ -121,6 +113,7 @@ export function Library({
           <FilterMenu
             icon={Layers}
             label="Level"
+            hint={h.level}
             value={query.level ? `${query.level} · ${LEVEL_NAMES[query.level]}` : "All levels"}
             active={!!query.level}
           >
@@ -141,6 +134,7 @@ export function Library({
           <FilterMenu
             icon={SlidersHorizontal}
             label="Filters"
+            hint={h.filters}
             value={extraFilters > 0 ? `${extraFilters} on` : "None"}
             active={extraFilters > 0}
             wide
@@ -217,7 +211,7 @@ export function Library({
           {query.show !== "all" && (
             <ActiveChip label={query.show === "new" ? "Not in my list" : "In my list"} onClear={() => set({ show: "all" })} />
           )}
-          <Button variant="link" size="sm" className="h-auto px-1 text-caption" onClick={reset}>
+          <Button variant="link" size="sm" className="h-auto px-1 text-caption" onClick={reset} title={h.clearAll}>
             Clear all
           </Button>
         </div>
@@ -318,13 +312,14 @@ function CompareTray({
   onCompare: (terms: string[]) => void;
   onClear: () => void;
 }) {
+  const h = useHints();
   const terms = picked.map((w) => w.term);
   const suggestions = picked.length === 1 ? picked[0]!.synonyms.slice(0, 3) : [];
   return (
     <div className="sticky bottom-3 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-surface-elevated p-3 shadow-lg">
       <ArrowLeftRight className="size-4 text-primary" aria-hidden />
       {picked.map((w) => (
-        <Chip key={w.id} onClick={() => onRemove(w.id)} title="Remove" active>
+        <Chip key={w.id} onClick={() => onRemove(w.id)} title={h.unpick} active>
           {w.term}
           <X className="size-3" aria-hidden />
         </Chip>
@@ -379,6 +374,7 @@ function SearchField({
   placeholder: string;
   label: string;
 }) {
+  const h = useHints();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -407,19 +403,21 @@ function SearchField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
+        title={h.search}
         className="h-full min-w-0 flex-1 bg-transparent text-body-sm outline-none placeholder:text-fg-muted [&::-webkit-search-cancel-button]:hidden"
       />
       {value ? (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label={h.clearSearch}
+          title={h.clearSearch}
           onClick={() => onChange("")}
           className="grid size-7 place-items-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-foreground"
         >
           <X className="size-4" aria-hidden />
         </button>
       ) : (
-        <kbd className="hidden rounded border px-1.5 text-[0.6875rem] text-fg-muted sm:block" title="Press / to search">
+        <kbd className="hidden rounded border px-1.5 text-[0.6875rem] text-fg-muted sm:block" title={h.search}>
           /
         </kbd>
       )}
@@ -434,10 +432,12 @@ function FilterMenu({
   value,
   active,
   wide,
+  hint,
   children,
 }: {
   icon: typeof Layers;
   label: string;
+  hint: string;
   value: string;
   active: boolean;
   wide?: boolean;
@@ -448,6 +448,7 @@ function FilterMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          title={hint}
           className={cn(
             "flex h-11 items-center gap-2 rounded-xl border px-3 text-body-sm outline-none transition-colors duration-micro",
             "focus-visible:ring-[3px] focus-visible:ring-ring/40 data-[state=open]:border-primary",
@@ -473,13 +474,15 @@ function MenuCount({ n }: { n: number }) {
 
 /** A filter that is on, with a way to turn it off. */
 function ActiveChip({ label, onClear }: { label: string; onClear: () => void }) {
+  const h = useHints();
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary-subtle py-0.5 pr-1 pl-2.5 text-caption text-primary-subtle-foreground capitalize">
       {label}
       <button
         type="button"
         onClick={onClear}
-        aria-label={`Remove ${label}`}
+        aria-label={`${h.removeFilter}: ${label}`}
+        title={h.removeFilter}
         className="grid size-4 place-items-center rounded-full hover:bg-primary/20"
       >
         <X className="size-3" aria-hidden />
@@ -513,6 +516,7 @@ function ListHeader({
   setRevealAll: (value: boolean) => void;
 }) {
   const langs = shown(columns);
+  const h = useHints();
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -530,14 +534,14 @@ function ListHeader({
             variant={revealAll ? "subtle" : "ghost"}
             aria-pressed={revealAll}
             onClick={() => setRevealAll(!revealAll)}
-            title={revealAll ? "Hide the translated meanings" : "Show every translated meaning"}
+            title={revealAll ? h.hideMeanings : h.showMeanings}
           >
             {revealAll ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
             {revealAll ? "Hide meanings" : "Show meanings"}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" aria-label="Arrange columns">
+              <Button size="sm" variant="ghost" aria-label={h.columns} title={h.columns}>
                 <Columns3 aria-hidden />
                 Columns
               </Button>
@@ -633,6 +637,7 @@ function WordRow({
   const add = useAddToDeck();
   const inDeck = word.in_deck || add.data?.added === true;
   const [revealed, setRevealed] = useState(false);
+  const h = useHints();
   const show = revealAll || revealed;
   const t = word.translations;
 
@@ -648,6 +653,7 @@ function WordRow({
             <button
               type="button"
               onClick={onOpen}
+              title={h.open}
               className="truncate rounded text-left text-body-sm font-semibold outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:text-body"
             >
               {term || "—"}
@@ -685,6 +691,7 @@ function WordRow({
                 setRevealed(!revealed);
               }}
               aria-label={revealed ? `Hide the ${name} meaning` : `Show the ${name} meaning`}
+              title={revealed ? h.hideOne : h.revealOne}
               aria-pressed={revealed}
               className="-mt-0.5 shrink-0 rounded p-0.5 text-fg-muted outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/40"
             >
@@ -711,7 +718,7 @@ function WordRow({
             size="icon-sm"
             variant={picked ? "subtle" : "ghost"}
             aria-pressed={picked}
-            title={picked ? "Picked for comparing" : "Pick to compare"}
+            title={picked ? h.unpick : h.pick}
             aria-label={`${picked ? "Unpick" : "Pick"} ${word.term} to compare`}
             onClick={onPick}
           >
@@ -735,6 +742,7 @@ function WordRow({
               loading={add.isPending}
               onClick={() => add.mutate(word.id)}
               aria-label={`Add ${word.term} to my list`}
+              title={h.add}
             >
               <Plus aria-hidden />
               Add

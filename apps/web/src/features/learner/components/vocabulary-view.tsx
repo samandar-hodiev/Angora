@@ -12,6 +12,7 @@ import { ComparePanel } from "./vocabulary/compare-panel";
 import { Deck } from "./vocabulary/deck";
 import { LadderPanel } from "./vocabulary/ladder-panel";
 import { Library } from "./vocabulary/library";
+import { useHints } from "./vocabulary/hints";
 import { KINDS } from "./vocabulary/shared";
 import { WordSheet } from "./vocabulary/word-sheet";
 
@@ -38,23 +39,29 @@ export function VocabularyView({ kind = "word" }: { kind?: LexiconKind }) {
     setTab("compare");
   };
 
-  const tabs: { value: Tab; label: string; icon: typeof Compass; badge?: number }[] = [
-    { value: "explore", label: "Explore", icon: Compass },
-    ...(kind === "word" ? [{ value: "ladder" as const, label: "Level ladder", icon: GitBranch }] : []),
-    { value: "compare", label: "Compare", icon: ArrowLeftRight },
-    { value: "deck", label: "My list", icon: BookMarked, badge: due },
+  const h = useHints();
+  const tabs: { value: Tab; label: string; hint: string; icon: typeof Compass; badge?: number }[] = [
+    { value: "explore", label: "Explore", hint: h.explore, icon: Compass },
+    ...(kind === "word" ? [{ value: "ladder" as const, label: "Level ladder", hint: h.ladder, icon: GitBranch }] : []),
+    { value: "compare", label: "Compare", hint: h.compare, icon: ArrowLeftRight },
+    { value: "deck", label: "My list", hint: h.myList, icon: BookMarked, badge: due },
   ];
 
   return (
     <>
       <PageHeader pinned={false} compact title={names.title} description={names.description} />
-      <div role="tablist" aria-label={names.title} className="mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border bg-surface p-1">
-        {tabs.map(({ value, label, icon: Icon, badge }) => (
+      <div
+        role="tablist"
+        aria-label={names.title}
+        className="mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border bg-surface p-1"
+      >
+        {tabs.map(({ value, label, hint, icon: Icon, badge }) => (
           <button
             key={value}
             type="button"
             role="tab"
             aria-selected={tab === value}
+            title={hint}
             onClick={() => setTab(value)}
             className={cn(
               "flex shrink-0 items-center gap-2 rounded-lg px-4 py-1.5 text-label whitespace-nowrap outline-none transition-colors duration-micro",

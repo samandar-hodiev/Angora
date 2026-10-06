@@ -81,3 +81,12 @@ export function useI18n(): I18nValue {
   if (!context) throw new Error("useI18n must be used inside I18nProvider");
   return context;
 }
+
+/**
+ * The language the learner picked on the website, read outside the website's provider — for
+ * the small pieces of the app that already speak it, such as button hints. English on the
+ * server and until a choice is made.
+ */
+export function useStoredLocale(): Locale {
+  return useSyncExternalStore(subscribe, readLocale, () => DEFAULT_LOCALE);
+}
