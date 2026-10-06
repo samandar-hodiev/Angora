@@ -9,13 +9,13 @@ import {
   Eye,
   EyeOff,
   Info,
+  Layers,
   ListChecks,
   Play,
   RotateCcw,
-  Search,
   Shuffle,
+  SlidersHorizontal,
   Table2,
-  X,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
@@ -25,6 +25,7 @@ import { EmptyState, ErrorState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Stat } from "@/components/ui/data-display";
 import { Input } from "@/components/ui/input";
+import { DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from "@/components/ui/overlay";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError } from "@/lib/api";
@@ -33,7 +34,9 @@ import type { IrregularVerb, IrregularVerbQuery, VerbCheck, VerbPattern, VerbSta
 
 import { learnerApi } from "../api";
 import { useAnswerVerb, useIrregularVerbs } from "../hooks";
-import { LEVEL_NAMES, LEVELS, LevelTag, Segmented, SpeakButton } from "./vocabulary/shared";
+import { ActiveChip, FilterMenu, MenuCount, SearchField } from "./vocabulary/filters";
+import { useHints } from "./vocabulary/hints";
+import { LEVEL_NAMES, LEVELS, LevelTag, SpeakButton } from "./vocabulary/shared";
 
 /** The four ways the forms change — the groups the table is learned in. */
 const PATTERNS: Record<VerbPattern, { title: string; example: string; uz: string }> = {
@@ -50,6 +53,8 @@ const STATE_DOT: Record<VerbState, { label: string; className: string }> = {
   mistake: { label: "Last answer was wrong", className: "bg-error" },
   known: { label: "Known — three right in a row", className: "bg-success" },
 };
+
+const SHOW_LABEL: Record<string, string> = { mistakes: "My mistakes", known: "Known", new: "Not practised yet" };
 
 type Tab = "table" | "practice";
 type Hide = "" | "forms" | "translations";
@@ -118,6 +123,9 @@ function VerbTable({ onPracticeMistakes }: { onPracticeMistakes: () => void }) {
   const data = table.data;
   const set = (patch: Partial<IrregularVerbQuery>) => setQuery((q) => ({ ...q, ...patch }));
   const count = (code: string) => data?.levels.find((l) => l.value === code)?.count ?? 0;
+  const h = useHints();
+  const extraFilters = [query.pattern, query.show, hide, !grouped].filter(Boolean).length;
+  const filtered = Boolean(query.q || query.level || extraFilters);
 
   const groups = useMemo(() => {
     const items = data?.items ?? [];
@@ -149,78 +157,107 @@ function VerbTable({ onPracticeMistakes }: { onPracticeMistakes: () => void }) {
         </div>
       )}
 
-      <Segmented
-        label="Level"
-        value={query.level}
-        onChange={(level) => set({ level })}
-        options={[
-          { value: "", label: "All" },
-          ...LEVELS.map((code) => ({
-            value: code as string,
-            label: (
-              <>
-                {code}
-                {count(code) > 0 && <span className="text-[0.6875rem] text-fg-muted tabular-nums">{count(code)}</span>}
-              </>
-            ),
-            disabled: !!data && count(code) === 0,
-          })),
-        ]}
-      />
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-        <Input
-          type="search"
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchField
           value={query.q}
-          onChange={(e) => set({ q: e.target.value })}
-          placeholder="Search any form, or the Uzbek or Russian meaning"
-          aria-label="Search verbs"
-          className="h-10 pr-9 pl-9"
+          onChange={(q) => set({ q })}
+          placeholder="Search any form — or the Uzbek or Russian meaning"
+          label="Search verbs"
         />
-        {query.q && (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => set({ q: "" })}
-            className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-fg-muted hover:text-foreground"
+        <FilterMenu
+          icon={Layers}
+          label="Level"
+          hint={h.level}
+          value={query.level ? `${query.level} · ${LEVEL_NAMES[query.level]}` : "All levels"}
+          active={!!query.level}
+        >
+          <DropdownMenuRadioGroup value={query.level} onValueChange={(level) => set({ level })}>
+            <DropdownMenuRadioItem value="">
+              All levels <MenuCount n={data?.summary.total ?? 0} />
+            </DropdownMenuRadioItem>
+            <DropdownMenuSeparator />
+            {LEVELS.map((code) => (
+              <DropdownMenuRadioItem key={code} value={code} disabled={!!data && count(code) === 0}>
+                <LevelTag level={code} />
+                <span className="text-fg-secondary">{LEVEL_NAMES[code]}</span>
+                <MenuCount n={count(code)} />
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </FilterMenu>
+        <FilterMenu
+          icon={SlidersHorizontal}
+          label="Filters"
+          hint="Pattern, your progress, test-yourself mode and grouping"
+          value={extraFilters > 0 ? `${extraFilters} on` : "None"}
+          active={extraFilters > 0}
+          wide
+        >
+          <DropdownMenuLabel>Pattern</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={query.pattern} onValueChange={(pattern) => set({ pattern })}>
+            <DropdownMenuRadioItem value="">Every pattern</DropdownMenuRadioItem>
+            {PATTERN_ORDER.map((p) => (
+              <DropdownMenuRadioItem key={p} value={p}>
+                <span className="font-mono">{PATTERNS[p].example}</span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Show</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={query.show} onValueChange={(show) => set({ show: show as IrregularVerbQuery["show"] })}>
+            <DropdownMenuRadioItem value="">All verbs</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="mistakes">
+              My mistakes <MenuCount n={data?.summary.mistakes ?? 0} />
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="known">
+              Known <MenuCount n={data?.summary.known ?? 0} />
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="new">Not practised yet</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Test yourself</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={hide} onValueChange={(v) => setHide(v as Hide)}>
+            <DropdownMenuRadioItem value="">Show everything</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="forms">Hide the past forms</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="translations">Hide the translations</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Group</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={grouped ? "pattern" : "level"} onValueChange={(v) => setGrouped(v === "pattern")}>
+            <DropdownMenuRadioItem value="pattern">By pattern</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="level">One list, by level</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </FilterMenu>
+      </div>
+      {filtered && (
+        <div className="-mt-1 flex flex-wrap items-center gap-1.5" aria-label="Filters on">
+          {query.q && <ActiveChip label={`“${query.q.trim()}”`} onClear={() => set({ q: "" })} />}
+          {query.level && (
+            <ActiveChip label={`${query.level} · ${LEVEL_NAMES[query.level]}`} onClear={() => set({ level: "" })} />
+          )}
+          {query.pattern && (
+            <ActiveChip label={PATTERNS[query.pattern as VerbPattern].example} onClear={() => set({ pattern: "" })} />
+          )}
+          {query.show && <ActiveChip label={SHOW_LABEL[query.show] ?? query.show} onClear={() => set({ show: "" })} />}
+          {hide && (
+            <ActiveChip label={hide === "forms" ? "Past forms hidden" : "Translations hidden"} onClear={() => setHide("")} />
+          )}
+          {!grouped && <ActiveChip label="One list, by level" onClear={() => setGrouped(true)} />}
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto px-1 text-caption"
+            title={h.clearAll}
+            onClick={() => {
+              setQuery({ q: "", level: "", pattern: "", show: "" });
+              setHide("");
+              setGrouped(true);
+            }}
           >
-            <X className="size-4" aria-hidden />
-          </button>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <NativeSelect value={query.pattern} onChange={(e) => set({ pattern: e.target.value })} aria-label="Pattern">
-          <option value="">Every pattern</option>
-          {PATTERN_ORDER.map((p) => (
-            <option key={p} value={p}>
-              {PATTERNS[p].example}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          value={query.show}
-          onChange={(e) => set({ show: e.target.value as IrregularVerbQuery["show"] })}
-          aria-label="Show"
-        >
-          <option value="">All verbs</option>
-          <option value="mistakes">My mistakes</option>
-          <option value="known">Known</option>
-          <option value="new">Not practised yet</option>
-        </NativeSelect>
-        <NativeSelect value={hide} onChange={(e) => setHide(e.target.value as Hide)} aria-label="Memorise">
-          <option value="">Show everything</option>
-          <option value="forms">Hide past forms — test yourself</option>
-          <option value="translations">Hide translations</option>
-        </NativeSelect>
-        <NativeSelect
-          value={grouped ? "pattern" : "level"}
-          onChange={(e) => setGrouped(e.target.value === "pattern")}
-          aria-label="Group"
-        >
-          <option value="pattern">Grouped by pattern</option>
-          <option value="level">One list, by level</option>
-        </NativeSelect>
-      </div>
+            Clear all
+          </Button>
+        </div>
+      )}
 
       {table.isPending ? (
         <div className="grid gap-2">
