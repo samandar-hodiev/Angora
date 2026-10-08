@@ -267,6 +267,8 @@ func (m *Module) saveGrammarTask(c *gin.Context) {
 	}
 	for _, t := range tasks[level.BaseCode()] {
 		if t.Kind == kind {
+			recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarContentSaved, c.Param("slug"),
+				map[string]any{"level": level.BaseCode(), "section": kind})
 			httpx.OK(c, t)
 			return
 		}

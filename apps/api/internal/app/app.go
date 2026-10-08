@@ -198,6 +198,8 @@ func newAIGateway(cfg config.AIConfig, pool *pgxpool.Pool, log *slog.Logger) (*a
 	return ai.NewGateway(ai.GatewayConfig{
 		DefaultProvider: provider.Name(),
 		DefaultModel:    cfg.Model,
+		// Every call is priced as it is recorded, so the AI page shows what was spent.
+		Pricing: ai.DefaultPricing,
 	}, ai.NewPostgresUsageRecorder(pool, log), log, provider)
 }
 

@@ -462,6 +462,11 @@ func (m *Module) saveGrammarLevel(c *gin.Context) {
 			return
 		}
 	}
+	meta := map[string]any{"language": language, "level": level.BaseCode()}
+	if in.Questions != nil {
+		meta["section"] = "test"
+	}
+	recordGrammarAudit(ctx, m.audit, p.UserID, ActionGrammarContentSaved, slug, meta)
 
 	out, err := m.loadTopicContent(ctx, slug, language)
 	if err != nil {

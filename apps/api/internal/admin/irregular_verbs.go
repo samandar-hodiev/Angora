@@ -259,6 +259,9 @@ func (m *Module) publishIrregularVerbs(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	if n := tag.RowsAffected(); n > 0 {
+		m.recordContent(c, ActionLexiconPublished, "irregular_verbs", "manual", "", int(n), nil)
+	}
 	httpx.OK(c, map[string]int64{"published": tag.RowsAffected()})
 }
 
@@ -316,6 +319,7 @@ func (m *Module) generateIrregularVerbs(c *gin.Context) {
 		httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "No new irregular verbs came back — the table may already hold the common ones."))
 		return
 	}
+	m.recordContent(c, ActionLexiconGenerated, "irregular_verbs", "ai", "", added, nil)
 	httpx.OK(c, map[string]int{"added": added, "requested": in.Count})
 }
 
@@ -329,5 +333,6 @@ func (m *Module) respondVerb(c *gin.Context, id uuid.UUID) {
 		httpx.Fail(c, err)
 		return
 	}
+	m.recordWordChange(c, "irregular_verbs", v.Base, v.Status)
 	httpx.OK(c, v)
 }
