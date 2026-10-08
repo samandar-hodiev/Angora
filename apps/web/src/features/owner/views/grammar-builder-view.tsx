@@ -21,6 +21,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
+import { FlagGB, FlagRU, FlagUZ } from "@/components/common/flags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,8 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const [language, setLanguage] = useState<ContentLanguage>(
     (contentLanguages as readonly string[]).includes(params.get("lang") ?? "")
       ? (params.get("lang") as ContentLanguage)
-      : "en",
+      : // Uzbek first: it is what most learners read, so it is what the owner checks first.
+        "uz",
   );
   const [level, setLevel] = useState<CEFRLevel>("B1");
   const [tab, setTab] = useState("editor");
@@ -237,8 +239,8 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         }
       />
 
-      <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <SectionCard title="Basic information" description="Comes from the curriculum; you do not retype it">
+      <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
+        <SectionCard title="Basic information" description="Comes from the curriculum; you do not retype it" className="h-full">
           <dl className="grid sm:grid-cols-2">
             <KeyValue label="Topic">{data.topic.name}</KeyValue>
             <KeyValue label="Category">{data.topic.category_name ?? "—"}</KeyValue>
@@ -254,7 +256,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
           )}
         </SectionCard>
 
-        <SectionCard title="Language" description="The explanation is written in each; the practice is shared">
+        <SectionCard title="Language" description="The explanation you are editing" className="h-full" bodyClassName="flex">
           <LanguageSwitch value={language} onChange={setLanguage} />
         </SectionCard>
       </div>
@@ -438,23 +440,37 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   );
 }
 
+/** Uzbek, English, Russian — the order learners mostly read them in. */
+const switchOrder: ContentLanguage[] = ["uz", "en", "ru"];
+const languageFlags: Record<ContentLanguage, typeof FlagUZ> = { uz: FlagUZ, en: FlagGB, ru: FlagRU };
+
 function LanguageSwitch({ value, onChange }: { value: ContentLanguage; onChange: (next: ContentLanguage) => void }) {
   return (
-    <div className="flex rounded-lg border p-0.5" role="group" aria-label="Content language">
-      {contentLanguages.map((code) => (
-        <button
-          key={code}
-          type="button"
-          onClick={() => onChange(code)}
-          aria-pressed={value === code}
-          className={cn(
-            "flex-1 rounded-md px-2 py-1 text-caption font-medium transition-colors duration-micro",
-            value === code ? "bg-surface-active text-foreground" : "text-fg-muted hover:text-foreground",
-          )}
-        >
-          {contentLanguageLabels[code]}
-        </button>
-      ))}
+    <div className="grid flex-1 content-stretch gap-1.5" role="radiogroup" aria-label="Content language">
+      {switchOrder.map((code) => {
+        const Flag = languageFlags[code];
+        const selected = value === code;
+        return (
+          <button
+            key={code}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(code)}
+            className={cn(
+              "flex min-h-10 items-center gap-3 rounded-lg border px-3 text-left text-body-sm font-medium outline-none transition-colors duration-micro",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+              selected
+                ? "border-primary bg-primary-subtle text-primary-subtle-foreground"
+                : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+            )}
+          >
+            <Flag className="h-3.5 w-5" />
+            <span className="flex-1">{contentLanguageLabels[code]}</span>
+            <span className="text-caption uppercase opacity-70">{code}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -709,7 +725,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
       )}
 
       <SectionCard
-        title={`${content.level} content`}
+        title={`Explanation · ${contentLanguageLabels[language]}`}
         description={`${contentLanguageLabels[language]} · version ${content.version || 1} · ${content.source === "ai" ? "written by AI, unreviewed" : "edited by hand"}`}
         action={
           <span className="flex flex-wrap items-center gap-1">
