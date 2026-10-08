@@ -183,8 +183,10 @@ func TestGrammarBuilderFlowPostgres(t *testing.T) {
 		if author.calls != 1 {
 			t.Errorf("model calls = %d, want exactly one for three levels", author.calls)
 		}
-		if len(author.lastReq.Levels) != 3 {
-			t.Errorf("the model was asked for %d levels, want 3", len(author.lastReq.Levels))
+		// The explanation is one lesson for every level, so it is always written for all six;
+		// the three picked levels are the ones that get a test and tasks.
+		if len(author.lastReq.Levels) != 6 {
+			t.Errorf("the model was asked for %d levels, want all 6", len(author.lastReq.Levels))
 		}
 
 		data, _ := body["data"].(map[string]any)
@@ -246,7 +248,13 @@ func TestGrammarBuilderFlowPostgres(t *testing.T) {
 		errObj, _ := body["error"].(map[string]any)
 		details, _ := errObj["details"].(map[string]any)
 		levels, _ := details["levels"].([]any)
-		if len(levels) != 1 || levels[0] != "B1" {
+		// The B1 edit is the explanation every level shares, so it was saved at every level
+		// that had one, and a new explanation would replace it at all of them.
+		named := false
+		for _, l := range levels {
+			named = named || l == "B1"
+		}
+		if !named {
 			t.Errorf("details = %v, want the B1 level named", details)
 		}
 	})

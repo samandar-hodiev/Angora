@@ -140,11 +140,13 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 	if plan.wants(PartExplanation) {
 		var meta *ai.EvaluationMeta
 		generated, meta, err = m.author.AuthorGrammarContent(ctx, ai.GrammarAuthorRequest{
-			Topic:         current.Topic.Name,
-			Slug:          current.Topic.Slug,
-			Category:      category,
-			Description:   current.Topic.Description,
-			Levels:        levels,
+			Topic:       current.Topic.Name,
+			Slug:        current.Topic.Slug,
+			Category:    category,
+			Description: current.Topic.Description,
+			// The explanation is one lesson for every learner, so it is written for every
+			// level whichever ones were picked; the picked levels are the practice's.
+			Levels:        everyLevel(),
 			Language:      plan.Source,
 			RelatedTopics: current.Related,
 			ActorID:       &actor,
@@ -283,6 +285,17 @@ func shareTranslation(lesson ai.GeneratedGrammarLevel, levels []ai.GeneratedGram
 	return out
 }
 
+// everyLevel is A1 to C2: where a topic's one explanation is stored.
+func everyLevel() []cefr.Level {
+	out := make([]cefr.Level, 0, len(cefr.Codes))
+	for _, code := range cefr.Codes {
+		if level, err := cefr.Parse(code); err == nil {
+			out = append(out, level)
+		}
+	}
+	return out
+}
+
 func (p generationPlan) partsOrAll() []string {
 	if len(p.Parts) == 0 {
 		return allParts
@@ -300,8 +313,12 @@ func (m *Module) lessonsFor(
 	var lessons []ai.GeneratedGrammarLevel
 	var taskLevels []cefr.Level
 	if generated != nil {
+		picked := map[string]bool{}
+		for _, level := range levels {
+			picked[level.BaseCode()] = true
+		}
 		for _, l := range generated.Levels {
-			if !l.Applicable {
+			if !l.Applicable || !picked[l.Level] {
 				continue
 			}
 			lessons = append(lessons, l)

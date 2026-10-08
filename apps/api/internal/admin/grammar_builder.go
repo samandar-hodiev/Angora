@@ -105,7 +105,8 @@ func (m *Module) generateGrammarContent(c *gin.Context) {
 				httpx.Fail(c, err)
 				return
 			}
-			if edited := handEditedLevels(current, levels); len(edited) > 0 {
+			// The new explanation goes to every level, so every level's hand edits count.
+			if edited := handEditedLevels(current, everyLevel()); len(edited) > 0 {
 				httpx.Fail(c, apperr.Conflict("This would replace content that was edited by hand").
 					WithDetails(map[string]any{"levels": edited, "language": language}))
 				return

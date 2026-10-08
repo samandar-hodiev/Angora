@@ -2193,7 +2193,8 @@ function GenerateDialog({
   // Only a new explanation replaces hand-written text; a test or a task on its own does not.
   const replacing = explaining
     ? levels.filter(
-        (level) => selected.includes(level.level) && level.source === "curated" && level.status !== "not_created",
+        // A new explanation is written for every level, so a hand edit at any level is replaced.
+        (level) => level.source === "curated" && level.status !== "not_created",
       )
     : [];
   const statusOf = (code: CEFRLevel) => levels.find((l) => l.level === code)?.status ?? "not_created";
@@ -2211,7 +2212,7 @@ function GenerateDialog({
       onOpenChange={onOpenChange}
       className="sm:max-w-2xl"
       title="Generate with AI"
-      description="Choose the levels and what to write for each. Everything lands as a draft for you to read before it goes live."
+      description="The explanation is one full lesson for every level; the test and tasks are written for the levels you pick. Everything lands as a draft for you to read before it goes live."
       confirmLabel={replacing.length > 0 && overwrite ? "Replace and generate" : "Generate"}
       disabled={selected.length === 0 || parts.length === 0 || (replacing.length > 0 && !overwrite)}
       onConfirm={() => onGenerate(selected, overwrite, languages, parts)}
@@ -2220,7 +2221,7 @@ function GenerateDialog({
       <div className="grid max-h-[60vh] gap-5 overflow-y-auto pr-1">
         <section className="grid gap-2">
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-label">Levels</h3>
+            <h3 className="text-label">Test, writing and speaking for</h3>
             <button
               type="button"
               className="text-caption font-medium text-primary hover:underline"
@@ -2253,8 +2254,8 @@ function GenerateDialog({
             })}
           </div>
           <p className="text-caption text-fg-muted">
-            The model decides which levels the topic is really worth teaching at, and marks the rest as not taught instead of
-            inventing a version that is wrong.
+            The explanation is not tied to these: it is one complete lesson — rule, forms, exceptions, examples, mistakes — that
+            every learner from A1 to C2 reads. Each level you pick gets its own test, writing and speaking task at that level.
           </p>
         </section>
 
