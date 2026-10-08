@@ -42,6 +42,7 @@ import {
   useGrammarContent,
   useGrammarGeneration,
   useGrammarValidation,
+  useDeleteGrammarContent,
   usePublishGrammarContent,
   useRefineGrammarLevel,
   useSaveGrammarLevel,
@@ -100,6 +101,8 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const content = useGrammarContent(slug, language);
   const validation = useGrammarValidation(slug, language);
   const publish = usePublishGrammarContent(slug);
+  const remove = useDeleteGrammarContent(slug);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const generation = useGrammarGeneration(slug, {
     onSucceeded: (job) => {
       const failed: string[] = job.result?.failed ?? [];
@@ -241,6 +244,17 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
                 <span aria-hidden className={cn("size-1.5 rounded-full", upToDate ? "bg-success" : isLive ? "bg-warning" : "bg-fg-muted")} />
                 {upToDate ? "Live for learners" : isLive ? "Live · unpublished changes" : "Draft — not live yet"}
               </span>
+            )}
+            {written.length > 0 && (
+              <Button
+                variant="ghost"
+                className="h-9 text-error hover:bg-error/10 hover:text-error"
+                disabled={Boolean(writing)}
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 aria-hidden />
+                Delete
+              </Button>
             )}
             <Button variant="ghost" className="h-9" onClick={() => router.push("/owner/content/grammar")}>
               <ArrowLeft aria-hidden />
@@ -472,6 +486,26 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
           );
           setPublishOpen(false);
         }}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={`Delete everything written for ${data.topic.name}?`}
+        description="The explanation in every language, the test questions, the writing and speaking tasks, the visuals and learners' progress on this topic are removed for good. If you delete it, it has to be created again from scratch. The topic itself stays in the curriculum as not created."
+        confirmLabel="Delete"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() =>
+          remove.mutate(undefined, {
+            onSuccess: () => {
+              setDeleteOpen(false);
+              toast({ title: "Deleted", description: `${data.topic.name} is empty again — generate it to start over.`, variant: "success" });
+            },
+            onError: (error) =>
+              toast({ title: "It could not be deleted", description: isApiError(error) ? error.message : undefined, variant: "error" }),
+          })
+        }
       />
     </>
   );

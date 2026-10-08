@@ -639,6 +639,27 @@ export function useSaveGrammarTask(slug: string) {
   });
 }
 
+/** The same, for a topic chosen at call time — the grammar list deletes from its rows. */
+export function useDeleteAnyGrammarContent() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) => assessmentApi.grammarMapApi.deleteContent(slug),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: queryKeys.owner.all });
+    },
+  });
+}
+
+export function useDeleteGrammarContent(slug: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => assessmentApi.grammarMapApi.deleteContent(slug),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: queryKeys.owner.all });
+    },
+  });
+}
+
 export function usePublishGrammarContent(slug: string) {
   const client = useQueryClient();
   return useMutation({

@@ -1,17 +1,19 @@
 "use client";
 
-import { ChevronDown, Circle, CircleDashed, CircleDot, CircleSlash, Sparkles } from "lucide-react";
+import { ChevronDown, Circle, CircleDashed, CircleDot, CircleSlash, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Highlight, HighlightProvider } from "@/components/common/highlight";
+import { toast } from "@/components/ui/toast";
+import { isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 
 import { LiveDataState } from "../components/live-state";
-import { FilterBar, FilterSelect, SearchInput } from "../components/primitives";
-import { useGrammarMap } from "../hooks";
+import { ConfirmDialog, FilterBar, FilterSelect, SearchInput } from "../components/primitives";
+import { useDeleteAnyGrammarContent, useGrammarMap } from "../hooks";
 import { formatNumber } from "../lib/format";
 import { cefrLevels } from "../types";
 import type { ContentStatusState, LevelStatus, MapTopic } from "../types";
@@ -132,6 +134,8 @@ export function GrammarMapView({ language }: { language: string }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [level, setLevel] = useState("all");
+  const [deleting, setDeleting] = useState<MapTopic | null>(null);
+  const remove = useDeleteAnyGrammarContent();
 
   const query = useMemo(
     () => ({ lang: language, search, status, level }),
@@ -196,11 +200,33 @@ export function GrammarMapView({ language }: { language: string }) {
               topics={category.topics}
               language={language}
               filtering={Boolean(search) || status !== "all" || level !== "all"}
+              onDelete={setDeleting}
             />
           ))}
         </div>
         </HighlightProvider>
       )}
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title={deleting ? `Delete everything written for ${deleting.name}?` : ""}
+        description="The explanation in every language, the test questions, the writing and speaking tasks, the visuals and learners' progress on this topic are removed for good. If you delete it, it has to be created again from scratch. The topic itself stays in the curriculum as not created."
+        confirmLabel="Delete"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (!deleting) return;
+          const name = deleting.name;
+          remove.mutate(deleting.slug, {
+            onSuccess: () => {
+              setDeleting(null);
+              toast({ title: "Deleted", description: `${name} is empty again — generate it to start over.`, variant: "success" });
+            },
+            onError: (error) =>
+              toast({ title: "It could not be deleted", description: isApiError(error) ? error.message : undefined, variant: "error" }),
+          });
+        }}
+      />
     </>
   );
 }
@@ -210,11 +236,13 @@ function CategoryGroup({
   topics,
   language,
   filtering,
+  onDelete,
 }: {
   name: string;
   topics: MapTopic[];
   language: string;
   filtering: boolean;
+  onDelete: (topic: MapTopic) => void;
 }) {
   // Closed by default, so the page reads as a list of categories; a search or filter opens
   // every category it leaves, since the matches are what the owner came for.
@@ -250,7 +278,7 @@ function CategoryGroup({
       {open && (
         <ul className="border-t">
           {topics.map((topic) => (
-            <li key={topic.id}>
+            <li key={topic.id} className="relative">
               <Link
                 href={`/owner/content/grammar/${topic.slug}?lang=${language}`}
                 className={cn(
@@ -276,11 +304,26 @@ function CategoryGroup({
                     <span className="text-caption text-fg-muted tabular-nums">{topic.question_count} questions</span>
                   )}
                   <StatusPill topic={topic} />
-                  {topic.content.status === "not_created" && (
+                  {topic.content.status === "not_created" ? (
                     <Sparkles className="size-3.5 text-primary-text" aria-label="Ready to write" />
+                  ) : (
+                    // Room for the delete button, which sits over the row rather than inside the
+                    // link: a button inside a link is two controls fighting over one click.
+                    <span aria-hidden className="w-7" />
                   )}
                 </span>
               </Link>
+              {topic.content.status !== "not_created" && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(topic)}
+                  aria-label={`Delete everything written for ${topic.name}`}
+                  title="Delete content"
+                  className="absolute top-1/2 right-3 grid size-7 -translate-y-1/2 place-items-center rounded-md text-fg-muted outline-none transition-colors duration-micro hover:bg-error/10 hover:text-error focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </button>
+              )}
             </li>
           ))}
         </ul>

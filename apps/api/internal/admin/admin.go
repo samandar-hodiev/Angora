@@ -178,6 +178,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	// the manage permission, because generated text is still text learners will be taught.
 	g.GET("/grammar/map", content, m.grammarMap)
 	g.GET("/grammar/topics/:slug/content", content, m.grammarTopicContent)
+	g.DELETE("/grammar/topics/:slug/content", content, m.deleteGrammarContent)
 	g.GET("/grammar/topics/:slug/validate", content, m.validateGrammarContent)
 	g.POST("/grammar/topics/:slug/generate", content, m.generateGrammarContent)
 	g.PUT("/grammar/topics/:slug/levels/:level", content, m.saveGrammarLevel)

@@ -417,6 +417,8 @@ export const grammarMapApi = {
     apiClient.put<PracticeTask>(`/admin/grammar/topics/${slug}/levels/${level}/tasks/${kind}`, input),
   publish: (slug: string, input: { language?: string; languages?: string[]; levels?: string[] }) =>
     apiClient.post<TopicContent>(`/admin/grammar/topics/${slug}/publish`, input),
+  /** Removes everything written for the topic; the topic stays in the curriculum as a draft. */
+  deleteContent: (slug: string) => apiClient.delete<TopicContent>(`/admin/grammar/topics/${slug}/content`),
   // Neither of these saves anything: they answer with a proposal the editor keeps or drops.
   refine: (slug: string, level: string, input: RefineInput) =>
     apiClient.post<ProposedLevel>(`/admin/grammar/topics/${slug}/levels/${level}/refine`, input),

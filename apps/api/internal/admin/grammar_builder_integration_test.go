@@ -362,4 +362,31 @@ func TestGrammarBuilderFlowPostgres(t *testing.T) {
 			t.Errorf("message = %q, want something the owner can act on", message)
 		}
 	})
+
+	t.Run("deleting a topic's content removes all of it and puts the topic back to draft", func(t *testing.T) {
+		if _, err := pool.Exec(ctx, `UPDATE grammar_topics SET status = 'published' WHERE id = $1`, topicID); err != nil {
+			t.Fatal(err)
+		}
+		w, _ := do(http.MethodDelete, "/admin/grammar/topics/"+slug+"/content", nil)
+		if w.Code != http.StatusOK {
+			t.Fatalf("delete status = %d body = %s", w.Code, w.Body.String())
+		}
+		for _, table := range []string{"grammar_content", "grammar_questions", "grammar_practice_tasks"} {
+			var n int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE grammar_topic_id = $1`, topicID).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			if n != 0 {
+				t.Errorf("%s still has %d rows for the topic", table, n)
+			}
+		}
+		var status string
+		if err := pool.QueryRow(ctx, `SELECT status FROM grammar_topics WHERE id = $1`, topicID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if status != "draft" {
+			t.Errorf("topic status = %q, want draft — learners see it as coming soon", status)
+		}
+	})
+
 }
