@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpenText,
+  Clock,
   ChevronDown,
   Columns2,
   Languages,
@@ -23,6 +24,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { ErrorState } from "@/components/common/states";
+import { isApiError } from "@/lib/api/errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Meter } from "@/components/ui/data-display";
@@ -51,6 +53,9 @@ export function GrammarTopicView({ slug }: { slug: string }) {
   const compareParam = useSearchParams().get("compare");
 
   if (topic.isPending) return <TopicSkeleton />;
+  // A topic on the map that is not published yet answers "not found". That is not a fault: it
+  // is a lesson the teacher is still writing, and the learner is told so.
+  if (topic.isError && isApiError(topic.error) && topic.error.status === 404) return <ComingSoonTopic />;
   if (topic.isError) return <ErrorState error={topic.error} onRetry={() => void topic.refetch()} />;
   if (!topic.data) return null;
 
@@ -577,6 +582,32 @@ function RailList({ title, topics }: { title: string; topics: GrammarRelatedTopi
         ))}
       </ul>
     </section>
+  );
+}
+
+/** A topic that exists in the curriculum but has not been published yet. */
+function ComingSoonTopic() {
+  return (
+    <div className="mx-auto grid w-full max-w-2xl justify-items-center gap-4 rounded-2xl border bg-surface px-6 py-12 text-center">
+      <span className="grid size-14 place-items-center rounded-full bg-warning/15 text-warning-text">
+        <Clock className="size-7" aria-hidden />
+      </span>
+      <div className="grid gap-1.5">
+        <h1 className="text-h3">This topic is being prepared</h1>
+        <p className="text-body text-fg-secondary">
+          Your teacher is still writing this lesson. It will open here as soon as it is ready — in the meantime, pick
+          another topic from the map.
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button asChild>
+          <Link href="/app/grammar/map">Back to the grammar map</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/app/grammar">All grammar</Link>
+        </Button>
+      </div>
+    </div>
   );
 }
 
