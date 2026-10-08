@@ -1,6 +1,22 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Columns2, Languages, ListChecks, Mic, PenLine, Timer } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpenText,
+  ChevronDown,
+  Columns2,
+  Languages,
+  ListChecks,
+  Mic,
+  PenLine,
+  Quote,
+  Sigma,
+  Sparkles,
+  Target,
+  Timer,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -15,6 +31,7 @@ import type { GrammarRelatedTopic, GrammarTopic } from "@engora/types";
 
 import { useGrammarComparison, useGrammarTopic } from "../hooks";
 import { ExplainPanel, TutorPanel, VisualPanel } from "./ai-panels";
+import { ExampleList, FormulaList, LessonSection, MistakeList, RichText, SignalWords, UsageList } from "./lesson-blocks";
 import { MasteryBar, StateBadge } from "./shared";
 
 /**
@@ -70,12 +87,14 @@ export function GrammarTopicView({ slug }: { slug: string }) {
         <ProgressStrip topic={t} />
 
         {t.content ? (
-          <>
+          <div className="lesson-paper grid gap-8 rounded-2xl p-4 sm:p-6 lg:p-8">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-              {t.content_level && (
-                <span className="text-caption text-fg-muted">
+              {t.content_level ? (
+                <span className="flex items-center gap-2 text-caption text-fg-muted">
                   Written for <Badge variant="outline">{t.content_level}</Badge>
                 </span>
+              ) : (
+                <span />
               )}
               <ContentLanguageSwitch
                 current={t.content_language}
@@ -84,18 +103,15 @@ export function GrammarTopicView({ slug }: { slug: string }) {
                 onChange={setLanguage}
               />
             </div>
+            <LessonJumpBar sections={lessonSections(t.content)} />
             <CanonicalContent topic={t} />
-            {/* A second pass over the same rule, written for this learner's level. */}
-            <section aria-labelledby="ai-title" className="grid gap-3">
-              <h2 id="ai-title" className="text-h3">
-                Explained for your level
-              </h2>
-              <ExplainPanel slug={t.slug} level={null} />
-            </section>
-          </>
+            {/* The same rule again, written for this learner's level — on request, so the page
+                does not teach it twice in a row. */}
+            <SimplerExplanation slug={t.slug} />
+          </div>
         ) : (
           // No curated text for this topic yet, so the generated lesson is the lesson.
-          <section aria-labelledby="ai-title" className="grid gap-3">
+          <section aria-labelledby="ai-title" className="lesson-paper grid gap-3 rounded-2xl p-4 sm:p-6 lg:p-8">
             <h2 id="ai-title" className="text-h3">
               What is {t.name}?
             </h2>
@@ -121,113 +137,116 @@ export function GrammarTopicView({ slug }: { slug: string }) {
   );
 }
 
+/** The sections of the lesson, in reading order, for the jump bar above it. */
+function lessonSections(c: NonNullable<GrammarTopic["content"]>) {
+  return [
+    { id: "rule", label: "Rule", show: true },
+    { id: "form", label: "Form", show: c.formulas.length > 0 },
+    { id: "usage", label: "When to use", show: c.usage.length > 0 },
+    { id: "examples", label: "Examples", show: c.examples.length > 0 },
+    { id: "mistakes", label: "Mistakes", show: c.common_mistakes.length > 0 },
+    { id: "practice-title", label: "Practise", show: true },
+  ].filter((s) => s.show);
+}
+
+/** A row of chips that jumps to each part of the lesson; it stays in reach while reading. */
+function LessonJumpBar({ sections }: { sections: { id: string; label: string }[] }) {
+  return (
+    <nav
+      aria-label="Lesson sections"
+      className="sticky top-[calc(var(--app-header-h,3rem)+0.75rem)] z-[5] -mx-1 flex gap-1.5 overflow-x-auto rounded-xl border bg-surface-elevated/95 p-1.5 shadow-sm backdrop-blur"
+    >
+      {sections.map((s) => (
+        <a
+          key={s.id}
+          href={`#${s.id}`}
+          className="shrink-0 rounded-lg px-3 py-1.5 text-body-sm font-medium text-fg-secondary outline-none transition-colors duration-micro hover:bg-surface-hover hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
+        >
+          {s.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function CanonicalContent({ topic }: { topic: GrammarTopic }) {
   const c = topic.content!;
   return (
-    <div className="grid gap-8">
-      <section aria-labelledby="what-title" className="grid gap-3">
-        <h2 id="what-title" className="text-h3">
-          What is {topic.name}?
-        </h2>
-        {c.intro && <p className="text-body-lg text-fg-secondary">{c.intro}</p>}
-        {c.explanation.split("\n\n").map((paragraph, i) => (
-          <p key={i} className="text-body">
-            {paragraph}
-          </p>
-        ))}
-      </section>
+    <div className="grid gap-10">
+      <LessonSection id="rule" title={`What is ${topic.name}?`} tone="rule" icon={BookOpenText}>
+        <div data-tone="rule" className="lesson-block grid gap-3 rounded-xl px-5 py-4">
+          {c.intro && <RichText text={c.intro} className="text-body-lg font-medium" />}
+          {c.explanation
+            .split("\n\n")
+            .filter(Boolean)
+            .map((paragraph, i) => (
+              <p key={i} className="text-body leading-relaxed text-fg-secondary">
+                <RichText text={paragraph} />
+              </p>
+            ))}
+        </div>
+        {c.signal_words.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-label text-fg-muted">Signal words</span>
+            <SignalWords words={c.signal_words} />
+          </div>
+        )}
+      </LessonSection>
 
       {c.formulas.length > 0 && (
-        <section aria-labelledby="form-title" className="grid gap-3">
-          <h2 id="form-title" className="text-h3">
-            Form
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {c.formulas.map((f) => (
-              <div key={f.label} className="grid gap-1.5 rounded-xl border bg-surface p-4">
-                <p className="text-label text-fg-muted">{f.label}</p>
-                <p className="font-mono text-body-sm">{f.pattern}</p>
-                {f.examples.length > 0 && (
-                  <ul className="grid gap-0.5 border-t pt-2">
-                    {f.examples.map((e, i) => (
-                      <li key={i} className="text-body-sm text-fg-secondary">
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
+        <LessonSection id="form" title="Form" tone="formula" icon={Sigma} count={c.formulas.length}>
+          <FormulaList formulas={c.formulas} />
+        </LessonSection>
       )}
 
       {c.usage.length > 0 && (
-        <section aria-labelledby="usage-title" className="grid gap-3">
-          <h2 id="usage-title" className="text-h3">
-            When do we use it?
-          </h2>
-          <ul className="grid gap-2">
-            {c.usage.map((u, i) => (
-              <li key={i} className="flex items-start gap-2 text-body">
-                <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                {u}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {c.signal_words.length > 0 && (
-        <section aria-labelledby="signals-title" className="grid gap-3">
-          <h2 id="signals-title" className="text-h3">
-            Signal words
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {c.signal_words.map((word) => (
-              <li key={word}>
-                <Badge variant="outline" className="px-2.5 py-1 text-body-sm">
-                  {word}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <LessonSection id="usage" title="When do we use it?" tone="usage" icon={Target}>
+          <UsageList items={c.usage.map((use) => ({ use }))} />
+        </LessonSection>
       )}
 
       {c.examples.length > 0 && (
-        <section aria-labelledby="examples-title" className="grid gap-3">
-          <h2 id="examples-title" className="text-h3">
-            Examples
-          </h2>
-          <ul className="divide-y rounded-xl border bg-surface">
-            {c.examples.map((e, i) => (
-              <li key={i} className="grid gap-0.5 px-4 py-3">
-                <p className="text-body">{e.text}</p>
-                {e.note && <p className="text-caption text-fg-muted">{e.note}</p>}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <LessonSection id="examples" title="Examples" tone="example" icon={Quote} count={c.examples.length}>
+          <ExampleList items={c.examples} />
+        </LessonSection>
       )}
 
       {c.common_mistakes.length > 0 && (
-        <section aria-labelledby="mistakes-title" className="grid gap-3">
-          <h2 id="mistakes-title" className="text-h3">
-            Common mistakes
-          </h2>
-          <ul className="grid gap-3">
-            {c.common_mistakes.map((m, i) => (
-              <li key={i} className="grid gap-1.5 rounded-xl border-l-2 border-warning bg-surface px-4 py-3">
-                <p className="text-body text-fg-muted line-through decoration-error/60">{m.wrong}</p>
-                <p className="text-body font-medium">{m.right}</p>
-                <p className="text-body-sm text-fg-secondary">{m.why}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <LessonSection id="mistakes" title="Common mistakes" tone="mistake" icon={TriangleAlert} count={c.common_mistakes.length}>
+          <MistakeList items={c.common_mistakes} />
+        </LessonSection>
       )}
     </div>
+  );
+}
+
+/**
+ * The AI's second pass over the rule, written for the learner's level. Closed until asked for:
+ * open by default it repeated the whole lesson straight underneath itself.
+ */
+function SimplerExplanation({ slug }: { slug: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section aria-labelledby="simpler-title" className="grid gap-3 border-t pt-6">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 rounded-xl border bg-surface px-4 py-3 text-left outline-none transition-colors duration-micro hover:bg-surface-hover focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      >
+        <span className="grid size-8 place-items-center rounded-lg bg-primary-subtle text-primary-subtle-foreground">
+          <Sparkles className="size-4" aria-hidden />
+        </span>
+        <span className="grid min-w-0 flex-1">
+          <span id="simpler-title" className="text-body font-medium">
+            Explain it for my level
+          </span>
+          <span className="text-caption text-fg-muted">The same rule in simpler words, with more examples — written by AI</span>
+        </span>
+        <ChevronDown className={cn("size-4 shrink-0 text-fg-muted transition-transform duration-micro", open && "rotate-180")} aria-hidden />
+      </button>
+      {open && <ExplainPanel slug={slug} level={null} />}
+    </section>
   );
 }
 

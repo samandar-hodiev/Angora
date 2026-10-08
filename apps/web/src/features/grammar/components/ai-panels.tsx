@@ -1,8 +1,21 @@
 "use client";
 
-import { CircleAlert, Image as ImageIcon, Lightbulb, Lock, MessageCircle, Send, Sparkles } from "lucide-react";
+import {
+  CircleAlert,
+  Image as ImageIcon,
+  Lightbulb,
+  Lock,
+  MessageCircle,
+  Quote,
+  Send,
+  Shuffle,
+  Sigma,
+  Sparkles,
+  Target,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { InlineLoader } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +27,18 @@ import { apiAssetUrl } from "@/lib/media";
 import type { GrammarExplanationResponse, GrammarVisual } from "@engora/types";
 
 import { useGrammarExplanation, useGrammarTutor, useGrammarVisual } from "../hooks";
+import {
+  ExampleColumns,
+  ExampleList,
+  FormulaList,
+  LessonSection,
+  MistakeList,
+  RichText,
+  SignalWords,
+  SimpleMarkdown,
+  TipList,
+  UsageList,
+} from "./lesson-blocks";
 import { AIBadge } from "./shared";
 
 /**
@@ -131,7 +156,7 @@ export function ExplainPanel({
   const e = data.explanation;
 
   return (
-    <article className="grid gap-6 rounded-xl border bg-surface p-5 sm:p-6">
+    <article className="grid gap-6 rounded-xl border bg-surface p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
         <h3 className="text-h3">{isPrimary ? "The rule" : "Explained for you"}</h3>
         <span className="flex items-center gap-2">
@@ -140,147 +165,65 @@ export function ExplainPanel({
         </span>
       </header>
 
-      {e.summary && <p className="text-body-lg text-fg-secondary">{e.summary}</p>}
-
-      {e.paragraphs?.length > 0 && (
-        <div className="grid gap-3">
-          {e.paragraphs.map((paragraph, i) => (
-            <p key={i} className="text-body">
-              {paragraph}
+      {(e.summary || e.paragraphs?.length > 0) && (
+        <div data-tone="rule" className="lesson-block grid gap-3 rounded-xl px-5 py-4">
+          {e.summary && <RichText text={e.summary} className="text-body-lg font-medium" />}
+          {e.paragraphs?.map((paragraph, i) => (
+            <p key={i} className="text-body leading-relaxed text-fg-secondary">
+              <RichText text={paragraph} />
             </p>
           ))}
         </div>
       )}
 
       {e.formulas?.length > 0 && (
-        <Section title="Form">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {e.formulas.map((f, i) => (
-              <div key={i} className="grid gap-1.5 rounded-lg border bg-background p-3">
-                <p className="text-label text-fg-muted">{f.label}</p>
-                <p className="font-mono text-body-sm">{f.pattern}</p>
-                {f.examples?.length > 0 && (
-                  <ul className="grid gap-0.5 border-t pt-1.5">
-                    {f.examples.map((ex, j) => (
-                      <li key={j} className="text-body-sm text-fg-secondary">
-                        {ex}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
+        <LessonSection id={`${slug}-ai-form`} title="Form" tone="formula" icon={Sigma} count={e.formulas.length}>
+          <FormulaList formulas={e.formulas} />
+        </LessonSection>
       )}
 
       {e.when_to_use?.length > 0 && (
-        <Section title="When to use it">
-          <ul className="grid gap-2.5">
-            {e.when_to_use.map((item, i) => (
-              <li key={i} className="grid gap-0.5">
-                <span className="flex items-start gap-2 text-body">
-                  <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                  {item.use}
-                </span>
-                {item.example && <span className="pl-3.5 text-body-sm text-fg-secondary">{item.example}</span>}
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <LessonSection id={`${slug}-ai-usage`} title="When to use it" tone="usage" icon={Target}>
+          <UsageList items={e.when_to_use} />
+        </LessonSection>
       )}
 
-      {e.examples?.length > 0 && (
-        <Section title="Examples">
-          <ul className="divide-y rounded-lg border">
-            {e.examples.map((ex, i) => (
-              <li key={i} className="grid gap-0.5 px-3 py-2.5">
-                <p className="text-body">{ex.sentence}</p>
-                {ex.note && <p className="text-caption text-fg-muted">{ex.note}</p>}
-              </li>
-            ))}
-          </ul>
-        </Section>
+      {(e.examples?.length > 0 || e.positive?.length || e.negative?.length || e.questions?.length) && (
+        <LessonSection id={`${slug}-ai-examples`} title="Examples" tone="example" icon={Quote}>
+          {e.examples?.length > 0 && <ExampleList items={e.examples.map((ex) => ({ text: ex.sentence, note: ex.note }))} />}
+          <ExampleColumns positive={e.positive ?? []} negative={e.negative ?? []} questions={e.questions ?? []} />
+        </LessonSection>
       )}
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <ExampleColumn title="Positive" items={e.positive ?? []} />
-        <ExampleColumn title="Negative" items={e.negative ?? []} />
-        <ExampleColumn title="Questions" items={e.questions ?? []} />
-      </div>
 
       {e.signal_words?.length > 0 && (
-        <Section title="Signal words">
-          <ul className="flex flex-wrap gap-1.5">
-            {e.signal_words.map((word) => (
-              <li key={word}>
-                <Badge variant="outline">{word}</Badge>
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-label text-fg-muted">Signal words</span>
+          <SignalWords words={e.signal_words} />
+        </div>
       )}
 
       {e.common_mistakes?.length > 0 && (
-        <Section title="Common mistakes">
-          <ul className="grid gap-2">
-            {e.common_mistakes.map((m, i) => (
-              <li key={i} className="grid gap-0.5 rounded-lg border-l-2 border-warning bg-background px-3 py-2">
-                <p className="text-body-sm text-fg-muted line-through">{m.wrong}</p>
-                <p className="text-body-sm font-medium">{m.right}</p>
-                <p className="text-caption text-fg-secondary">{m.why}</p>
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <LessonSection id={`${slug}-ai-mistakes`} title="Common mistakes" tone="mistake" icon={TriangleAlert} count={e.common_mistakes.length}>
+          <MistakeList items={e.common_mistakes} />
+        </LessonSection>
       )}
 
       {e.compare_note && (
-        <Section title="Easy to confuse">
-          <p className="text-body-sm text-fg-secondary">{e.compare_note}</p>
-        </Section>
+        <LessonSection id={`${slug}-ai-confuse`} title="Easy to confuse" tone="exception" icon={Shuffle}>
+          <p data-tone="exception" className="lesson-block rounded-xl px-4 py-3 text-body">
+            <RichText text={e.compare_note} />
+          </p>
+        </LessonSection>
       )}
 
       {e.tips?.length > 0 && (
-        <Section title="Tips">
-          <ul className="grid gap-1.5">
-            {e.tips.map((tip, i) => (
-              <li key={i} className="flex items-start gap-2 text-body-sm text-fg-secondary">
-                <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                {tip}
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <LessonSection id={`${slug}-ai-tips`} title="Tips" tone="tip" icon={Lightbulb}>
+          <TipList items={e.tips} />
+        </LessonSection>
       )}
 
       {e.mini_check && <MiniCheck check={e.mini_check} />}
     </article>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-2">
-      <h4 className="text-label tracking-wide text-fg-muted uppercase">{title}</h4>
-      {children}
-    </section>
-  );
-}
-
-function ExampleColumn({ title, items }: { title: string; items: string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div>
-      <h4 className="mb-1.5 text-label text-fg-muted">{title}</h4>
-      <ul className="grid gap-1">
-        {items.map((item, i) => (
-          <li key={i} className="text-body-sm">
-            {item}
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -290,7 +233,8 @@ function MiniCheck({ check }: { check: NonNullable<GrammarExplanationResponse["e
   const answered = picked !== null;
 
   return (
-    <div className="grid gap-2 rounded-lg border border-dashed p-4">
+    <div className="grid gap-2 rounded-xl border border-dashed p-4">
+      <p className="text-label text-fg-muted">Quick check</p>
       <p className="text-body-sm font-medium">{check.question}</p>
       <div role="group" aria-label={check.question} className="grid gap-1.5">
         {check.options.map((option, i) => {
@@ -383,10 +327,10 @@ export function TutorPanel({ slug, topicName }: { slug: string; topicName: strin
               className={
                 message.role === "user"
                   ? "justify-self-end rounded-xl rounded-br-sm bg-primary-subtle px-3 py-2 text-body-sm text-primary-subtle-foreground"
-                  : "rounded-xl rounded-bl-sm bg-surface-active px-3 py-2 text-body-sm whitespace-pre-wrap"
+                  : "rounded-xl rounded-bl-sm bg-surface-active px-4 py-3 text-body-sm leading-relaxed"
               }
             >
-              {message.content}
+              {message.role === "assistant" ? <SimpleMarkdown text={message.content} /> : message.content}
             </div>
           ))}
           <div ref={endRef} />

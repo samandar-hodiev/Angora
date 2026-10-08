@@ -138,3 +138,41 @@
 @media (prefers-reduced-motion: reduce) {
   .loader-sweep { animation: none; left: 33%; }
 }
+
+/* ---- Grammar lesson --------------------------------------------------------------------------
+ * The lesson is read, not glanced at, so it sits on opaque paper: the live background behind the
+ * app stays at the page's edges and never moves behind a line of text. Inside, every kind of
+ * block has its own tone — the rule, its form, examples, mistakes, exceptions, tips — so a
+ * learner knows what they are reading before they read it. The tones are mixed into the surface
+ * colour, which keeps them quiet enough for both themes. */
+.lesson-paper {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 48px -32px oklch(0 0 0 / 0.45);
+}
+
+.lesson-block {
+  --tone: var(--primary);
+  background-color: color-mix(in oklch, var(--tone) 9%, var(--surface));
+  border: 1px solid color-mix(in oklch, var(--tone) 22%, var(--border));
+  border-left: 3px solid var(--tone);
+}
+.lesson-tone-text {
+  color: color-mix(in oklch, var(--tone) 80%, var(--foreground));
+}
+.lesson-chip {
+  background-color: color-mix(in oklch, var(--tone) 16%, var(--surface));
+  color: color-mix(in oklch, var(--tone) 75%, var(--foreground));
+  border: 1px solid color-mix(in oklch, var(--tone) 30%, transparent);
+}
+[data-tone="rule"] { --tone: oklch(0.65 0.13 250); }
+[data-tone="formula"] { --tone: oklch(0.64 0.17 295); }
+[data-tone="example"] { --tone: oklch(0.68 0.14 160); }
+[data-tone="usage"] { --tone: oklch(0.68 0.12 205); }
+[data-tone="mistake"] { --tone: oklch(0.66 0.19 25); }
+[data-tone="right"] { --tone: oklch(0.68 0.15 150); }
+[data-tone="exception"] { --tone: oklch(0.72 0.15 55); }
+[data-tone="tip"] { --tone: oklch(0.8 0.14 90); }
+[data-tone="positive"] { --tone: oklch(0.68 0.15 150); }
+[data-tone="negative"] { --tone: oklch(0.66 0.19 25); }
+[data-tone="question"] { --tone: oklch(0.65 0.13 250); }
