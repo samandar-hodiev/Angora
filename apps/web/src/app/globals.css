@@ -176,3 +176,16 @@
 [data-tone="positive"] { --tone: oklch(0.68 0.15 150); }
 [data-tone="negative"] { --tone: oklch(0.66 0.19 25); }
 [data-tone="question"] { --tone: oklch(0.65 0.13 250); }
+
+/* ---- Realtime speaking coach --------------------------------------------------------- */
+
+@keyframes coach-pulse {
+  0% { transform: scale(0.85); opacity: 0.55; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.coach-pulse { animation: coach-pulse 2.4s var(--ease-standard) infinite; }
+.coach-pulse-delay { animation-delay: 1.2s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-pulse { animation: none; }
+}

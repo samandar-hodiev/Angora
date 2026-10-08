@@ -26,7 +26,7 @@ const TOPIC_KEY = "topic";
 function LiveCoachLink() {
   return (
     <Button variant="outline" asChild>
-      <Link href="/app/speaking/live">
+      <Link href="/app/speaking">
         <Radio aria-hidden />
         Live coach
       </Link>
