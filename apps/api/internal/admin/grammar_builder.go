@@ -292,6 +292,10 @@ func grammarBody(level ai.GeneratedGrammarLevel) map[string]any {
 			"wrong": mistake.Wrong, "right": mistake.Right, "why": mistake.Why, "rule": mistake.Rule,
 		})
 	}
+	exceptions := make([]map[string]any, 0, len(level.Exceptions))
+	for _, e := range level.Exceptions {
+		exceptions = append(exceptions, map[string]any{"rule": e.Rule, "examples": orEmptyStrings(e.Examples)})
+	}
 	return map[string]any{
 		"intro":           level.Intro,
 		"explanation":     level.Explanation,
@@ -299,6 +303,7 @@ func grammarBody(level ai.GeneratedGrammarLevel) map[string]any {
 		"formulas":        formulas,
 		"signal_words":    orEmptyStrings(level.SignalWords),
 		"examples":        examples,
+		"exceptions":      exceptions,
 		"common_mistakes": mistakes,
 	}
 }
@@ -425,6 +430,29 @@ func (m *Module) saveGrammarLevel(c *gin.Context) {
 		topicID, language, level.BaseCode(), nullRaw(in.Body, body), in.Title, in.Summary, status, p.UserID); err != nil {
 		httpx.Fail(c, err)
 		return
+	}
+
+	// The explanation is one lesson shared by every level, so an edit to it is an edit at
+	// every level that has it — otherwise the B1 tab and the C1 tab would drift apart after
+	// the first typo fix. A level marked not applicable stays as it is; the practice below
+	// is the level's own and is not touched.
+	if in.Body != nil && status != ContentNotApplicable {
+		if _, err := m.pool.Exec(ctx, `
+			INSERT INTO grammar_content (grammar_topic_id, language, level_code, body, title, summary,
+			                             version, status, source, created_by)
+			SELECT $1, $2, latest.level_code, $3::jsonb,
+			       COALESCE($4::text, latest.title), COALESCE($5::text, latest.summary),
+			       latest.version + 1, 'draft', 'curated', $6
+			FROM (
+			    SELECT DISTINCT ON (level_code) level_code, title, summary, version, status
+			    FROM grammar_content WHERE grammar_topic_id = $1 AND language = $2
+			    ORDER BY level_code, version DESC
+			) latest
+			WHERE latest.level_code <> $7::cefr_code AND latest.status NOT IN ('not_applicable', 'archived')`,
+			topicID, language, *in.Body, in.Title, in.Summary, p.UserID, level.BaseCode()); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
 	}
 
 	if in.Questions != nil {

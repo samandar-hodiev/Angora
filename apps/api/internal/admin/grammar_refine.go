@@ -242,13 +242,14 @@ func (m *Module) levelDraft(ctx context.Context, slug, language string, level ce
 	}
 
 	var doc struct {
-		Intro          string                `json:"intro"`
-		Explanation    string                `json:"explanation"`
-		Usage          []string              `json:"usage"`
-		Formulas       []ai.GeneratedFormula `json:"formulas"`
-		SignalWords    []string              `json:"signal_words"`
-		Examples       []ai.GeneratedExample `json:"examples"`
-		CommonMistakes []ai.GeneratedMistake `json:"common_mistakes"`
+		Intro          string                  `json:"intro"`
+		Explanation    string                  `json:"explanation"`
+		Usage          []string                `json:"usage"`
+		Formulas       []ai.GeneratedFormula   `json:"formulas"`
+		SignalWords    []string                `json:"signal_words"`
+		Examples       []ai.GeneratedExample   `json:"examples"`
+		Exceptions     []ai.GeneratedException `json:"exceptions"`
+		CommonMistakes []ai.GeneratedMistake   `json:"common_mistakes"`
 	}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &doc); err != nil {
@@ -260,6 +261,7 @@ func (m *Module) levelDraft(ctx context.Context, slug, language string, level ce
 	out.Intro, out.Explanation = doc.Intro, doc.Explanation
 	out.Usage, out.Formulas, out.SignalWords = doc.Usage, doc.Formulas, doc.SignalWords
 	out.Examples, out.CommonMistakes = doc.Examples, doc.CommonMistakes
+	out.Exceptions = doc.Exceptions
 
 	practice, err := m.levelQuestions(ctx, topicID, level)
 	if err != nil {

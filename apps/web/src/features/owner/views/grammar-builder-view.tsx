@@ -481,6 +481,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
   const [formulas, setFormulas] = useState(body.formulas ?? []);
   const [examples, setExamples] = useState(body.examples ?? []);
   const [mistakes, setMistakes] = useState(body.common_mistakes ?? []);
+  const [exceptions, setExceptions] = useState(body.exceptions ?? []);
   /** Which section is waiting on the model, so only that card shows it is busy. */
   const [pending, setPending] = useState<string | null>(null);
   /** The one item being rewritten, as "section:index", so only that row shows it. */
@@ -520,6 +521,9 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
       case "common_mistakes":
         setMistakes(next.common_mistakes ?? []);
         break;
+      case "exceptions":
+        setExceptions(next.exceptions ?? []);
+        break;
       default:
         // No section named: the whole level was rewritten (Improve, Adapt, Translate).
         setTitle(proposed.title);
@@ -531,6 +535,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         setFormulas(next.formulas ?? []);
         setExamples(next.examples ?? []);
         setMistakes(next.common_mistakes ?? []);
+        setExceptions(next.exceptions ?? []);
     }
   }
 
@@ -560,6 +565,9 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
         break;
       case "common_mistakes":
         setMistakes((list) => replace(list, pick(next.common_mistakes)));
+        break;
+      case "exceptions":
+        setExceptions((list) => replace(list, pick(next.exceptions)));
         break;
     }
   }
@@ -652,6 +660,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
       signal_words: signalWords,
       formulas,
       examples,
+      exceptions,
       common_mistakes: mistakes,
     };
     save.mutate(
@@ -875,6 +884,52 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
                 placeholder="What it shows"
                 value={row.note ?? ""}
                 onChange={(e) => update({ ...row, note: e.target.value })}
+              />
+            </>
+          )}
+        />
+      </SectionCard>
+
+      <SectionCard
+        title="Exceptions"
+        description="Where the topic breaks its own rule — irregular forms, verbs that never take it, fixed phrases"
+        action={
+          <SectionAI
+            section="exceptions"
+            busy={busy}
+            onRun={runRefine}
+            actions={[{ action: "regenerate", label: "Regenerate" }, { action: "expand", label: "Add more" }]}
+          />
+        }
+      >
+        <RowList
+          rows={exceptions}
+          onChange={setExceptions}
+          {...itemAI("exceptions")}
+          blank={{ rule: "", examples: [] }}
+          addLabel="Add an exception"
+          display={(row) => (
+            <div className="grid gap-0.5 text-body-sm">
+              <span>{row.rule}</span>
+              {row.examples.length > 0 && <span className="text-caption text-fg-muted">{row.examples.join(" · ")}</span>}
+            </div>
+          )}
+          render={(row, update) => (
+            <>
+              <Input
+                aria-label="Exception"
+                placeholder="Stative verbs (know, like) are not used in the continuous."
+                value={row.rule}
+                onChange={(e) => update({ ...row, rule: e.target.value })}
+                className="sm:col-span-2"
+              />
+              <Input
+                aria-label="Examples, separated by |"
+                placeholder="I know him. | She likes tea."
+                value={row.examples.join(" | ")}
+                onChange={(e) =>
+                  update({ ...row, examples: e.target.value.split("|").map((x) => x.trim()).filter(Boolean) })
+                }
               />
             </>
           )}
@@ -2028,6 +2083,20 @@ function LearnerPreview({
         </section>
       )}
 
+      {(body.exceptions ?? []).length > 0 && (
+        <section className="grid gap-2">
+          <h3 className="text-h4">Exceptions</h3>
+          <ul className="grid gap-2">
+            {(body.exceptions ?? []).map((item, index) => (
+              <li key={index} className="grid gap-0.5 text-body-sm">
+                <span>{item.rule}</span>
+                {item.examples.length > 0 && <span className="text-caption text-fg-secondary">{item.examples.join(" · ")}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {(body.common_mistakes ?? []).length > 0 && (
         <section className="grid gap-2">
           <h3 className="text-h4">Common mistakes</h3>
@@ -2076,8 +2145,8 @@ const partCards: { part: GeneratePart; icon: typeof Pencil; title: string; descr
   {
     part: "explanation",
     icon: BookOpen,
-    title: "Adaptive explanation",
-    description: "A different lesson for each level — simpler at A1, fuller at C1.",
+    title: "Full explanation",
+    description: "One complete lesson for every level — rule, every form, exceptions, examples, mistakes. The test and tasks adapt to each level.",
   },
   {
     part: "test",

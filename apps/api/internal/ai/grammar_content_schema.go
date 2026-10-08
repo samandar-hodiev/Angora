@@ -31,6 +31,7 @@ var grammarContentSchema = json.RawMessage(`{
           "formulas",
           "signal_words",
           "examples",
+          "exceptions",
           "common_mistakes",
           "practice"
         ],
@@ -98,6 +99,19 @@ var grammarContentSchema = json.RawMessage(`{
                 "note": { "type": "string", "description": "What it shows. Empty when the sentence speaks for itself." }
               }
             }
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rule", "examples"],
+              "properties": {
+                "rule": { "type": "string", "description": "Where the topic does not follow its own rule, and what happens instead." },
+                "examples": { "type": "array", "items": { "type": "string" }, "description": "English sentences showing the exception." }
+              }
+            },
+            "description": "Every case that breaks the rule. Empty when the topic has none."
           },
           "common_mistakes": {
             "type": "array",

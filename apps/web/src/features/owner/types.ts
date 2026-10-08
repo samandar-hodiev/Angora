@@ -1244,6 +1244,7 @@ export interface GrammarBody {
   formulas?: { label: string; pattern: string; examples: string[] }[];
   signal_words?: string[];
   examples?: { text: string; note?: string }[];
+  exceptions?: { rule: string; examples: string[] }[];
   common_mistakes?: { wrong: string; right: string; why: string; rule?: string }[];
 }
 

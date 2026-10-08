@@ -113,6 +113,12 @@ type CommonMistake struct {
 	Rule string `json:"rule,omitempty"`
 }
 
+// Exception is a case where the topic does not follow its own rule.
+type Exception struct {
+	Rule     string   `json:"rule"`
+	Examples []string `json:"examples"`
+}
+
 // Content is the canonical explanation of a topic (grammar_content.body).
 type Content struct {
 	Intro          string          `json:"intro"`
@@ -121,6 +127,7 @@ type Content struct {
 	Usage          []string        `json:"usage"`
 	SignalWords    []string        `json:"signal_words"`
 	Examples       []Example       `json:"examples"`
+	Exceptions     []Exception     `json:"exceptions"`
 	CommonMistakes []CommonMistake `json:"common_mistakes"`
 }
 

@@ -296,3 +296,21 @@ func TestUsableWordsDropsDuplicatesAndExcluded(t *testing.T) {
 		t.Errorf("level %q definition %q, want A2 explained by its A1 text", w.Level, w.Definition)
 	}
 }
+
+// One lesson serves every level: what the model wrote once is the lesson at each level asked
+// for, under that level's own code, and a level the model refused does not stay refused.
+func TestShareLessonGivesEveryLevelTheSameLesson(t *testing.T) {
+	written := []GeneratedGrammarLevel{{
+		Level: "B1", Applicable: true, Intro: "One rule for all.", Explanation: "Full text.",
+		Exceptions: []GeneratedException{{Rule: "Some verbs never take it.", Examples: []string{"I know it."}}},
+	}}
+	got := shareLesson(written, []cefr.Level{{Base: 1}, {Base: 4}, {Base: 5}})
+	if len(got) != 3 {
+		t.Fatalf("levels = %d, want 3", len(got))
+	}
+	for i, code := range []string{"A1", "B2", "C1"} {
+		if got[i].Level != code || !got[i].Applicable || got[i].Intro != "One rule for all." || len(got[i].Exceptions) != 1 {
+			t.Errorf("level %d = %+v, want the shared lesson under %s", i, got[i], code)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import {
   Mic,
   PenLine,
   Quote,
+  Shuffle,
   Sigma,
   Sparkles,
   Target,
@@ -31,7 +32,7 @@ import type { GrammarRelatedTopic, GrammarTopic } from "@engora/types";
 
 import { useGrammarComparison, useGrammarTopic } from "../hooks";
 import { ExplainPanel, TutorPanel, VisualPanel } from "./ai-panels";
-import { ExampleList, FormulaList, LessonSection, MistakeList, RichText, SignalWords, UsageList } from "./lesson-blocks";
+import { ExampleList, ExceptionList, FormulaList, LessonSection, MistakeList, RichText, SignalWords, UsageList } from "./lesson-blocks";
 import { MasteryBar, StateBadge } from "./shared";
 
 /**
@@ -89,13 +90,7 @@ export function GrammarTopicView({ slug }: { slug: string }) {
         {t.content ? (
           <div className="lesson-paper grid gap-8 rounded-2xl p-4 sm:p-6 lg:p-8">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-              {t.content_level ? (
-                <span className="flex items-center gap-2 text-caption text-fg-muted">
-                  Written for <Badge variant="outline">{t.content_level}</Badge>
-                </span>
-              ) : (
-                <span />
-              )}
+              <span className="text-caption text-fg-muted">One lesson for every level — practice below adapts to yours</span>
               <ContentLanguageSwitch
                 current={t.content_language}
                 available={t.content_languages ?? []}
@@ -143,6 +138,7 @@ function lessonSections(c: NonNullable<GrammarTopic["content"]>) {
     { id: "rule", label: "Rule", show: true },
     { id: "form", label: "Form", show: c.formulas.length > 0 },
     { id: "usage", label: "When to use", show: c.usage.length > 0 },
+    { id: "exceptions", label: "Exceptions", show: (c.exceptions?.length ?? 0) > 0 },
     { id: "examples", label: "Examples", show: c.examples.length > 0 },
     { id: "mistakes", label: "Mistakes", show: c.common_mistakes.length > 0 },
     { id: "practice-title", label: "Practise", show: true },
@@ -202,6 +198,12 @@ function CanonicalContent({ topic }: { topic: GrammarTopic }) {
       {c.usage.length > 0 && (
         <LessonSection id="usage" title="When do we use it?" tone="usage" icon={Target}>
           <UsageList items={c.usage.map((use) => ({ use }))} />
+        </LessonSection>
+      )}
+
+      {c.exceptions && c.exceptions.length > 0 && (
+        <LessonSection id="exceptions" title="Exceptions" tone="exception" icon={Shuffle} count={c.exceptions.length}>
+          <ExceptionList items={c.exceptions} />
         </LessonSection>
       )}
 

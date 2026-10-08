@@ -82,6 +82,12 @@ export interface GrammarCommonMistake {
   rule?: string;
 }
 
+/** A case where the topic does not follow its own rule. */
+export interface GrammarException {
+  rule: string;
+  examples: string[];
+}
+
 /** The canonical, curated explanation of a topic. Never generated at read time. */
 export interface GrammarContent {
   intro: string;
@@ -90,6 +96,8 @@ export interface GrammarContent {
   usage: string[];
   signal_words: string[];
   examples: GrammarExample[];
+  /** Absent on lessons written before exceptions had their own section. */
+  exceptions?: GrammarException[];
   common_mistakes: GrammarCommonMistake[];
 }
 

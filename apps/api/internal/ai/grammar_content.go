@@ -30,7 +30,7 @@ import (
 //   - Nothing it returns is trusted. The output is validated before it reaches a column,
 //     and it lands as a draft. An owner publishes; the model never does.
 const (
-	GrammarAuthorPrompt  = "grammar_author.v1"
+	GrammarAuthorPrompt  = "grammar_author.v2"
 	SchemaGrammarContent = "grammar_content"
 
 	// Two levels of generated practice per level is a starting set, not a bank. The owner
@@ -62,6 +62,12 @@ type GeneratedFormula struct {
 type GeneratedExample struct {
 	Text string `json:"text"`
 	Note string `json:"note"`
+}
+
+// GeneratedException is a case where the topic does not follow its own rule.
+type GeneratedException struct {
+	Rule     string   `json:"rule"`
+	Examples []string `json:"examples"`
 }
 
 type GeneratedMistake struct {
@@ -100,18 +106,19 @@ func (q GeneratedPractice) IsFillBlank() bool { return q.Type == PracticeFillBla
 type GeneratedGrammarLevel struct {
 	Level string `json:"level"`
 	/** False when the topic is not worth teaching at this level; Reason says why. */
-	Applicable     bool                `json:"applicable"`
-	Reason         string              `json:"reason"`
-	Title          string              `json:"title"`
-	Summary        string              `json:"summary"`
-	Intro          string              `json:"intro"`
-	Explanation    string              `json:"explanation"`
-	Usage          []string            `json:"usage"`
-	Formulas       []GeneratedFormula  `json:"formulas"`
-	SignalWords    []string            `json:"signal_words"`
-	Examples       []GeneratedExample  `json:"examples"`
-	CommonMistakes []GeneratedMistake  `json:"common_mistakes"`
-	Practice       []GeneratedPractice `json:"practice"`
+	Applicable     bool                 `json:"applicable"`
+	Reason         string               `json:"reason"`
+	Title          string               `json:"title"`
+	Summary        string               `json:"summary"`
+	Intro          string               `json:"intro"`
+	Explanation    string               `json:"explanation"`
+	Usage          []string             `json:"usage"`
+	Formulas       []GeneratedFormula   `json:"formulas"`
+	SignalWords    []string             `json:"signal_words"`
+	Examples       []GeneratedExample   `json:"examples"`
+	Exceptions     []GeneratedException `json:"exceptions"`
+	CommonMistakes []GeneratedMistake   `json:"common_mistakes"`
+	Practice       []GeneratedPractice  `json:"practice"`
 }
 
 type GeneratedGrammarContent struct {
@@ -152,6 +159,7 @@ func (s *GrammarTutorService) AuthorGrammarContent(
 	if err := json.Unmarshal(res.Output, &out); err != nil {
 		return nil, nil, fmt.Errorf("generated grammar content is not valid JSON: %w", err)
 	}
+	out.Levels = shareLesson(out.Levels, req.Levels)
 	if err := validateAuthoredContent(&out, req); err != nil {
 		return nil, nil, err
 	}
@@ -159,6 +167,32 @@ func (s *GrammarTutorService) AuthorGrammarContent(
 		Versions:    Versions{SchemaVersion: GrammarSchemaVersion, ModelVersion: res.Model, PromptVersion: GrammarAuthorPrompt},
 		AIRequestID: res.AIRequestID,
 	}, nil
+}
+
+// shareLesson makes the one lesson the model wrote the lesson of every requested level.
+//
+// A grammar point is explained once, completely, for everyone: a B2 learner and an A1
+// learner read the same rule, forms, exceptions and examples. What changes with the level
+// is the practice written afterwards — the test and the tasks — not the explanation.
+func shareLesson(written []GeneratedGrammarLevel, levels []cefr.Level) []GeneratedGrammarLevel {
+	var lesson *GeneratedGrammarLevel
+	for i := range written {
+		if written[i].Applicable && strings.TrimSpace(written[i].Explanation+written[i].Intro) != "" {
+			lesson = &written[i]
+			break
+		}
+	}
+	if lesson == nil {
+		return written
+	}
+	out := make([]GeneratedGrammarLevel, 0, len(levels))
+	for _, level := range levels {
+		copied := *lesson
+		copied.Level = level.BaseCode()
+		copied.Applicable, copied.Reason = true, ""
+		out = append(out, copied)
+	}
+	return out
 }
 
 // validateAuthoredContent drops what cannot be taught and refuses what cannot be used.
@@ -286,13 +320,17 @@ func authorInstructions(req GrammarAuthorRequest) string {
 	b.WriteString("You are writing the canonical explanation of one English grammar point for a language-learning platform. ")
 	b.WriteString("This text is the curriculum: it is reviewed by an editor and then read by every learner who opens the topic.\n\n")
 
-	b.WriteString("Write one version per CEFR level you are given. The versions must genuinely differ:\n")
-	b.WriteString("- A1/A2: short sentences, everyday vocabulary, no grammatical terminology beyond the topic's own name. One idea per sentence.\n")
-	b.WriteString("- B1/B2: fuller usage, contrasts with the forms learners confuse this with, and the exceptions that actually come up.\n")
-	b.WriteString("- C1/C2: register, nuance, and the uses that are correct but rare. Do not pad — if a level has little to add, say less.\n")
-	b.WriteString("Copying one level's text into another is a failure, not a shortcut.\n\n")
-
-	b.WriteString("Some topics do not belong at every level. If this topic cannot be taught honestly at a level — because it needs grammar the learner does not have yet, or because it is too basic to be worth their time — set applicable to false for that level and give a one-sentence reason. Do not invent a simplified version that is wrong.\n\n")
+	b.WriteString("Write ONE complete lesson. Every learner reads the same lesson, whatever their level (A1 to C2), so it must be both easy to follow and complete:\n")
+	b.WriteString("- Plain sentences an A2 learner can follow; introduce a grammar term only when you explain it.\n")
+	b.WriteString("- Complete enough for a C1 learner: every form, every common use, and every exception that actually comes up.\n")
+	b.WriteString("- explanation: the rule in full, in at least four short paragraphs separated by a blank line: what it means; how it is built, step by step; each special case and spelling or form change; how it differs from what learners confuse it with. Put the exact phrase or form being taught in single quotes, e.g. 'be used to', 'children'.\n")
+	b.WriteString("- formulas: one entry per form — affirmative, negative, question, short answers, and every spelling or form pattern the topic has (for plurals: + s, + es, y → ies, f/fe → ves, irregular). label names the form only (e.g. Negative); pattern is the structure only, written with +, e.g. subject + be + not + used to + verb-ing; two or three examples each.\n")
+	b.WriteString("- usage: each situation it is used in, one per entry, at least three.\n")
+	b.WriteString("- exceptions: nearly every English grammar point has them — look for irregular forms, spelling changes, words or verbs that never take the form, fixed expressions, words with two possible forms, and British/American differences. List each one with two or three English examples. Leave it empty only if the topic genuinely has no exception at all.\n")
+	b.WriteString("- examples: at least eight natural sentences covering every form and use, each with a short note on what it shows.\n")
+	b.WriteString("- common_mistakes: at least four mistakes learners really make — wrong, right, why.\n")
+	b.WriteString("Do not cut anything short: this one lesson is the whole lesson for every learner, so a missing form or exception is missing for everyone.\n")
+	b.WriteString("Return exactly one entry in levels, with level B1 and applicable true — the level field is only a label here; the lesson is for everyone. The practice for each level is written separately.\n\n")
 
 	b.WriteString("Examples must be sentences someone would actually say. Common mistakes must be mistakes learners actually make — the wrong form, the right form, and why, in that order.\n\n")
 
@@ -318,10 +356,10 @@ func authorBrief(req GrammarAuthorRequest) string {
 	if strings.TrimSpace(req.Description) != "" {
 		fmt.Fprintf(&b, "What it covers: %s\n", req.Description)
 	}
-	fmt.Fprintf(&b, "Levels to write: %s\n", strings.Join(levelCodes(req.Levels), ", "))
+	b.WriteString("Readers: every learner from A1 to C2 reads this same lesson — write the complete lesson, not a beginner's version.\n")
 	if len(req.RelatedTopics) > 0 {
 		fmt.Fprintf(&b, "Learners confuse this with: %s\n", strings.Join(req.RelatedTopics, ", "))
 	}
-	fmt.Fprintf(&b, "Write at least %d practice questions for each applicable level.\n", minPracticePerLevel)
+	fmt.Fprintf(&b, "Write at least %d practice questions.\n", minPracticePerLevel)
 	return b.String()
 }

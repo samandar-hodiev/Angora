@@ -202,6 +202,33 @@ export function ExampleColumns({ positive, negative, questions }: { positive: st
   );
 }
 
+/** Where the topic breaks its own rule — set apart in orange so it is not read as the rule. */
+export function ExceptionList({ items }: { items: { rule: string; examples: string[] }[] }) {
+  return (
+    <ul className="grid gap-2.5">
+      {items.map((item, i) => (
+        <li key={i} data-tone="exception" className="lesson-block grid gap-2 rounded-xl px-4 py-3">
+          <p className="flex items-start gap-2.5">
+            <span className="lesson-chip mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-bold tracking-wide uppercase">
+              Exception
+            </span>
+            <RichText text={item.rule} className="text-body" />
+          </p>
+          {item.examples.length > 0 && (
+            <ul className="grid gap-0.5 pl-1">
+              {item.examples.map((example, j) => (
+                <li key={j} className="text-body-sm text-fg-secondary italic">
+                  {example}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function MistakeList({ items }: { items: { wrong: string; right: string; why: string }[] }) {
   return (
     <ul className="grid gap-3 md:grid-cols-2">

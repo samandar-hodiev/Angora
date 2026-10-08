@@ -204,9 +204,15 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 		missing []string
 	}
 	var translations []translation
-	if generated != nil && len(plan.Targets) > 0 && m.refiner != nil {
+	if generated != nil && len(generated.Levels) > 0 && len(plan.Targets) > 0 && m.refiner != nil {
+		// Every level shares the one lesson, so it is translated once per language and the
+		// translation is shared the same way — not six translations of the same text.
+		shared := generated.Levels[:1]
 		for _, target := range plan.Targets {
-			done, missing := m.translateAll(ctx, current, category, plan.Source, target, actor, generated.Levels)
+			done, missing := m.translateAll(ctx, current, category, plan.Source, target, actor, shared)
+			if len(done) == 1 {
+				done = shareTranslation(done[0], generated.Levels)
+			}
 			translations = append(translations, translation{target, done, missing})
 		}
 	}
@@ -264,6 +270,17 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 	return map[string]any{
 		"slug": plan.Slug, "languages": languages, "levels": plan.Levels, "parts": plan.partsOrAll(), "failed": failed,
 	}, nil
+}
+
+// shareTranslation gives every level the one translated lesson, each under its own level.
+func shareTranslation(lesson ai.GeneratedGrammarLevel, levels []ai.GeneratedGrammarLevel) []ai.GeneratedGrammarLevel {
+	out := make([]ai.GeneratedGrammarLevel, 0, len(levels))
+	for _, level := range levels {
+		copied := lesson
+		copied.Level, copied.Applicable, copied.Reason = level.Level, level.Applicable, level.Reason
+		out = append(out, copied)
+	}
+	return out
 }
 
 func (p generationPlan) partsOrAll() []string {

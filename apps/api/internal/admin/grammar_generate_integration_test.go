@@ -147,9 +147,10 @@ func TestGrammarGenerateEveryLanguagePostgres(t *testing.T) {
 		if author.calls != 1 {
 			t.Errorf("generation calls = %d, want one — the other languages are translations", author.calls)
 		}
-		// Two applicable levels × two target languages; the refused level is not translated.
-		if author.translations != 4 {
-			t.Errorf("translation calls = %d, want 4", author.translations)
+		// The lesson is shared by every level, so it is translated once per target language
+		// and the translation is shared too — not once per level.
+		if author.translations != 2 {
+			t.Errorf("translation calls = %d, want 2 (one per target language)", author.translations)
 		}
 	})
 
