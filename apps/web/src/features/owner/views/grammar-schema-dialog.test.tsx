@@ -95,11 +95,23 @@ describe("GrammarSchemaDialog", () => {
 });
 
 describe("GrammarMapView rows", () => {
+  it("starts with every category closed", async () => {
+    map.state = { ...map.state, data: fixture };
+    const { GrammarMapView } = await import("./grammar-map-view");
+
+    render(<GrammarMapView language="en" />);
+
+    expect(screen.getByRole("button", { name: /articles/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("link", { name: /zero article/i })).not.toBeInTheDocument();
+  });
+
   it("tints every content state, green only when a learner can read it", async () => {
     map.state = { ...map.state, data: fixture };
     const { GrammarMapView } = await import("./grammar-map-view");
 
     render(<GrammarMapView language="en" />);
+    // Categories start closed; open the one under test.
+    await userEvent.click(screen.getByRole("button", { name: /articles/i }));
 
     expect(row("^The").className).toContain("bg-success/[0.08]");
     expect(row("Zero Article").className).toContain("bg-surface-active/25");
@@ -112,6 +124,7 @@ describe("GrammarMapView rows", () => {
     const { GrammarMapView } = await import("./grammar-map-view");
 
     render(<GrammarMapView language="en" />);
+    await userEvent.click(screen.getByRole("button", { name: /articles/i }));
 
     expect(within(row("Zero Article")).getByText("Not created")).toBeInTheDocument();
     expect(within(row("^The")).getByText("Published")).toBeInTheDocument();

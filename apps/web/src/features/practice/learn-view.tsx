@@ -20,7 +20,7 @@ export function LearnView() {
 
   return (
     <>
-      <PageHeader pinned={false} compact title="Skills" description="Choose a skill, or pick up where your plan suggests." />
+      <PageHeader pinned={false} compact title="Practice" description="Daily practice in the four skills — choose one, or pick up where your plan suggests." />
 
       {recommendations.data && recommendations.data.length > 0 && (
         <section aria-labelledby="next-title" className="mb-10">

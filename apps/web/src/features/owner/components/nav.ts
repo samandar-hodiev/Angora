@@ -4,6 +4,7 @@ import {
   BookOpen,
   ClipboardList,
   CreditCard,
+  Dumbbell,
   FileStack,
   Headphones,
   LayoutDashboard,
@@ -98,10 +99,19 @@ export const ownerNav: OwnerNavSection[] = [
               { href: "/owner/content/lexicon/irregular-verbs", label: "Irregular verbs", icon: Shuffle },
             ],
           },
-          { href: "/owner/content/speaking", label: "Speaking", icon: Mic },
-          { href: "/owner/content/writing", label: "Writing", icon: PenLine },
-          { href: "/owner/content/reading", label: "Reading", icon: BookOpen },
-          { href: "/owner/content/listening", label: "Listening", icon: Headphones },
+          // The four skills' practice content, under one tree as the learner sees it under
+          // Practice. The parent only opens and closes the tree; it has no page of its own.
+          {
+            href: "/owner/content/practice",
+            label: "Practice",
+            icon: Dumbbell,
+            children: [
+              { href: "/owner/content/speaking", label: "Speaking", icon: Mic },
+              { href: "/owner/content/writing", label: "Writing", icon: PenLine },
+              { href: "/owner/content/reading", label: "Reading", icon: BookOpen },
+              { href: "/owner/content/listening", label: "Listening", icon: Headphones },
+            ],
+          },
           { href: "/owner/content/ielts", label: "IELTS", icon: Trophy },
           { href: "/owner/content/placement", label: "Placement & tests", icon: Target },
           { href: "/owner/content/question-bank", label: "Question bank", icon: ClipboardList },

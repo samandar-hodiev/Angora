@@ -36,10 +36,11 @@ export const homeNav: NavItem = { href: "/app/dashboard", label: "Home", icon: H
 /** Its own section rather than a skill under Learn: grammar is a library, not a practice queue. */
 export const grammarNav: NavItem = { href: "/app/grammar", label: "Grammar", icon: BookOpenCheck };
 /**
- * The four practice skills, grouped: in the sidebar a tree that opens on demand, its first
- * row the overview page that used to be "Learn".
+ * The four skills — speaking, writing, reading, listening — practised day to day, grouped: in
+ * the sidebar a tree that opens on demand, its first row the overview page. "Practice" rather
+ * than "Skills": it is where a learner goes to practise, and it sets it apart from a mock exam.
  */
-export const learnNav: NavItem = { href: "/app/learn", label: "Skills", icon: BookOpen };
+export const learnNav: NavItem = { href: "/app/learn", label: "Practice", icon: BookOpen };
 export const learnOverviewNav: NavItem = { href: "/app/learn", label: "Overview", icon: LayoutGrid };
 
 /** Each skill's own icon in the sidebar, by skill code; anything else uses the Skills icon. */
