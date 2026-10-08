@@ -26,6 +26,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import Stats from 'three/addons/libs/stats.module.js';
@@ -1195,6 +1196,7 @@ class TalkingHead {
 
     // Loader
     const loader = new GLTFLoader();
+    loader.setMeshoptDecoder( MeshoptDecoder );
 
     // Check if draco loading enabled
     if ( this.dracoEnabled ) {

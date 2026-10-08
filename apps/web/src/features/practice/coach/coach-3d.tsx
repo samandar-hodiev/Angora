@@ -105,6 +105,7 @@ export function Coach3D({
   voice,
   voiceLang = "en-GB",
   gesture,
+  preload,
   className,
 }: {
   model: string;
@@ -117,14 +118,30 @@ export function Coach3D({
   voiceLang?: string;
   /** A one-off gesture such as "thumbup"; a new id plays it again. */
   gesture?: { id: string; name: string } | null;
+  /** Other models this screen may switch to, fetched in the background once this one shows. */
+  preload?: string[];
   className?: string;
 }) {
   const node = useRef<HTMLDivElement>(null);
-  const head = useRef<TalkingHead | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [progress, setProgress] = useState(0);
+  const [engine, setEngine] = useState<TalkingHead | null>(null);
+  const [engineFailed, setEngineFailed] = useState(false);
+  /** The model on screen now; while it differs from `model`, the new one is loading. */
+  const [shown, setShown] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ model: string; pct: number } | null>(null);
   const initial = useRef({ view, mood });
+  /** Loads run one after another: the library cannot load two models at once. */
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const wanted = useRef(model);
 
+  const status: "loading" | "ready" | "error" =
+    engineFailed || failed === model ? "error" : shown === model && engine ? "ready" : "loading";
+  /** The renderer, once it has this coach on screen; null while loading. */
+  const live = status === "ready" ? engine : null;
+
+  // One renderer for the component's whole life. Switching coach swaps the model inside it;
+  // building a new WebGL context, environment map and scene per click is what made every
+  // switch slow, and the contexts piling up is what eventually left the stage blank.
   useEffect(() => {
     const container = node.current;
     if (!container) return;
@@ -162,54 +179,81 @@ export function Coach3D({
       instance.renderer.toneMapping = THREE.NeutralToneMapping;
       instance.renderer.toneMappingExposure = STUDIO_EXPOSURE;
       instance.lipsync.en = new LipsyncEn();
-      await instance.showAvatar({ url: model, body, avatarMood: initial.current.mood, lipsyncLang: "en" }, (event) => {
-        if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
-      });
-      if (cancelled) {
-        try {
-          instance.stop();
-          instance.dispose?.();
-        } catch {
-          // See the cleanup below.
-        }
-        return;
-      }
-      sharpenTextures(instance);
-      head.current = instance;
-      setStatus("ready");
+      setEngine(instance);
     })().catch(() => {
-      if (!cancelled) setStatus("error");
+      if (!cancelled) setEngineFailed(true);
     });
 
     return () => {
       cancelled = true;
-      head.current = null;
-      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       if (instance) {
         // The library's dispose assumes a fully loaded model; leaving mid-load must not crash.
         try {
           instance.stop();
           instance.dispose?.();
         } catch {
-          // Nothing left to clean up that the container reset below does not cover.
+          // Whatever it could not release, the context loss below does.
         }
+        // Give the WebGL context back now rather than whenever the GC gets to it: browsers
+        // allow only a handful, and the next coach screen needs one.
+        instance.renderer.dispose();
+        instance.renderer.forceContextLoss();
       }
       container.replaceChildren();
     };
-  }, [model, body]);
+  }, []);
+
+  // The coach: loaded into the running renderer whenever `model` changes. A pick that has
+  // been superseded by another click while waiting in the queue is skipped, so clicking
+  // through all four coaches loads one model, not four.
+  useEffect(() => {
+    wanted.current = model;
+  }, [model]);
 
   useEffect(() => {
-    if (status === "ready") head.current?.setView(view);
-  }, [view, status]);
+    if (!engine) return;
+    const url = model;
+    queue.current = queue.current.then(async () => {
+      if (wanted.current !== url) return;
+      try {
+        await engine.showAvatar({ url, body, avatarMood: initial.current.mood, lipsyncLang: "en" }, (event) => {
+          if (event.lengthComputable) setProgress({ model: url, pct: Math.round((event.loaded / event.total) * 100) });
+        });
+        sharpenTextures(engine);
+        engine.setView(initial.current.view);
+        setShown(url);
+      } catch {
+        setFailed(url);
+      }
+    });
+  }, [engine, model, body]);
+
+  // Once a coach is on screen, fetch the others' models into the HTTP cache, one at a time
+  // and at low priority, so switching coach later is a parse rather than a download.
+  const warmed = useRef(false);
+  useEffect(() => {
+    if (status !== "ready" || warmed.current || !preload?.length) return;
+    warmed.current = true;
+    const others = preload.filter((url) => url !== model);
+    void others.reduce<Promise<unknown>>(
+      (chain, url) => chain.then(() => fetch(url, { priority: "low" } as RequestInit).then((r) => r.blob()).catch(() => null)),
+      Promise.resolve(),
+    );
+  }, [status, preload, model]);
 
   useEffect(() => {
-    if (status === "ready") head.current?.setMood(mood);
-  }, [mood, status]);
+    live?.setView(view);
+  }, [view, live]);
+
+  useEffect(() => {
+    live?.setMood(mood);
+  }, [mood, live]);
 
   // Saying a line: visemes timed to the captions over a silent buffer, plus the voice.
   useEffect(() => {
-    const h = head.current;
-    if (status !== "ready" || !h || !speech) return;
+    const h = live;
+    if (!h || !speech) return;
 
     const words: string[] = [];
     const wtimes: number[] = [];
@@ -253,19 +297,20 @@ export function Coach3D({
       h.stopSpeaking();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
-  }, [speech, status, voice, voiceLang, body]);
+  }, [speech, live, voice, voiceLang, body]);
 
   // Listening is eye contact; thinking glances away for a moment, the way people do.
   useEffect(() => {
-    const h = head.current;
-    if (status !== "ready" || !h) return;
-    if (state === "listening") h.makeEyeContact(60_000);
-    if (state === "thinking") h.makeEyeContact(0);
-  }, [state, status]);
+    if (!live) return;
+    if (state === "listening") live.makeEyeContact(60_000);
+    if (state === "thinking") live.makeEyeContact(0);
+  }, [state, live]);
 
   useEffect(() => {
-    if (status === "ready" && gesture) head.current?.playGesture(gesture.name, 2.4);
-  }, [gesture, status]);
+    if (live && gesture) live.playGesture(gesture.name, 2.4);
+  }, [gesture, live]);
+
+  const pct = progress?.model === model ? progress.pct : 0;
 
   return (
     <div className={cn("relative", className)}>
@@ -273,12 +318,18 @@ export function Coach3D({
           but reads slightly flat on a dark stage. */}
       <div ref={node} className="absolute inset-0 [filter:contrast(1.06)_saturate(1.08)]" />
       {status === "loading" && (
-        <div className="absolute inset-0 grid place-items-center">
-          <div className="grid justify-items-center gap-3 text-white/80">
+        // Over the previous coach, dimmed, so a switch shows at once that something is happening.
+        <div className={cn("absolute inset-0 grid place-items-center", shown && "bg-black/45 backdrop-blur-[2px]")}>
+          <div className="grid justify-items-center gap-3 text-white/85" role="status">
             <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden />
-            <span className="text-caption">Your coach is getting ready… {progress > 0 ? `${progress}%` : ""}</span>
+            <span className="text-caption">
+              Your coach is getting ready…{pct > 0 && pct < 100 ? ` ${pct}%` : ""}
+            </span>
             <span className="h-1 w-40 overflow-hidden rounded-full bg-white/10">
-              <span className="block h-full rounded-full bg-emerald-400 transition-[width]" style={{ width: `${progress}%` }} />
+              <span
+                className={cn("block h-full rounded-full bg-emerald-400 transition-[width]", pct === 0 && "w-1/3 animate-pulse")}
+                style={pct > 0 ? { width: `${pct}%` } : undefined}
+              />
             </span>
           </div>
         </div>

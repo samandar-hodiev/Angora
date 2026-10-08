@@ -423,6 +423,14 @@ function CoachPicker({
 }) {
   const [greeting, setGreeting] = useState<CoachSpeech | null>(null);
   const email = useSession().user?.email;
+  // The models this account can switch to, so they can download while the first coach shows.
+  const preload = useMemo(
+    () =>
+      PERSONAS.filter((p) => canUseCoach(p, email, env.coachTesters)).flatMap((p) =>
+        p.renderer.kind === "3d" ? [p.renderer.model] : [],
+      ),
+    [email],
+  );
 
   useEffect(() => {
     if (!greeting) return;
@@ -440,6 +448,7 @@ function CoachPicker({
           voice={settings.voice}
           state={greeting ? "speaking" : "idle"}
           speech={greeting}
+          preload={preload}
         />
         <div className="pointer-events-none absolute left-3 top-3 grid gap-0.5 text-white">
           <span className="text-h4">{coach.name}</span>
@@ -622,6 +631,7 @@ function CoachFigure({
   state,
   speech,
   gesture,
+  preload,
 }: {
   persona: CoachPersona;
   view: CoachView;
@@ -630,6 +640,7 @@ function CoachFigure({
   state: CoachState;
   speech: CoachSpeech | null;
   gesture?: { id: string; name: string } | null;
+  preload?: string[];
 }) {
   if (persona.renderer.kind === "3d") {
     return (
@@ -643,6 +654,7 @@ function CoachFigure({
         state={state}
         speech={speech}
         gesture={gesture}
+        preload={preload}
         className="absolute inset-0"
       />
     );
