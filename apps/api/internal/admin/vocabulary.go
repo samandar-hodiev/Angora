@@ -459,6 +459,13 @@ func (m *Module) publishWords(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	if n := tag.RowsAffected(); n > 0 {
+		area := "vocabulary"
+		if in.Kind != "" {
+			area = lexiconArea(in.Kind)
+		}
+		m.recordContent(c, ActionLexiconPublished, area, "manual", "", int(n), map[string]any{"level": in.Level})
+	}
 	httpx.OK(c, map[string]int64{"published": tag.RowsAffected()})
 }
 
@@ -473,6 +480,8 @@ func (m *Module) respondWord(c *gin.Context, id uuid.UUID) {
 		httpx.Fail(c, err)
 		return
 	}
+	// Every caller is a change — create, edit, status, level — so it is recorded here once.
+	m.recordWordChange(c, lexiconArea(w.Kind), w.Term, w.Status)
 	httpx.OK(c, w)
 }
 
@@ -545,6 +554,8 @@ func (m *Module) generateVocabulary(c *gin.Context) {
 			httpx.Fail(c, err)
 			return
 		}
+		m.recordContent(c, ActionLexiconGenerated, lexiconArea(plan.Kind), "ai", strings.Join(plan.Topics, ", "), plan.Count,
+			map[string]any{"job_id": job.ID.String()})
 		httpx.Accepted(c, map[string]any{"job_id": job.ID, "kind": plan.Kind, "topics": plan.Topics, "count": plan.Count})
 		return
 	}
@@ -864,4 +875,24 @@ func (m *Module) existingTerms(ctx context.Context) ([]string, error) {
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+// DELETE /admin/vocabulary/:id — the entry is removed for good, with every learner's review
+// history on it (ON DELETE CASCADE). There is no undo; the console asks before it calls this.
+func (m *Module) deleteWord(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, apperr.BadRequest("Invalid word id"))
+		return
+	}
+	tag, err := m.pool.Exec(c.Request.Context(), `DELETE FROM vocabulary WHERE id = $1`, id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Fail(c, apperr.NotFound("Word"))
+		return
+	}
+	httpx.OK(c, gin.H{"deleted": id})
 }

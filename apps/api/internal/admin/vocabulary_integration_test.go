@@ -195,6 +195,22 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		}
 	})
 
+	t.Run("deleting an entry removes it for good, and a second delete is not found", func(t *testing.T) {
+		var id uuid.UUID
+		_ = pool.QueryRow(ctx, `SELECT id FROM vocabulary WHERE term = $1`, "zz"+stamp+"manual").Scan(&id)
+		if w := call(http.MethodDelete, "/vocabulary/"+id.String(), nil); w.Code != http.StatusOK {
+			t.Fatalf("delete status = %d body = %s", w.Code, w.Body.String())
+		}
+		var n int
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary WHERE id = $1`, id).Scan(&n)
+		if n != 0 {
+			t.Errorf("the entry is still there")
+		}
+		if w := call(http.MethodDelete, "/vocabulary/"+id.String(), nil); w.Code != http.StatusNotFound {
+			t.Errorf("second delete status = %d, want 404", w.Code)
+		}
+	})
+
 	t.Run("irregular verbs: a regular verb is refused, drafts are added and published", func(t *testing.T) {
 		t.Cleanup(func() {
 			_, _ = pool.Exec(context.Background(), `DELETE FROM irregular_verbs WHERE base LIKE $1`, "zz"+stamp+"%")

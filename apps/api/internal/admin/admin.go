@@ -155,6 +155,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.POST("/vocabulary/generate", content, m.generateVocabulary)
 	g.POST("/vocabulary/publish", content, m.publishWords)
 	g.PATCH("/vocabulary/:id", content, m.updateWord)
+	g.DELETE("/vocabulary/:id", content, m.deleteWord)
 	g.POST("/vocabulary/:id/status", content, m.setWordStatus)
 	g.POST("/vocabulary/:id/level", content, m.setWordLevel)
 	g.POST("/lexicon/proofread", content, m.proofreadLexicon)
@@ -250,6 +251,8 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/analytics/overview", usersRead, m.analyticsOverview)
 	g.GET("/analytics/growth", usersRead, m.growth)
 	g.GET("/ai/failures", authz.RequirePermission(authz.PermAIUsageRead), m.aiFailures)
+	g.GET("/ai/timeline", authz.RequirePermission(authz.PermAIUsageRead), m.aiTimeline)
+	g.GET("/activity", authz.RequirePermission(authz.PermAuditRead), m.activityReport)
 	g.GET("/ai/quality", authz.RequirePermission(authz.PermAIUsageRead), m.aiQuality)
 }
 
