@@ -1326,6 +1326,8 @@ export interface TopicContent {
   /** Topics learners confuse this with; the model is told about them. */
   related: string[];
   levels: LevelContent[];
+  /** True while anything of the topic, in any language, is still a draft — text, questions or tasks. */
+  unpublished?: boolean;
 }
 
 export interface ValidationIssue {

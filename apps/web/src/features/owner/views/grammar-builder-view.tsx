@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  CheckCircle2,
   ArrowLeft,
   BookOpen,
   Check,
@@ -177,6 +178,9 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
     (!writing!.parts?.length || writing!.parts.includes("explanation")) &&
     writing!.languages.includes(language);
   const practiceTab = tab === "test" || tab === "writing" || tab === "speaking";
+  // Live when any level has a version learners can read — published now, or behind a newer draft.
+  const isLive = data.levels.some((entry) => entry.status === "published" || entry.published_version != null);
+  const upToDate = isLive && data.unpublished === false;
 
   function runGenerate(levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[], parts: GeneratePart[]) {
     // The dialog closes at once: the editor itself shows what is being written, field by
@@ -223,6 +227,21 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         ]}
         actions={
           <>
+            {written.length > 0 && (
+              <span
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-caption font-medium",
+                  upToDate
+                    ? "bg-success/15 text-success"
+                    : isLive
+                      ? "bg-warning/20 text-warning-text"
+                      : "bg-surface-active text-fg-secondary",
+                )}
+              >
+                <span aria-hidden className={cn("size-1.5 rounded-full", upToDate ? "bg-success" : isLive ? "bg-warning" : "bg-fg-muted")} />
+                {upToDate ? "Live for learners" : isLive ? "Live · unpublished changes" : "Draft — not live yet"}
+              </span>
+            )}
             <Button variant="ghost" className="h-9" onClick={() => router.push("/owner/content/grammar")}>
               <ArrowLeft aria-hidden />
               Grammar Map
@@ -238,10 +257,19 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
               <Sparkles aria-hidden className="text-primary" />
               {writing ? "Writing…" : "Generate with AI"}
             </Button>
-            <Button className="h-9 px-4" disabled={written.length === 0} onClick={() => setPublishOpen(true)}>
-              <Send aria-hidden />
-              Publish
-            </Button>
+            {/* Once everything is live there is nothing to publish: the button says so and
+                waits until an edit or a generation leaves something new behind. */}
+            {upToDate ? (
+              <Button className="h-9 px-4" variant="outline" disabled title="Everything is live — edit or generate to publish again">
+                <CheckCircle2 aria-hidden className="text-success" />
+                Published
+              </Button>
+            ) : (
+              <Button className="h-9 px-4" disabled={written.length === 0} onClick={() => setPublishOpen(true)}>
+                <Send aria-hidden />
+                Publish
+              </Button>
+            )}
           </>
         }
       />

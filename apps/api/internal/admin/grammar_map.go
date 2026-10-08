@@ -300,6 +300,10 @@ type TopicContent struct {
 	/** Names of topics learners confuse this with; the model is told about them. */
 	Related []string       `json:"related"`
 	Levels  []LevelContent `json:"levels"`
+	// Unpublished is true while anything of the topic in any language is not live yet — a
+	// draft explanation, a draft question or a draft task — so Publish can say whether there
+	// is anything left to publish.
+	Unpublished bool `json:"unpublished"`
 }
 
 func (m *Module) grammarTopicContent(c *gin.Context) {
@@ -420,6 +424,17 @@ func (m *Module) loadTopicContent(ctx context.Context, slug, language string) (T
 			level.Tasks = []PracticeTask{}
 		}
 		out.Levels = append(out.Levels, level)
+	}
+	if err := m.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+		           SELECT 1 FROM (
+		               SELECT DISTINCT ON (language, level_code) status FROM grammar_content
+		               WHERE grammar_topic_id = $1 ORDER BY language, level_code, version DESC
+		           ) latest WHERE status IN ('draft', 'review'))
+		    OR EXISTS (SELECT 1 FROM grammar_questions WHERE grammar_topic_id = $1 AND status = 'draft')
+		    OR EXISTS (SELECT 1 FROM grammar_practice_tasks WHERE grammar_topic_id = $1 AND status = 'draft')`,
+		topicID).Scan(&out.Unpublished); err != nil {
+		return out, err
 	}
 	return out, nil
 }
