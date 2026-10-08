@@ -4,6 +4,7 @@ import { Ban, RotateCcw, ShieldCheck, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { Highlight } from "@/components/common/highlight";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -107,9 +108,11 @@ export function LearnersView() {
           <LearnerAvatar name={learner.display_name || learner.email} avatarUrl={learner.avatar_url} size="sm" />
           <div className="grid min-w-0">
             <Link href={`/owner/learners/${learner.id}`} className="truncate font-medium hover:underline">
-              {learner.display_name || learner.email}
+              <Highlight text={learner.display_name || learner.email} query={search} />
             </Link>
-            <span className="truncate text-caption text-fg-muted">{learner.email}</span>
+            <span className="truncate text-caption text-fg-muted">
+              <Highlight text={learner.email} query={search} />
+            </span>
           </div>
         </div>
       ),

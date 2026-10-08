@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Pencil, Plus, Send, Shuffle, Sparkles, Undo2 } from "lucide-react";
 import { useState } from "react";
 
+import { Highlight } from "@/components/common/highlight";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,13 +142,15 @@ export function IrregularVerbsView() {
       header: "Verb",
       cell: (v) => (
         <div className="grid gap-0.5">
-          <span className="font-semibold">{v.base}</span>
+          <span className="font-semibold">
+            <Highlight text={v.base} query={search} />
+          </span>
           <span className="text-caption text-fg-muted">{PATTERN_EXAMPLE[v.pattern]}</span>
         </div>
       ),
     },
-    { key: "past", header: "Past Simple", cell: (v) => v.past },
-    { key: "pp", header: "Past Participle", cell: (v) => v.past_participle },
+    { key: "past", header: "Past Simple", cell: (v) => <Highlight text={v.past} query={search} /> },
+    { key: "pp", header: "Past Participle", cell: (v) => <Highlight text={v.past_participle} query={search} /> },
     { key: "level", header: "Level", width: "5rem", cell: (v) => <LevelBadge level={v.level} /> },
     {
       key: "meaning",

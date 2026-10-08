@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Highlight, HighlightProvider } from "@/components/common/highlight";
 import { FlagGB, FlagRU, FlagUZ } from "@/components/common/flags";
 import { EmptyState, ErrorState } from "@/components/common/states";
 import { Button, IconButton } from "@/components/ui/button";
@@ -100,6 +101,7 @@ export function Library({
   }, [data?.items, query.sort, query.level]);
 
   return (
+    <HighlightProvider query={query.q}>
     <div className="grid gap-4">
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -293,6 +295,7 @@ export function Library({
         />
       )}
     </div>
+    </HighlightProvider>
   );
 }
 
@@ -524,10 +527,10 @@ function WordRow({
               title={h.open}
               className="truncate rounded text-left text-body-sm font-semibold outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:text-body"
             >
-              {term || "—"}
+              {term ? <Highlight text={term} /> : "—"}
             </button>
           ) : (
-            <span className="truncate text-body-sm font-medium sm:text-body">{term || "—"}</span>
+            <span className="truncate text-body-sm font-medium sm:text-body">{term ? <Highlight text={term} /> : "—"}</span>
           )}
           {lang === "en" && <SpeakButton text={word.term} lang="en-GB" />}
           {lang === "ru" && t.ru && <SpeakButton text={t.ru} lang="ru-RU" label={`Listen to “${t.ru}”`} />}
@@ -545,7 +548,7 @@ function WordRow({
         </span>
         <span className="flex min-w-0 items-start gap-1 pl-6 text-caption text-fg-secondary">
           {first || show ? (
-            <span className="line-clamp-2">{meaning || "—"}</span>
+            <span className="line-clamp-2">{meaning ? <Highlight text={meaning} /> : "—"}</span>
           ) : (
             <span className="tracking-widest text-fg-muted select-none" aria-label="Meaning hidden">
               ••••••••••

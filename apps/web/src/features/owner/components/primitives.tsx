@@ -382,7 +382,7 @@ export function SearchInput({
         // reads as a label until you click it, and a search box has to look typeable.
         // rounded-xl matches the bar's own corner, so the field reads as part of it rather
         // than as a smaller box dropped inside it.
-        className="h-11 rounded-xl border-(--glass-border) bg-background/55 pr-10 pl-10 focus-visible:bg-background/75"
+        className="h-11 rounded-xl border-(--glass-border) bg-background/55 pr-10 pl-10 focus-visible:bg-background/75 [&::-webkit-search-cancel-button]:hidden"
       />
       {draft && (
         <button

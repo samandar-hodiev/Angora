@@ -3,6 +3,7 @@
 import { Archive, ClipboardList, Eye, Pencil, Plus, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Highlight } from "@/components/common/highlight";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -135,7 +136,7 @@ export function QuestionBankView() {
             onClick={() => setEditing({ id: row.id })}
             className="truncate text-left font-medium hover:underline"
           >
-            {row.prompt}
+            <Highlight text={row.prompt} query={search} />
           </button>
           <span className="truncate font-mono text-caption text-fg-muted">{row.slug}</span>
         </div>

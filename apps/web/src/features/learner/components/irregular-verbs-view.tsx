@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
+import { Highlight, HighlightProvider } from "@/components/common/highlight";
 import { FlagRU, FlagUZ } from "@/components/common/flags";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState, ErrorState } from "@/components/common/states";
@@ -134,6 +135,7 @@ function VerbTable({ onPracticeMistakes }: { onPracticeMistakes: () => void }) {
   }, [data?.items, grouped]);
 
   return (
+    <HighlightProvider query={query.q}>
     <div className="grid gap-4">
       {data && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -306,6 +308,7 @@ function VerbTable({ onPracticeMistakes }: { onPracticeMistakes: () => void }) {
         </div>
       )}
     </div>
+    </HighlightProvider>
   );
 }
 
@@ -359,14 +362,14 @@ function VerbRow({ verb, hide }: { verb: IrregularVerb; hide: Hide }) {
             aria-expanded={open}
             className="truncate rounded text-left font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
           >
-            {verb.base}
+            <Highlight text={verb.base} />
           </button>
           <SpeakButton text={verb.base} />
           <LevelTag level={verb.level} className="hidden sm:inline-flex" />
         </span>
         <Form key={`p${hide}`} form={verb.past} hidden={hide === "forms"} label="past simple" />
         <Form key={`pp${hide}`} form={verb.past_participle} hidden={hide === "forms"} label="past participle" />
-        <span className="hidden min-w-0 truncate md:block">{hide === "translations" ? "••••" : verb.uz}</span>
+        <span className="hidden min-w-0 truncate md:block">{hide === "translations" ? "••••" : <Highlight text={verb.uz} />}</span>
         <span className="hidden min-w-0 items-center gap-1 md:flex">
           <span className="truncate">{hide === "translations" ? "••••" : verb.ru}</span>
           {hide !== "translations" && verb.ru && <SpeakButton text={verb.ru.split(",")[0]!} lang="ru-RU" />}

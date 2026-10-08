@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, BookA, Check, ChevronRight, Pencil, Plus, Send, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Highlight } from "@/components/common/highlight";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,7 +362,9 @@ export function VocabularyView({ kind }: { kind: Kind }) {
       header: "Word",
       cell: (w) => (
         <div className="grid gap-0.5">
-          <span className="font-medium">{w.term}</span>
+          <span className="font-medium">
+            <Highlight text={w.term} query={search} />
+          </span>
           <span className="text-caption text-fg-muted">
             {w.level && w.level !== shownLevel && `${w.level} · `}
             {w.part_of_speech}
@@ -386,9 +389,12 @@ export function VocabularyView({ kind }: { kind: Kind }) {
           )}
           {(w.translations.uz || w.translations.ru) && (
             <span className="text-caption text-fg-muted">
-              {[w.translations.uz && `uz: ${w.translations.uz}`, w.translations.ru && `ru: ${w.translations.ru}${w.translations.ru_pron ? ` [${w.translations.ru_pron}]` : ""}`]
-                .filter(Boolean)
-                .join(" · ")}
+              <Highlight
+                query={search}
+                text={[w.translations.uz && `uz: ${w.translations.uz}`, w.translations.ru && `ru: ${w.translations.ru}${w.translations.ru_pron ? ` [${w.translations.ru_pron}]` : ""}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
             </span>
           )}
         </div>

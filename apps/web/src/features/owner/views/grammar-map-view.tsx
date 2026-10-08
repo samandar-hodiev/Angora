@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Highlight, HighlightProvider } from "@/components/common/highlight";
 import { cn } from "@/lib/utils";
 
 import { LiveDataState } from "../components/live-state";
@@ -186,6 +187,7 @@ export function GrammarMapView({ language }: { language: string }) {
           No grammar topic matches these filters.
         </p>
       ) : (
+        <HighlightProvider query={search}>
         <div className="grid gap-3">
           {(map.data ?? []).map((category) => (
             <CategoryGroup
@@ -197,6 +199,7 @@ export function GrammarMapView({ language }: { language: string }) {
             />
           ))}
         </div>
+        </HighlightProvider>
       )}
     </>
   );
@@ -235,7 +238,9 @@ function CategoryGroup({
       >
         <ChevronDown className={cn("size-4 shrink-0 text-fg-muted transition-transform duration-micro", !open && "-rotate-90")} aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-h4">{name}</span>
+          <span className="block truncate text-h4">
+            <Highlight text={name} />
+          </span>
           <span className="block text-caption text-fg-muted">
             {topics.length} topics · {live} with content learners can read
           </span>
@@ -255,9 +260,13 @@ function CategoryGroup({
                 )}
               >
                 <span className="grid min-w-0 flex-1 basis-64 gap-0.5">
-                  <span className="truncate text-body-sm">{topic.name}</span>
+                  <span className="truncate text-body-sm">
+                    <Highlight text={topic.name} />
+                  </span>
                   {topic.description && (
-                    <span className="truncate text-caption text-fg-muted">{topic.description}</span>
+                    <span className="truncate text-caption text-fg-muted">
+                      <Highlight text={topic.description} />
+                    </span>
                   )}
                 </span>
                 {topic.level && <Badge variant="outline">{topic.level}</Badge>}

@@ -128,7 +128,7 @@ export function highlightMatch(text: string, term?: string): ReactNode {
   for (let i = lower.indexOf(target); i !== -1; i = lower.indexOf(target, cursor)) {
     if (i > cursor) parts.push(text.slice(cursor, i));
     parts.push(
-      <mark key={i} className="rounded-xs bg-primary-subtle px-0.5 text-primary-subtle-foreground">
+      <mark key={i} className="rounded-[3px] bg-yellow-200 px-0.5 text-neutral-900">
         {text.slice(i, i + needle.length)}
       </mark>,
     );

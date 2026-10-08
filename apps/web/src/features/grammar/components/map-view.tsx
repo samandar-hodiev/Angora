@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { PageHeader } from "@/components/common/page-header";
+import { Highlight } from "@/components/common/highlight";
 import { SearchField } from "@/components/common/search-field";
 import { EmptyState, ErrorState } from "@/components/common/states";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,7 +73,7 @@ export function GrammarMapView() {
           {nodes.length === 0 ? (
             <EmptyState title="No topic matches" description={`Nothing on the map matches “${query}”. Try a shorter word.`} />
           ) : (
-            nodes.map((node) => <CategorySection key={node.slug} node={node} />)
+            nodes.map((node) => <CategorySection key={node.slug} node={node} query={query} />)
           )}
         </div>
       )}
@@ -100,14 +101,14 @@ function filterMap(nodes: GrammarMapNode[], query: string): GrammarMapNode[] {
     .filter((node) => node.groups.length > 0);
 }
 
-function CategorySection({ node }: { node: GrammarMapNode }) {
+function CategorySection({ node, query }: { node: GrammarMapNode; query: string }) {
   const topics = node.groups.flatMap((g) => g.topics);
   const ready = topics.filter((t) => !t.coming_soon).length;
   return (
     <section aria-labelledby={`map-${node.slug}`} className="rounded-xl border bg-surface p-4 sm:p-5">
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 id={`map-${node.slug}`} className="text-h4">
-          {node.name}
+          <Highlight text={node.name} query={query} />
         </h2>
         <span className="text-caption text-fg-muted tabular-nums">
           {ready} of {topics.length} ready
@@ -119,7 +120,7 @@ function CategorySection({ node }: { node: GrammarMapNode }) {
         <ul className="mt-3 gap-x-6 [column-width:17rem]">
           {node.groups[0]!.topics.map((topic) => (
             <li key={topic.slug} className="min-w-0 break-inside-avoid">
-              <MapTopic topic={topic} />
+              <MapTopic topic={topic} query={query} />
             </li>
           ))}
         </ul>
@@ -127,11 +128,15 @@ function CategorySection({ node }: { node: GrammarMapNode }) {
         <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-x-6 gap-y-4">
           {node.groups.map((group) => (
             <div key={group.label || "_"} className="grid min-w-0 content-start gap-1.5">
-              {group.label && <p className="text-label tracking-wide text-fg-muted uppercase">{group.label}</p>}
+              {group.label && (
+                <p className="text-label tracking-wide text-fg-muted uppercase">
+                  <Highlight text={group.label} query={query} />
+                </p>
+              )}
               <ul className="grid min-w-0 gap-0.5 border-l pl-3">
                 {group.topics.map((topic) => (
                   <li key={topic.slug} className="min-w-0">
-                    <MapTopic topic={topic} />
+                    <MapTopic topic={topic} query={query} />
                   </li>
                 ))}
               </ul>
@@ -143,7 +148,7 @@ function CategorySection({ node }: { node: GrammarMapNode }) {
   );
 }
 
-function MapTopic({ topic }: { topic: GrammarTopicSummary }) {
+function MapTopic({ topic, query }: { topic: GrammarTopicSummary; query: string }) {
   const soon = Boolean(topic.coming_soon);
   return (
     <Link
@@ -175,7 +180,9 @@ function MapTopic({ topic }: { topic: GrammarTopicSummary }) {
         />
       )}
       {/* The muted colour sits on the name, not the link: cn() would drop text-body-sm for it. */}
-      <span className={cn("min-w-0 flex-1 truncate", soon && "text-fg-muted")}>{topic.name}</span>
+      <span className={cn("min-w-0 flex-1 truncate", soon && "text-fg-muted")}>
+        <Highlight text={topic.name} query={query} />
+      </span>
       {soon && (
         <span className="shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-semibold tracking-wide text-warning-text uppercase">
           Soon

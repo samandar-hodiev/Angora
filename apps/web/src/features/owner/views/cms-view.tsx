@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { Highlight } from "@/components/common/highlight";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -126,7 +127,7 @@ export function OwnerCmsView({ initialType }: { initialType?: string } = {}) {
       cell: (row) => (
         <div className="grid min-w-0 gap-0.5">
           <button type="button" onClick={() => setEditing({ id: row.id })} className="truncate text-left font-medium hover:underline">
-            {row.title}
+            <Highlight text={row.title} query={search} />
           </button>
           <span className="truncate text-caption text-fg-muted">{row.type.replace(/_/g, " ")}</span>
         </div>
