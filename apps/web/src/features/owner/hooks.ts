@@ -217,6 +217,22 @@ export function useAIUsage(days: number) {
   });
 }
 
+export function useAITimeline(days: number) {
+  return useQuery({
+    queryKey: ["owner", "ai-timeline", days],
+    queryFn: () => assessmentApi.getAITimeline(days),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useActivity(query: { days: number; actor?: string; area?: string }) {
+  return useQuery({
+    queryKey: ["owner", "activity", query],
+    queryFn: () => assessmentApi.getActivity(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
 // ---- Content, grammar authoring and settings (live API) --------------------------------------
 
 export function useLiveContent(query: { search?: string; type?: string; skill?: string; level?: string; status?: string; page?: number }) {

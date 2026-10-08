@@ -128,7 +128,7 @@ export const ownerNav: OwnerNavSection[] = [
       { href: "/owner/paywall", label: "Paywall", icon: CreditCard },
       { href: "/owner/payments", label: "Payments", icon: Wallet },
       { href: "/owner/notifications", label: "Notifications", icon: Bell },
-      { href: "/owner/ai", label: "AI", icon: Sparkles },
+      { href: "/owner/ai", label: "AI & Activity", icon: Sparkles },
       { href: "/owner/audit", label: "Audit log", icon: ScrollText },
       // Named for what it configures. It is the Learner App's settings, not this console's.
       { href: "/owner/learner-app", label: "Learner App", icon: Smartphone },

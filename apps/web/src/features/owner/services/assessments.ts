@@ -258,6 +258,71 @@ export function getAIUsage(days: number): Promise<{
   return apiClient.get("/admin/ai-usage", { query: { days } });
 }
 
+export interface ProviderSpend {
+  provider: string;
+  requests: number;
+  failed: number;
+  input_tokens: number;
+  output_tokens: number;
+  audio_seconds: number;
+  cost_usd: number;
+  models: { model: string; requests: number; tokens: number; cost_usd: number; priced: boolean }[] | null;
+}
+
+export interface AITimeline {
+  days: number;
+  bucket: "hour" | "day";
+  providers: ProviderSpend[];
+  points: { at: string; by_provider: Record<string, { requests: number; tokens: number; cost_usd: number }> }[];
+  tasks: { task: string; requests: number; failed: number; tokens: number; cost_usd: number }[];
+  totals: ProviderSpend;
+}
+
+/** AI spend per provider over time; cost is worked out from tokens and model prices. */
+export function getAITimeline(days: number): Promise<AITimeline> {
+  return apiClient.get("/admin/ai/timeline", { query: { days } });
+}
+
+export interface ActivityPerson {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar_url: string | null;
+}
+
+export interface ActivityCounts {
+  total: number;
+  ai: number;
+  manual: number;
+  regenerated: number;
+  published: number;
+  deleted: number;
+}
+
+export interface ActivityEvent {
+  at: string;
+  actor: ActivityPerson;
+  area: string;
+  kind: string;
+  method: "ai" | "manual" | string;
+  target: string;
+  count: number;
+  detail: string;
+}
+
+export interface ActivityReport {
+  days: number;
+  workers: (ActivityPerson & ActivityCounts & { last_at: string })[];
+  by_area: Record<string, ActivityCounts>;
+  events: ActivityEvent[];
+}
+
+/** What the team did to the content: who, when, what, and whether the AI or a person wrote it. */
+export function getActivity(query: { days: number; actor?: string; area?: string }): Promise<ActivityReport> {
+  return apiClient.get("/admin/activity", { query });
+}
+
 // ---- Content, grammar authoring and settings -------------------------------------------------
 
 export async function getLiveContent(query: {

@@ -10,11 +10,16 @@ import { BarList } from "../components/charts";
 import { DataTable, Pagination, type Column } from "../components/data-table";
 import { LiveDataState } from "../components/live-state";
 import { OwnerPageHeader, SectionCard, SegmentedControl } from "../components/primitives";
-import { useAIFailures, useAIQuality, useAIUsage } from "../hooks";
+import { AISpendChart, ProviderMark, formatUSD } from "../components/ai-spend-chart";
+import { useAIFailures, useAIQuality, useAITimeline } from "../hooks";
+import { TeamActivity } from "./team-activity";
 import { formatDateTime, formatNumber } from "../lib/format";
 import type { AIFailureRow, AIQualityRow } from "../types";
 
 /**
+ * AI & Team Activity: what the AI costs, per provider and over time, and what every member of
+ * the team did to the content (see team-activity.tsx). Opens on the AI numbers.
+ *
  * AI monitoring: what the platform spends, what fails, and what the evaluators produce.
  *
  * Cost is the gateway's own estimate recorded per call, not a projection. Scores are
@@ -32,102 +37,139 @@ const rangeOptions = [
 ];
 
 export function OwnerAIView() {
-  const [days, setDays] = useState("30");
+  const [days, setDays] = useState("7");
+  const [view, setView] = useState<"ai" | "team">("ai");
   const numericDays = Number(days);
-  const usage = useAIUsage(numericDays);
 
   return (
     <>
       <OwnerPageHeader
-        title="AI"
-        description="Usage, cost, failures and evaluation quality."
-        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "AI" }]}
+        title="AI & Team Activity"
+        description="What the AI costs, provider by provider — and what every member of the team did to the content."
+        breadcrumbs={[{ label: "Owner", href: "/owner/dashboard" }, { label: "AI & Team Activity" }]}
       />
 
-      <div className="mb-5">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <SegmentedControl
+          label="View"
+          value={view}
+          options={[
+            { value: "ai", label: "AI usage" },
+            { value: "team", label: "Team activity" },
+          ]}
+          onChange={setView}
+        />
         <SegmentedControl label="Period" value={days} options={rangeOptions} onChange={setDays} />
       </div>
 
-      {usage.isError ? (
-        <LiveDataState error={usage.error} onRetry={() => void usage.refetch()} />
-      ) : (
-        <>
-          <section aria-label="AI totals" className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {usage.isPending || !usage.data
-              ? Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)
-              : [
-                  { label: "Requests", value: formatNumber(usage.data.totals.requests), hint: `${formatNumber(usage.data.totals.failed)} failed` },
-                  { label: "Estimated cost", value: `$${usage.data.totals.cost_usd.toFixed(2)}`, hint: "Recorded per call by the gateway" },
-                  {
-                    label: "Tokens",
-                    value: formatNumber(usage.data.totals.input_tokens + usage.data.totals.output_tokens),
-                    hint: `${formatNumber(usage.data.totals.input_tokens)} in · ${formatNumber(usage.data.totals.output_tokens)} out`,
-                  },
-                  {
-                    label: "Audio",
-                    value: `${Math.round(usage.data.totals.audio_seconds / 60)} min`,
-                    hint: `avg latency ${Math.round(usage.data.totals.avg_latency_ms)} ms`,
-                  },
-                ].map((stat) => (
-                  <article key={stat.label} className="grid gap-1 rounded-xl border bg-surface p-4">
-                    <h3 className="text-label text-fg-muted">{stat.label}</h3>
-                    <p className="text-h2 tabular-nums">{stat.value}</p>
-                    <p className="text-caption text-fg-muted">{stat.hint}</p>
-                  </article>
+      {view === "ai" ? <AIUsage days={numericDays} /> : <TeamActivity days={numericDays} />}
+    </>
+  );
+}
+
+function AIUsage({ days }: { days: number }) {
+  const timeline = useAITimeline(days);
+  const data = timeline.data;
+
+  if (timeline.isError) return <LiveDataState error={timeline.error} onRetry={() => void timeline.refetch()} />;
+
+  const models = (data?.providers ?? []).flatMap((p) => (p.models ?? []).map((m) => ({ ...m, provider: p.provider })));
+
+  return (
+    <>
+      <section aria-label="AI totals" className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {!data
+          ? Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)
+          : [
+              { label: "Requests", value: formatNumber(data.totals.requests), hint: `${formatNumber(data.totals.failed)} failed` },
+              { label: "Cost", value: formatUSD(data.totals.cost_usd), hint: "From tokens used × each model's price" },
+              {
+                label: "Tokens",
+                value: formatNumber(data.totals.input_tokens + data.totals.output_tokens),
+                hint: `${formatNumber(data.totals.input_tokens)} in · ${formatNumber(data.totals.output_tokens)} out`,
+              },
+              {
+                label: "Providers",
+                value: formatNumber(data.providers.length),
+                hint: `${Math.round(data.totals.audio_seconds / 60)} min of audio transcribed`,
+              },
+            ].map((stat) => (
+              <article key={stat.label} className="grid gap-1 rounded-xl border bg-surface p-4">
+                <h3 className="text-label text-fg-muted">{stat.label}</h3>
+                <p className="text-h2 tabular-nums">{stat.value}</p>
+                <p className="text-caption text-fg-muted">{stat.hint}</p>
+              </article>
+            ))}
+      </section>
+
+      <SectionCard
+        title="AI spend over time"
+        description={`Tokens and dollars per provider · ${data?.bucket === "hour" ? "by hour" : "by day"} — switch a provider off to compare the rest`}
+        className="mb-6"
+      >
+        {!data ? <Skeleton className="h-72 w-full" /> : <AISpendChart timeline={data} />}
+      </SectionCard>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <SectionCard title="Cost by feature" description="Which parts of the product spend the money">
+          {!data ? (
+            <Skeleton className="h-40 w-full" />
+          ) : data.tasks.length === 0 ? (
+            <p className="py-10 text-center text-body-sm text-fg-muted">No AI calls in this period.</p>
+          ) : (
+            <BarList
+              items={data.tasks.map((task) => ({
+                key: task.task || "other",
+                label: (task.task || "other").replace(/_/g, " "),
+                value: Math.max(1, Math.round(task.cost_usd * 10000)),
+                display: formatUSD(task.cost_usd),
+                hint: `${formatNumber(task.requests)} requests · ${formatNumber(task.tokens)} tokens · ${formatNumber(task.failed)} failed`,
+              }))}
+            />
+          )}
+        </SectionCard>
+
+        <SectionCard title="Cost by model" description="Provider and model">
+          {!data ? (
+            <Skeleton className="h-40 w-full" />
+          ) : models.length === 0 ? (
+            <p className="py-10 text-center text-body-sm text-fg-muted">No AI calls in this period.</p>
+          ) : (
+            <ul className="grid gap-2">
+              {models
+                .sort((x, y) => y.cost_usd - x.cost_usd)
+                .map((m) => (
+                  <li key={`${m.provider}/${m.model}`} className="flex items-center gap-3 rounded-lg border px-3 py-2">
+                    <ProviderMark provider={m.provider} index={data.providers.findIndex((p) => p.provider === m.provider)} />
+                    <span className="grid min-w-0 flex-1">
+                      <span className="truncate text-body-sm font-medium">{m.model || "—"}</span>
+                      <span className="text-caption text-fg-muted">
+                        {formatNumber(m.requests)} requests · {formatNumber(m.tokens)} tokens
+                        {!m.priced && " · no price set"}
+                      </span>
+                    </span>
+                    <span className="text-body-sm font-semibold tabular-nums">{formatUSD(m.cost_usd)}</span>
+                  </li>
                 ))}
-          </section>
-
-          <div className="mb-6 grid gap-4 lg:grid-cols-2">
-            <SectionCard title="Cost by feature" description="Which parts of the product spend the money">
-              {usage.isPending || !usage.data ? (
-                <Skeleton className="h-40 w-full" />
-              ) : usage.data.by_task.length === 0 ? (
-                <p className="py-10 text-center text-body-sm text-fg-muted">No AI calls in this period.</p>
-              ) : (
-                <BarList
-                  items={usage.data.by_task.map((task) => ({
-                    key: task.key,
-                    label: task.key.replace(/_/g, " "),
-                    value: Math.round(task.cost_usd * 100),
-                    display: `$${task.cost_usd.toFixed(2)}`,
-                    hint: `${formatNumber(task.requests)} requests · ${formatNumber(task.failed)} failed · ${Math.round(task.avg_latency_ms)} ms`,
-                  }))}
-                />
-              )}
-            </SectionCard>
-
-            <SectionCard title="Cost by model" description="Provider and model">
-              {usage.isPending || !usage.data ? (
-                <Skeleton className="h-40 w-full" />
-              ) : usage.data.by_model.length === 0 ? (
-                <p className="py-10 text-center text-body-sm text-fg-muted">No AI calls in this period.</p>
-              ) : (
-                <BarList
-                  items={usage.data.by_model.map((model) => ({
-                    key: model.key,
-                    label: model.key,
-                    value: Math.round(model.cost_usd * 100),
-                    display: `$${model.cost_usd.toFixed(2)}`,
-                    hint: `${formatNumber(model.requests)} requests`,
-                    color: "var(--info)",
-                  }))}
-                />
-              )}
-            </SectionCard>
-          </div>
-        </>
-      )}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
 
       <Tabs defaultValue="failures">
         <TabsList className="mb-4">
-          <TabsTrigger value="failures" className={activeTab}>Failures</TabsTrigger>
-          <TabsTrigger value="quality" className={activeTab}>Evaluation quality</TabsTrigger>
+          <TabsTrigger value="failures" className={activeTab}>
+            Failures
+          </TabsTrigger>
+          <TabsTrigger value="quality" className={activeTab}>
+            Evaluation quality
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="failures">
-          <FailuresSection days={numericDays} />
+          <FailuresSection days={days} />
         </TabsContent>
         <TabsContent value="quality">
-          <QualitySection days={numericDays} />
+          <QualitySection days={days} />
         </TabsContent>
       </Tabs>
     </>
