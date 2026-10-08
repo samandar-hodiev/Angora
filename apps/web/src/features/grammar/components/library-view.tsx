@@ -34,16 +34,6 @@ import {
 } from "../hooks";
 import { MasteryBar, TopicRow } from "./shared";
 
-const LEVELS: { value: GrammarLevelFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "me", label: "My Level" },
-  { value: "A1", label: "A1" },
-  { value: "A2", label: "A2" },
-  { value: "B1", label: "B1" },
-  { value: "B2", label: "B2" },
-  { value: "C1", label: "C1" },
-  { value: "C2", label: "C2" },
-];
 
 /**
  * The grammar library.
@@ -55,7 +45,9 @@ const LEVELS: { value: GrammarLevelFilter; label: string }[] = [
  */
 export function GrammarLibraryView() {
   const [query, setQuery] = useState("");
-  const [level, setLevel] = useState<GrammarLevelFilter>("all");
+  // Every topic, whatever the level: the explanation is the same for every learner, and the
+  // practice inside a topic adapts to theirs, so filtering the library by level only hid things.
+  const level: GrammarLevelFilter = "all";
   const searchRef = useRef<HTMLInputElement>(null);
 
   const categories = useGrammarCategories();
@@ -97,29 +89,6 @@ export function GrammarLibraryView() {
             </Button>
           </div>
 
-          <div
-            role="group"
-            aria-label="Filter by level"
-            className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
-          >
-            {LEVELS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={level === option.value}
-                onClick={() => setLevel(option.value)}
-                className={cn(
-                  "shrink-0 rounded-lg border px-3 py-1.5 text-label transition-colors duration-micro outline-none",
-                  "focus-visible:ring-[3px] focus-visible:ring-ring/40",
-                  level === option.value
-                    ? "border-primary bg-primary-subtle text-primary-subtle-foreground"
-                    : "bg-surface text-fg-secondary hover:bg-surface-hover hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {searching ? (
@@ -340,7 +309,7 @@ function CategoryFolder({
             </div>
           ) : groups.length === 0 ? (
             <p className="px-4 py-4 text-body-sm text-fg-muted">
-              No topics at this level. Switch to All to see the rest.
+              No topics here yet.
             </p>
           ) : (
             groups.map((group) => (
