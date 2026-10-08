@@ -68,6 +68,14 @@ func (q *MemoryQueue) State(_ context.Context, id uuid.UUID) (*State, error) {
 	return &s, nil
 }
 
+// SetProgress records how far a running job has got, on its running state.
+func (q *MemoryQueue) SetProgress(_ context.Context, job *Job, p Progress) error {
+	s := stateOf(job, StatusRunning)
+	s.Progress = &p
+	q.put(s)
+	return nil
+}
+
 func (q *MemoryQueue) put(s State) {
 	q.mu.Lock()
 	defer q.mu.Unlock()

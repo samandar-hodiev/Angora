@@ -246,6 +246,8 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         }
       />
 
+      {writing && <GenerationProgress progress={generation.progress} parts={writing.parts} levels={writing.levels} startedAt={generation.active?.started_at} />}
+
       <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch">
         <SectionCard title="Basic information" description="Comes from the curriculum; you do not retype it" className="h-full">
           <dl className="grid sm:grid-cols-2">
@@ -2455,7 +2457,7 @@ function WritingPlaceholder({
     <div className="grid gap-4" aria-busy aria-live="polite">
       <WritingBanner level={level} languages={languages} startedAt={startedAt} />
 
-      <WritingCard title={`${level} content`}>
+      <WritingCard title="Explanation">
         <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <WritingField label="Title" lines={1} seed={0} />
@@ -2477,6 +2479,70 @@ function WritingPlaceholder({
         </WritingCard>
       ))}
     </div>
+  );
+}
+
+/**
+ * How far a generation has got, as a percentage across the top of the page: the explanation,
+ * each translation, each level's test and tasks are steps the worker reports as it finishes
+ * them. Before the first report it shows 0% and keeps moving, rather than guessing.
+ */
+function GenerationProgress({
+  progress,
+  parts,
+  levels,
+  startedAt,
+}: {
+  progress: { done: number; total: number } | null;
+  parts?: GeneratePart[];
+  levels: CEFRLevel[];
+  startedAt?: number;
+}) {
+  const now = useNow();
+  const total = progress?.total ?? 0;
+  const done = Math.min(progress?.done ?? 0, total);
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const elapsed = startedAt && now > startedAt ? Math.floor((now - startedAt) / 1000) : 0;
+  const what = (parts && parts.length > 0 ? parts : generateParts)
+    .map((part) => ({ explanation: "explanation", test: "tests", writing: "writing", speaking: "speaking" })[part])
+    .join(", ");
+
+  return (
+    <section
+      role="status"
+      aria-live="polite"
+      className="relative mb-5 grid gap-3 overflow-hidden rounded-xl border border-primary/40 bg-surface p-4"
+    >
+      <div aria-hidden className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5" />
+      <div className="relative flex flex-wrap items-center gap-3">
+        <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+          <Sparkles className="size-4 animate-spin [animation-duration:2.4s]" aria-hidden />
+        </span>
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <p className="text-body font-medium">
+            Generating with AI{" "}
+            <span className="text-fg-muted">
+              · {total > 0 ? `${done} of ${total} steps` : "starting"}
+              {elapsed > 0 && ` · ${formatDuration(elapsed * 1000)}`}
+            </span>
+          </p>
+          <p className="text-caption text-fg-muted">
+            {what} · practice for {levels.join(", ")} · you can leave this page — it keeps going.
+          </p>
+        </div>
+        <span className="text-h4 text-primary tabular-nums">{pct}%</span>
+      </div>
+      <div
+        className="relative h-2 overflow-hidden rounded-full bg-surface-active"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-label="Generation progress"
+      >
+        <div className="h-full rounded-full bg-primary transition-[width] duration-700" style={{ width: `${Math.max(pct, 3)}%` }} />
+      </div>
+    </section>
   );
 }
 

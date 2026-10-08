@@ -121,7 +121,7 @@ func (w *Worker) execute(ctx context.Context, job *Job, log *slog.Logger) Outcom
 	}
 
 	start := time.Now()
-	jobCtx, cancel := context.WithTimeout(ctx, w.JobTimeout)
+	jobCtx, cancel := context.WithTimeout(withTracker(ctx, w.queue, job), w.JobTimeout)
 	defer cancel()
 	result, err := safeRun(jobCtx, handler, job)
 	elapsed := slog.Int64("duration_ms", time.Since(start).Milliseconds())

@@ -1316,6 +1316,8 @@ export interface JobState {
   status: "queued" | "running" | "retrying" | "succeeded" | "failed";
   error_code?: string;
   result?: { languages?: string[]; failed?: string[] };
+  /** Steps done of the job's total, while it runs. Absent for jobs that do not report it. */
+  progress?: { done: number; total: number };
 }
 
 export interface TopicContent {

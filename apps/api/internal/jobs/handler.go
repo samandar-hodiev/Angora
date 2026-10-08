@@ -20,6 +20,7 @@ type StateView struct {
 	Attempts  int            `json:"attempts"`
 	ErrorCode string         `json:"error_code,omitempty"`
 	Result    map[string]any `json:"result,omitempty"`
+	Progress  *Progress      `json:"progress,omitempty"`
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
@@ -50,7 +51,7 @@ func RegisterRoutes(v1 *gin.RouterGroup, queue Queue) {
 		}
 		httpx.OK(c, StateView{
 			ID: s.ID, Type: s.Type, Status: s.Status, Attempts: s.Attempts,
-			ErrorCode: s.ErrorCode, Result: s.Result, UpdatedAt: s.UpdatedAt,
+			ErrorCode: s.ErrorCode, Result: s.Result, Progress: s.Progress, UpdatedAt: s.UpdatedAt,
 		})
 	})
 }

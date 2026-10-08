@@ -14,6 +14,7 @@ import (
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
+	"github.com/samandar-hodiev/engora/apps/api/internal/jobs"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/apperr"
 	"github.com/samandar-hodiev/engora/apps/api/pkg/cefr"
@@ -86,19 +87,20 @@ func (m *Module) writeTasks(
 		kind  string
 		level cefr.Level
 	}
-	var jobs []job
+	var todo []job
 	for _, level := range levels {
 		for _, kind := range kinds {
-			jobs = append(jobs, job{kind, level})
+			todo = append(todo, job{kind, level})
 		}
 	}
-	out := make([]*PracticeTask, len(jobs))
+	out := make([]*PracticeTask, len(todo))
 	sem := make(chan struct{}, translationConcurrency)
 	var wg sync.WaitGroup
-	for i, j := range jobs {
+	for i, j := range todo {
 		wg.Add(1)
 		go func(i int, j job) {
 			defer wg.Done()
+			defer jobs.TrackerFrom(ctx).Step()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			req := ai.GrammarWritingTaskRequest{
@@ -123,7 +125,7 @@ func (m *Module) writeTasks(
 
 	var written []PracticeTask
 	var failed []string
-	for i, j := range jobs {
+	for i, j := range todo {
 		if out[i] == nil {
 			failed = append(failed, j.kind+":"+j.level.BaseCode())
 			continue

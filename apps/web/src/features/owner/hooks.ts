@@ -565,7 +565,12 @@ export function useGrammarGeneration(
     setActive(null);
   }, [active, status, lost, client, slug, storageKey, job.data]);
 
-  return { start, active, generating: Boolean(active) || start.isPending };
+  return {
+    start,
+    active,
+    generating: Boolean(active) || start.isPending,
+    progress: active ? (job.data?.progress ?? null) : null,
+  };
 }
 
 const GENERATION_GIVE_UP_MS = 7 * 60 * 1000;

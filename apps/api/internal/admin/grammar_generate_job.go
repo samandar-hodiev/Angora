@@ -129,6 +129,23 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 		category = *current.Topic.CategoryName
 	}
 
+	// Steps, for the progress bar: the explanation, one translation per language, a test
+	// per level, a task per level and kind, and storing it all.
+	progress := jobs.TrackerFrom(ctx)
+	steps := 1
+	if plan.wants(PartExplanation) {
+		steps += 1 + len(plan.Targets)
+	}
+	if plan.wants(PartTest) {
+		steps += len(levels)
+	}
+	for _, part := range []string{PartWriting, PartSpeaking} {
+		if plan.wants(part) {
+			steps += len(levels)
+		}
+	}
+	progress.SetTotal(steps)
+
 	actor := plan.Actor
 	failed := []string{}
 	languages := []string{}
@@ -162,6 +179,7 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 		for _, code := range generated.Dropped {
 			failed = append(failed, plan.Source+":"+code)
 		}
+		progress.Step()
 	}
 	lessons, taskLevels, err := m.lessonsFor(ctx, plan, levels, generated)
 	if err != nil {
@@ -216,6 +234,7 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 				done = shareTranslation(done[0], generated.Levels)
 			}
 			translations = append(translations, translation{target, done, missing})
+			progress.Step()
 		}
 	}
 	writtenTests := <-tests
@@ -268,6 +287,7 @@ func (m *Module) runGeneration(ctx context.Context, plan generationPlan) (map[st
 	if err := m.storeTasks(ctx, current.Topic.ID, actor, "ai", writtenTasks.tasks); err != nil {
 		return nil, err
 	}
+	progress.Step()
 
 	return map[string]any{
 		"slug": plan.Slug, "languages": languages, "levels": plan.Levels, "parts": plan.partsOrAll(), "failed": failed,
@@ -389,6 +409,7 @@ func (m *Module) writeTests(
 		wg.Add(1)
 		go func(i int, parsed cefr.Level) {
 			defer wg.Done()
+			defer jobs.TrackerFrom(ctx).Step()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			questions, _, err := writer.WriteGrammarPractice(ctx, ai.GrammarPracticeRequest{

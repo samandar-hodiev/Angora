@@ -154,6 +154,13 @@ func (q *RedisQueue) State(ctx context.Context, id uuid.UUID) (*State, error) {
 	return &s, nil
 }
 
+// SetProgress records how far a running job has got, on its running state.
+func (q *RedisQueue) SetProgress(ctx context.Context, job *Job, p Progress) error {
+	state := stateOf(job, StatusRunning)
+	state.Progress = &p
+	return q.setState(ctx, state)
+}
+
 func (q *RedisQueue) setState(ctx context.Context, s State) error {
 	raw, err := json.Marshal(s)
 	if err != nil {

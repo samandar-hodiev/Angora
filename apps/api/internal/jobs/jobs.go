@@ -81,6 +81,7 @@ type State struct {
 	Attempts  int            `json:"attempts"`
 	ErrorCode string         `json:"error_code,omitempty"`
 	Result    map[string]any `json:"result,omitempty"`
+	Progress  *Progress      `json:"progress,omitempty"`
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
