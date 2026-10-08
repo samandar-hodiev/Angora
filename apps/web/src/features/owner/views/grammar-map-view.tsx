@@ -188,7 +188,13 @@ export function GrammarMapView({ language }: { language: string }) {
       ) : (
         <div className="grid gap-3">
           {(map.data ?? []).map((category) => (
-            <CategoryGroup key={category.slug} name={category.name} topics={category.topics} language={language} />
+            <CategoryGroup
+              key={category.slug}
+              name={category.name}
+              topics={category.topics}
+              language={language}
+              filtering={Boolean(search) || status !== "all" || level !== "all"}
+            />
           ))}
         </div>
       )}
@@ -196,8 +202,25 @@ export function GrammarMapView({ language }: { language: string }) {
   );
 }
 
-function CategoryGroup({ name, topics, language }: { name: string; topics: MapTopic[]; language: string }) {
-  const [open, setOpen] = useState(true);
+function CategoryGroup({
+  name,
+  topics,
+  language,
+  filtering,
+}: {
+  name: string;
+  topics: MapTopic[];
+  language: string;
+  filtering: boolean;
+}) {
+  // Closed by default, so the page reads as a list of categories; a search or filter opens
+  // every category it leaves, since the matches are what the owner came for.
+  const [open, setOpen] = useState(filtering);
+  const [wasFiltering, setWasFiltering] = useState(filtering);
+  if (filtering !== wasFiltering) {
+    setWasFiltering(filtering);
+    setOpen(filtering);
+  }
   const live = topics.filter(
     (t) => t.content.status === "published" || t.content.status === "partially_published",
   ).length;
