@@ -435,10 +435,8 @@ type MapGroup struct {
 // and the relation graph is already available per topic.
 func (m *Module) topicMap(c *gin.Context) {
 	p, _ := authz.PrincipalFrom(c)
-	// The whole curriculum, not only what is published: the map is the road ahead, and a
-	// topic still being written is shown as coming soon rather than left out.
 	rows, err := m.pool.Query(c.Request.Context(), `SELECT `+topicColumns+topicJoins+`
-		WHERE t.status IN ('published', 'draft') AND c.status = 'published'
+		WHERE t.status = 'published' AND c.status = 'published'
 		ORDER BY c.sort_order, t.group_order, t.sort_order, t.name`, p.UserID)
 	if err != nil {
 		httpx.Fail(c, err)
@@ -450,25 +448,6 @@ func (m *Module) topicMap(c *gin.Context) {
 	if err != nil {
 		httpx.Fail(c, err)
 		return
-	}
-	published := map[string]bool{}
-	pubRows, err := m.pool.Query(c.Request.Context(), `SELECT slug FROM grammar_topics WHERE status = 'published'`)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	for pubRows.Next() {
-		var slug string
-		if err := pubRows.Scan(&slug); err != nil {
-			pubRows.Close()
-			httpx.Fail(c, err)
-			return
-		}
-		published[slug] = true
-	}
-	pubRows.Close()
-	for i := range topics {
-		topics[i].ComingSoon = !published[topics[i].Slug]
 	}
 
 	nodes := []MapNode{}

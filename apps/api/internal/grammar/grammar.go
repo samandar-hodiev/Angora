@@ -90,10 +90,6 @@ type TopicSummary struct {
 	State           string     `json:"state"`
 	Attempts        int        `json:"attempts"`
 	LastPracticedAt *time.Time `json:"last_practiced_at"`
-
-	// ComingSoon marks a curriculum topic that is not published yet. Only the map sends
-	// these, so a learner sees the whole road ahead; nothing else lists them.
-	ComingSoon bool `json:"coming_soon,omitempty"`
 }
 
 // Formula is one pattern of a topic ("Affirmative: Subject + V2") with its examples.

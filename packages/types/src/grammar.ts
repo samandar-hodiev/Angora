@@ -61,8 +61,6 @@ export interface GrammarTopicSummary {
   state: GrammarState;
   attempts: number;
   last_practiced_at: Timestamp | null;
-  /** Only on the map: a curriculum topic that is not published yet. */
-  coming_soon?: boolean;
 }
 
 export interface GrammarFormula {
