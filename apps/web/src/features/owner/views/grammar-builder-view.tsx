@@ -223,15 +223,22 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         ]}
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => router.push("/owner/content/grammar")}>
+            <Button variant="ghost" className="h-9" onClick={() => router.push("/owner/content/grammar")}>
               <ArrowLeft aria-hidden />
               Grammar Map
             </Button>
-            <Button variant="outline" size="sm" loading={Boolean(writing)} onClick={() => setDialogOpen(true)}>
-              <Sparkles aria-hidden />
+            {/* The AI action has its own look — a violet-to-green wash — so it reads as "the
+                model writes this", not as one more neutral button beside Publish. */}
+            <Button
+              variant="subtle"
+              className="h-9 border border-primary/35 bg-[linear-gradient(110deg,color-mix(in_oklch,oklch(0.64_0.17_295)_22%,transparent),color-mix(in_oklch,var(--primary)_22%,transparent))] px-4 text-foreground hover:brightness-110"
+              loading={Boolean(writing)}
+              onClick={() => setDialogOpen(true)}
+            >
+              <Sparkles aria-hidden className="text-primary" />
               {writing ? "Writing…" : "Generate with AI"}
             </Button>
-            <Button size="sm" disabled={written.length === 0} onClick={() => setPublishOpen(true)}>
+            <Button className="h-9 px-4" disabled={written.length === 0} onClick={() => setPublishOpen(true)}>
               <Send aria-hidden />
               Publish
             </Button>
