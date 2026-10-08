@@ -7,6 +7,7 @@ import {
   Mic,
   PenLine,
   ChartLine,
+  ClipboardCheck,
   GraduationCap,
   House,
   Library,
@@ -63,6 +64,9 @@ export const lexiconItems: NavItem[] = [
   { href: "/app/collocations", label: "Collocations", icon: Link2 },
   { href: "/app/irregular-verbs", label: "Irregular verbs", icon: Shuffle },
 ];
+
+/** Timed exams at a chosen level, set apart from Practice: no hints, results at the end. */
+export const mockExamNav: NavItem = { href: "/app/mock-exam", label: "Mock exam", icon: ClipboardCheck };
 
 export const primaryNav: NavItem[] = [
   { href: "/app/ielts", label: "IELTS", icon: GraduationCap },

@@ -33,6 +33,7 @@ import {
   lexiconItems,
   lexiconNav,
   learnOverviewNav,
+  mockExamNav,
   mobileNav,
   primaryNav,
   secondaryNav,
@@ -226,6 +227,7 @@ function SidebarNav({ inSheet = false, collapsed = false }: { inSheet?: boolean;
         {/* What there is to learn first (grammar, then words), then where to practise it. */}
         <NavTree root={lexiconNav} id="nav-lexicon" items={lexiconItems} link={link} collapsed={collapsed} />
         <NavTree root={learnNav} id="nav-skills" items={skillItems} link={link} collapsed={collapsed} />
+        <li>{link(mockExamNav)}</li>
         {primaryNav.map((item) => (
           <li key={item.href}>{link(item)}</li>
         ))}
