@@ -38,7 +38,10 @@ const fixture: MapCategory[] = [
 ];
 
 const map = vi.hoisted(() => ({ state: { data: [] as MapCategory[], isPending: false, isError: false, error: null, refetch: () => {} } }));
-vi.mock("../hooks", () => ({ useGrammarMap: () => map.state }));
+vi.mock("../hooks", () => ({
+  useGrammarMap: () => map.state,
+  useDeleteAnyGrammarContent: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 
 function row(name: string): HTMLElement {
   return screen.getByRole("link", { name: new RegExp(name, "i") });
