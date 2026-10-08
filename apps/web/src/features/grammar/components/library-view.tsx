@@ -8,12 +8,12 @@ import {
   Map as MapIcon,
   Search,
   Target,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
 import { PageHeader, SectionTitle } from "@/components/common/page-header";
+import { SearchField } from "@/components/common/search-field";
 import {
   EmptyState,
   ErrorState,
@@ -21,7 +21,6 @@ import {
 } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { GrammarCategory, GrammarTopicSummary } from "@engora/types";
@@ -82,37 +81,14 @@ export function GrammarLibraryView() {
             style={{ top: "calc(var(--app-header-h, 3.5rem) + 12px)" }}
             className="sticky z-20 flex items-center gap-2"
           >
-            <div className="relative min-w-0 flex-1">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-muted"
-                aria-hidden
-              />
-              <Input
-                ref={searchRef}
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setQuery("");
-                }}
-                placeholder="Search grammar topics..."
-                aria-label="Search grammar topics"
-                className="h-11 pr-10 pl-9"
-              />
-              {searching && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery("");
-                    searchRef.current?.focus();
-                  }}
-                  aria-label="Clear search"
-                  className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-fg-muted outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
-                >
-                  <X className="size-4" aria-hidden />
-                </button>
-              )}
-            </div>
+            <SearchField
+              ref={searchRef}
+              value={query}
+              onChange={setQuery}
+              placeholder="Search grammar topics — a rule, a form or an example"
+              label="Search grammar topics"
+              className="min-w-0"
+            />
             <Button variant="outline" className="h-11 shrink-0" asChild>
               <Link href="/app/grammar/map">
                 <MapIcon aria-hidden />
