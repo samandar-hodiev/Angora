@@ -54,7 +54,6 @@ import type {
   GeneratePart,
   GrammarBody,
   LevelContent,
-  LevelStatus,
   PracticeKind,
   PracticeQuestion,
   PracticeTask,
@@ -78,14 +77,6 @@ import type {
 
 const activeTab = "data-[state=active]:text-primary-text data-[state=active]:ring-1 data-[state=active]:ring-border";
 
-const levelTone: Record<LevelStatus, string> = {
-  published: "bg-success/15 text-success",
-  draft: "bg-warning/20 text-warning-text",
-  review: "bg-warning/20 text-warning-text",
-  archived: "bg-surface-active text-fg-muted",
-  not_applicable: "bg-surface-active text-fg-disabled line-through",
-  not_created: "bg-surface-active text-fg-muted",
-};
 
 export function GrammarBuilderView({ slug }: { slug: string }) {
   const router = useRouter();
@@ -169,7 +160,21 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
   const current = data.levels.find((entry) => entry.level === level) ?? data.levels[0]!;
   const issues = validation.data?.issues ?? [];
   const written = data.levels.filter((entry) => entry.status !== "not_created" && entry.status !== "not_applicable");
-  const live = data.levels.filter((entry) => entry.status === "published");
+  /**
+   * The explanation is one lesson stored at every level, so the Editor and the Preview show
+   * one level's copy of it — the curriculum level's when it has one — and saving it updates
+   * them all. The level only matters for the practice tabs.
+   */
+  const lesson =
+    written.find((entry) => entry.level === data.topic.level) ??
+    written[0] ??
+    data.levels.find((entry) => entry.level === data.topic.level) ??
+    current;
+  const explaining =
+    Boolean(writing) &&
+    (!writing!.parts?.length || writing!.parts.includes("explanation")) &&
+    writing!.languages.includes(language);
+  const practiceTab = tab === "test" || tab === "writing" || tab === "speaking";
 
   function runGenerate(levels: CEFRLevel[], overwrite: boolean, languages: ContentLanguage[], parts: GeneratePart[]) {
     // The dialog closes at once: the editor itself shows what is being written, field by
@@ -249,25 +254,8 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
           )}
         </SectionCard>
 
-        <SectionCard title="Where this stands" description={`${live.length} of ${written.length || 6} levels live`}>
-          <div className="grid gap-2">
-            <LanguageSwitch value={language} onChange={setLanguage} />
-            <ul className="grid gap-1 text-caption">
-              {data.levels.map((entry) => (
-                <li key={entry.level} className="flex items-center justify-between gap-2">
-                  <span className="tabular-nums">{entry.level}</span>
-                  {isWriting(writing, entry.level, language) ? (
-                    <WritingBadge />
-                  ) : (
-                    <span className={cn("rounded px-1.5 py-0.5", levelTone[entry.status])}>
-                      {entry.status.replace(/_/g, " ")}
-                      {entry.status !== "not_created" && entry.version > 0 ? ` · v${entry.version}` : ""}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <SectionCard title="Language" description="The explanation is written in each; the practice is shared">
+          <LanguageSwitch value={language} onChange={setLanguage} />
         </SectionCard>
       </div>
 
@@ -284,36 +272,6 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
           </ul>
         </div>
       )}
-
-      {/* The level being edited. Switching it changes the text, not just a label — that is
-          the whole point of writing a topic six times. */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        {cefrLevels.map((code) => {
-          const entry = data.levels.find((item) => item.level === code);
-          const selected = code === level;
-          return (
-            <button
-              key={code}
-              type="button"
-              onClick={() => setLevel(code)}
-              aria-pressed={selected}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-body-sm transition-colors duration-micro",
-                selected ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "hover:bg-surface-hover",
-              )}
-            >
-              {code}
-              {isWriting(writing, code, language) ? (
-                <WritingBadge compact />
-              ) : (
-                <span className={cn("rounded px-1 text-[0.625rem]", levelTone[entry?.status ?? "not_created"])}>
-                  {(entry?.status ?? "not_created").replace(/_/g, " ")}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
@@ -344,11 +302,53 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
           </TabsTrigger>
         </TabsList>
 
+        {/* The level whose practice is open. Only the practice changes with the level — the
+            explanation is the same lesson for every one of them. */}
+        {practiceTab ? (
+          <div className="mb-4 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-caption text-fg-muted">Practice for</span>
+            {cefrLevels.map((code) => {
+              const entry = data.levels.find((item) => item.level === code);
+              const task = entry && tab !== "test" ? taskOf(entry, tab as "writing" | "speaking") : undefined;
+              const selected = code === level;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLevel(code)}
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-body-sm transition-colors duration-micro",
+                    selected ? "border-primary bg-primary-subtle text-primary-subtle-foreground" : "hover:bg-surface-hover",
+                  )}
+                >
+                  {code}
+                  {isWriting(writing, code, language, tab as GeneratePart) ? (
+                    <WritingBadge compact />
+                  ) : (
+                    <span className="rounded bg-surface-active px-1 text-[0.625rem] text-fg-muted tabular-nums">
+                      {tab === "test" ? `${entry?.question_count ?? 0} q` : (task?.status ?? "none")}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary-subtle/40 px-4 py-2.5 text-body-sm">
+            <Badge variant="outline" className="border-primary/40 text-primary-subtle-foreground">
+              A1–C2
+            </Badge>
+            One complete explanation for every level. Learners at every level read this same lesson; saving it updates all
+            levels. Only the test, writing and speaking change with the level.
+          </p>
+        )}
+
         <TabsContent value="editor">
-          {isWriting(writing, current.level, language, "explanation") ? (
-            <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
+          {explaining ? (
+            <WritingPlaceholder level={lesson.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
-            <LevelEditor key={`${language}-${current.level}-${current.version}`} slug={slug} language={language} content={current} />
+            <LevelEditor key={`${language}-${lesson.level}-${lesson.version}`} slug={slug} language={language} content={lesson} />
           )}
         </TabsContent>
 
@@ -378,10 +378,10 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         ))}
 
         <TabsContent value="preview">
-          {isWriting(writing, current.level, language, "explanation") ? (
-            <WritingPlaceholder level={current.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
+          {explaining ? (
+            <WritingPlaceholder level={lesson.level} languages={writing!.languages} startedAt={generation.active?.started_at} />
           ) : (
-            <LearnerPreview topic={data.topic.name} level={current.level} language={language} content={current} />
+            <LearnerPreview topic={data.topic.name} level={lesson.level} language={language} content={lesson} />
           )}
         </TabsContent>
       </Tabs>
@@ -401,7 +401,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
         description={
           issues.length > 0
             ? `${issues.length} ${issues.length === 1 ? "issue has" : "issues have"} to be fixed first. Publishing is refused until they are.`
-            : `${written.length} level${written.length === 1 ? "" : "s"} go live in ${contentLanguages.map((code) => contentLanguageLabels[code]).join(", ")} together — every language that has a draft. Learners on other levels keep whatever is published for them.`
+            : `The explanation and every level's practice go live in ${contentLanguages.map((code) => contentLanguageLabels[code]).join(", ")} together — every language that has a draft.`
         }
         confirmLabel="Publish"
         loading={publish.isPending}
