@@ -30,7 +30,28 @@ const STUDIO_LIGHTS = {
 };
 const STUDIO_EXPOSURE = 1.12;
 
-/** Full anisotropic filtering: fabric and hair stay crisp instead of smearing at an angle. */
+/** Pixels the coach may render, at most — about two 4K frames' worth of a large stage. */
+const MAX_RENDER_PIXELS = 9_000_000;
+
+/**
+ * How much denser than the screen to render (the library multiplies by devicePixelRatio).
+ * 2× supersampling is what makes lashes, irises and hair edges read as sharp; the area cap
+ * keeps a big stage on a weak GPU from rendering more than it can draw at 30 fps.
+ */
+function supersampling(container: HTMLElement) {
+  const dpr = window.devicePixelRatio || 1;
+  const area = Math.max(1, container.clientWidth * container.clientHeight);
+  const total = Math.max(dpr, Math.min(dpr * 2, 4, Math.sqrt(MAX_RENDER_PIXELS / area)));
+  return total / dpr;
+}
+
+/** Normal maps a little stronger than authored: pores, folds and hair strands catch the light. */
+const NORMAL_BOOST = 1.35;
+
+/**
+ * Crisper materials: full anisotropic filtering, so fabric and hair stay sharp instead of
+ * smearing at an angle, and a stronger normal map for surface detail.
+ */
 function sharpenTextures(head: TalkingHead) {
   const max = head.renderer.capabilities.getMaxAnisotropy();
   head.scene.traverse((object) => {
@@ -44,6 +65,8 @@ function sharpenTextures(head: TalkingHead) {
           texture.needsUpdate = true;
         }
       }
+      const normalScale = material.normalScale as { multiplyScalar(n: number): void } | undefined;
+      if (material.normalMap && normalScale) normalScale.multiplyScalar(NORMAL_BOOST);
     }
   });
 }
@@ -123,10 +146,7 @@ export function Coach3D({
         lipsyncLang: "en",
         cameraView: initial.current.view,
         cameraRotateEnable: false,
-        // Supersampled: rendered at 1.5× the screen's density (the library multiplies this by
-        // devicePixelRatio itself), capped at 3× overall. Eyes, lashes and hair edges are where
-        // a face reads as sharp or soft, and they need the extra pixels.
-        modelPixelRatio: Math.min(1.5, 3 / (window.devicePixelRatio || 1)),
+        modelPixelRatio: supersampling(container),
         modelFPS: 30,
         avatarMood: initial.current.mood,
         // More eye contact and a little more head movement: a person who is listening to you,
@@ -249,7 +269,9 @@ export function Coach3D({
 
   return (
     <div className={cn("relative", className)}>
-      <div ref={node} className="absolute inset-0" />
+      {/* A touch of contrast and colour on top of the neutral tone mapping, which is accurate
+          but reads slightly flat on a dark stage. */}
+      <div ref={node} className="absolute inset-0 [filter:contrast(1.06)_saturate(1.08)]" />
       {status === "loading" && (
         <div className="absolute inset-0 grid place-items-center">
           <div className="grid justify-items-center gap-3 text-white/80">
