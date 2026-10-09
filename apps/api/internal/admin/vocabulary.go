@@ -267,6 +267,11 @@ func (in wordInput) clean() (ai.GeneratedWord, error) {
 			w.Translations[lang] = t
 		}
 	}
+	if kind := ai.KindOf(w.PartOfSpeech); !ai.FitsKind(w.Term, kind) {
+		return w, apperr.Validation(map[string]any{
+			"fields": map[string]any{"term": "a " + kind + " has at least two words — a single word belongs in Vocabulary"},
+		})
+	}
 	kept := ai.UsableWords([]ai.GeneratedWord{w}, nil)
 	if len(kept) == 0 {
 		return w, apperr.Validation(map[string]any{

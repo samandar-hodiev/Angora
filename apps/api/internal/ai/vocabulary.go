@@ -47,6 +47,20 @@ var KindPartsOfSpeech = map[string][]string{
 	KindCollocation: {"verb + noun", "adjective + noun", "adverb + adjective", "adverb + verb", "noun + noun", "verb + preposition", "noun + preposition", "verb + adverb"},
 }
 
+// FitsKind reports whether a term has the shape its kind needs. A phrase or a collocation is
+// learned as more than one word — "explain" or "together" is a word, however the model labels
+// it — and an infinitive "to" in front ("to mention") does not count as a second word.
+func FitsKind(term, kind string) bool {
+	if kind != KindPhrase && kind != KindCollocation {
+		return true
+	}
+	words := strings.Fields(strings.ToLower(term))
+	if len(words) > 0 && words[0] == "to" {
+		words = words[1:]
+	}
+	return len(words) >= 2
+}
+
 // PartsOfSpeech are every value a part of speech may take, across kinds.
 var PartsOfSpeech = func() []string {
 	out := []string{}
@@ -189,8 +203,8 @@ func vocabularySchema(kind string) json.RawMessage {
 
 var kindGuide = map[string]string{
 	KindWord:        "single English words",
-	KindPhrase:      "phrases learned as a whole: phrasal verbs (look after), idioms (break the ice) and fixed phrases (by the way) — never single words, never free combinations",
-	KindCollocation: "collocations: two or three words that naturally go together where another word would sound wrong (make a decision, heavy rain, deeply sorry) — never single words, never idioms",
+	KindPhrase:      "phrases learned as a whole: phrasal verbs (look after), idioms (break the ice) and fixed phrases (by the way) — never single words, never free combinations; every term has at least two words (not counting an infinitive \"to\")",
+	KindCollocation: "collocations: two or three words that naturally go together where another word would sound wrong (make a decision, heavy rain, deeply sorry) — never single words, never idioms; every term has at least two words",
 }
 
 // WriteVocabulary writes one batch of entries of one kind.
@@ -249,7 +263,9 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	for _, e := range req.Exclude {
 		excluded[strings.ToLower(strings.TrimSpace(e))] = true
 	}
-	words := UsableWords(out.words(kind), excluded)
+	// Only entries of the kind asked for: a phrase run that comes back with a single word labelled
+	// as a noun drops it rather than filing it under Vocabulary.
+	words := slices.DeleteFunc(UsableWords(out.words(kind), excluded), func(w GeneratedWord) bool { return w.Kind != kind })
 	if len(words) == 0 {
 		return nil, nil, fmt.Errorf("no usable words came back")
 	}
@@ -374,7 +390,7 @@ func UsableWords(words []GeneratedWord, excluded map[string]bool) []GeneratedWor
 	for _, w := range words {
 		w.Term = strings.TrimSpace(w.Term)
 		key := strings.ToLower(w.Term)
-		if w.Term == "" || !known[w.PartOfSpeech] || excluded[key] || seen[key] {
+		if w.Term == "" || !known[w.PartOfSpeech] || excluded[key] || seen[key] || !FitsKind(w.Term, KindOf(w.PartOfSpeech)) {
 			continue
 		}
 		content := map[string]LevelText{}
