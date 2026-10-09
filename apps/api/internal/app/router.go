@@ -114,6 +114,7 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 		MaxUploadBytes: cfg.Storage.MaxUploadBytes, Tracker: c.Analytics,
 		Conversation: c.AI, AllowedOrigins: cfg.HTTP.CORSAllowedOrigins,
 		TopicTasks: c.GrammarAuthor,
+		LiveHub:    c.LiveHub, LiveTurnTimeout: cfg.Live.TurnTimeout,
 	}).RegisterRoutes(v1)
 	recommendations.NewModule(c.DB).RegisterRoutes(v1)
 	levels.NewModule(c.DB).RegisterRoutes(v1)
@@ -130,7 +131,14 @@ func NewRouter(c *Container) (*gin.Engine, error) {
 	jobs.RegisterRoutes(v1, c.Jobs)
 
 	v1.GET("/admin/system/metrics", authz.RequirePermission(authz.PermSystemRead), func(ctx *gin.Context) {
-		httpx.OK(ctx, c.Metrics.Snapshot())
+		// The live coach's load sits next to the HTTP numbers: open conversations against
+		// capacity, turn latency, and AI calls in flight per task — the three things to
+		// watch when a thousand learners are talking at once.
+		httpx.OK(ctx, gin.H{
+			"http":         c.Metrics.Snapshot(),
+			"live":         c.LiveHub.Stats(),
+			"ai_in_flight": c.AI.Stats(),
+		})
 	})
 
 	return r, nil

@@ -82,6 +82,14 @@ func run() error {
 	}
 
 	log.Info("shutting down api")
+	// Live conversations first: Shutdown does not wait for hijacked WebSocket connections,
+	// so without this every deploy would cut every learner off mid-sentence. Turns in
+	// progress finish; everyone else is told to reconnect (to another instance).
+	drainCtx, cancelDrain := context.WithTimeout(context.Background(), cfg.Live.DrainTimeout)
+	container.LiveHub.Drain(drainCtx)
+	cancelDrain()
+	log.Info("live sessions drained", slog.Any("live", container.LiveHub.Stats()))
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)

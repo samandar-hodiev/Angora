@@ -73,6 +73,9 @@ type Module struct {
 	topicTasks *topicTaskCache
 	// topicSpeaking caches speaking tasks written on the spot, like topicTasks for writing.
 	topicSpeaking *speakingTaskCache
+	// live admits and tracks live coach conversations; turnTimeout bounds one turn.
+	live        *LiveHub
+	turnTimeout time.Duration
 }
 
 type Deps struct {
@@ -100,6 +103,11 @@ type Deps struct {
 	// TopicTasks writes a writing task for the grammar topic a learner has just studied.
 	// Nil falls back to a plain task about the topic rather than to the library.
 	TopicTasks TopicTaskWriter
+	// LiveHub admits live coach conversations. Nil gets an in-memory hub with the default
+	// capacity, which is right for tests and a single development instance.
+	LiveHub *LiveHub
+	// LiveTurnTimeout bounds one live turn end to end. Zero means 60 seconds.
+	LiveTurnTimeout time.Duration
 }
 
 func NewModule(d Deps) *Module {
@@ -107,10 +115,19 @@ func NewModule(d Deps) *Module {
 	if maxUpload <= 0 {
 		maxUpload = 12 << 20
 	}
+	hub := d.LiveHub
+	if hub == nil {
+		hub = NewLiveHub(0, nil)
+	}
+	turnTimeout := d.LiveTurnTimeout
+	if turnTimeout <= 0 {
+		turnTimeout = 60 * time.Second
+	}
 	return &Module{pool: d.Pool, plans: d.Plans, usage: d.Usage, evaluator: d.Evaluator,
 		speaker: d.Speaker, store: d.Storage, maxUpload: maxUpload, track: d.Tracker,
 		conversation: d.Conversation, origins: d.AllowedOrigins,
-		taskWriter: d.TopicTasks, topicTasks: &topicTaskCache{}, topicSpeaking: &speakingTaskCache{}}
+		taskWriter: d.TopicTasks, topicTasks: &topicTaskCache{}, topicSpeaking: &speakingTaskCache{},
+		live: hub, turnTimeout: turnTimeout}
 }
 
 func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {

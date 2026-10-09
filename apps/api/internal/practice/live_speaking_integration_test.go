@@ -81,6 +81,11 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 
 	dial := func(t *testing.T) (*websocket.Conn, *http.Response, error) {
 		t.Helper()
+		// The previous subtest's connection is released by the server after the client
+		// closes it; one learner may hold only one conversation, so wait for that first.
+		for i := 0; i < 200 && module.live.Stats().Active > 0; i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
 		return websocket.DefaultDialer.Dial(wsURL, nil)
 	}
 
@@ -256,6 +261,26 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 		}
 	})
 
+	t.Run("a second tab is refused while the first is open", func(t *testing.T) {
+		first, _, err := dial(t)
+		if err != nil {
+			t.Fatalf("dial: %v", err)
+		}
+		defer func() { _ = first.Close() }()
+		send(t, first, map[string]any{"type": "start"})
+		if ready := readMessage(t, first); ready.Type != "ready" {
+			t.Fatalf("message = %+v", ready)
+		}
+
+		_, res, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		if err == nil {
+			t.Fatal("a second conversation opened for the same learner")
+		}
+		if res == nil || res.StatusCode != http.StatusConflict {
+			t.Fatalf("status = %v, want 409", res)
+		}
+	})
+
 	t.Run("a cross-origin page cannot open a session", func(t *testing.T) {
 		_, res, err := websocket.DefaultDialer.Dial(wsURL, http.Header{"Origin": []string{"https://evil.example"}})
 		if err == nil {
@@ -263,6 +288,39 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 		}
 		if res == nil || res.StatusCode != http.StatusForbidden {
 			t.Errorf("status = %v, want 403", res)
+		}
+	})
+
+	// Last: a drained hub stays drained.
+	t.Run("a deploy tells a waiting learner to reconnect", func(t *testing.T) {
+		conn, _, err := dial(t)
+		if err != nil {
+			t.Fatalf("dial: %v", err)
+		}
+		defer func() { _ = conn.Close() }()
+		send(t, conn, map[string]any{"type": "start"})
+		if ready := readMessage(t, conn); ready.Type != "ready" {
+			t.Fatalf("message = %+v", ready)
+		}
+
+		drained := make(chan struct{})
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			module.live.Drain(ctx)
+			close(drained)
+		}()
+
+		if msg := readMessage(t, conn); msg.Type != "reconnect" {
+			t.Fatalf("message = %+v, want reconnect", msg)
+		}
+		select {
+		case <-drained:
+		case <-time.After(5 * time.Second):
+			t.Fatal("drain did not finish once the conversation had ended")
+		}
+		if _, res, err := websocket.DefaultDialer.Dial(wsURL, nil); err == nil || res.StatusCode != http.StatusServiceUnavailable {
+			t.Errorf("a draining instance accepted a new conversation (status %v)", res)
 		}
 	})
 }

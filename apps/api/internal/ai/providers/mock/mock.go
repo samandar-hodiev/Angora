@@ -7,14 +7,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"strings"
+	"time"
 
 	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 )
 
 const Name = "mock"
 
-type Provider struct{}
+type Provider struct {
+	// Latency delays every answer, so load tests see vendor-like timing (queueing,
+	// timeouts) instead of an instant fake. Zero answers immediately.
+	Latency time.Duration
+}
+
+// wait sleeps for the configured latency, or until the call is cancelled.
+func (p *Provider) wait(ctx context.Context) error {
+	if p.Latency <= 0 {
+		return nil
+	}
+	// ±25% so concurrent calls do not finish in lockstep.
+	d := p.Latency*3/4 + time.Duration(rand.Int64N(int64(p.Latency)/2+1))
+	select {
+	case <-time.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 func New() *Provider { return &Provider{} }
 
@@ -27,7 +48,10 @@ func model(m string) string {
 	return m
 }
 
-func (*Provider) GenerateText(_ context.Context, req ai.TextRequest) (*ai.TextResponse, error) {
+func (p *Provider) GenerateText(ctx context.Context, req ai.TextRequest) (*ai.TextResponse, error) {
+	if err := p.wait(ctx); err != nil {
+		return nil, err
+	}
 	last := ""
 	if n := len(req.Messages); n > 0 {
 		last = req.Messages[n-1].Content
@@ -41,7 +65,10 @@ func (*Provider) GenerateText(_ context.Context, req ai.TextRequest) (*ai.TextRe
 	}, nil
 }
 
-func (*Provider) AnalyzeText(_ context.Context, req ai.AnalysisRequest) (*ai.AnalysisResponse, error) {
+func (p *Provider) AnalyzeText(ctx context.Context, req ai.AnalysisRequest) (*ai.AnalysisResponse, error) {
+	if err := p.wait(ctx); err != nil {
+		return nil, err
+	}
 	if out, ok := grammarAnalysis(req); ok {
 		return &ai.AnalysisResponse{
 			Output: out,
@@ -83,7 +110,10 @@ func (*Provider) AnalyzeText(_ context.Context, req ai.AnalysisRequest) (*ai.Ana
 	}, nil
 }
 
-func (*Provider) TranscribeAudio(_ context.Context, req ai.TranscriptionRequest) (*ai.TranscriptionResponse, error) {
+func (p *Provider) TranscribeAudio(ctx context.Context, req ai.TranscriptionRequest) (*ai.TranscriptionResponse, error) {
+	if err := p.wait(ctx); err != nil {
+		return nil, err
+	}
 	n, err := io.Copy(io.Discard, req.Audio)
 	if err != nil {
 		return nil, err

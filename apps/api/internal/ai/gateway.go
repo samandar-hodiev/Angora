@@ -34,6 +34,15 @@ type GatewayConfig struct {
 	Routes map[Task]Route
 	// Pricing is keyed by "provider/model".
 	Pricing map[string]Pricing
+
+	// MaxConcurrent caps calls in flight per task on this instance (0 = unlimited). Each
+	// task has its own pool, so a burst of transcriptions cannot starve the conversation
+	// replies the same learners are waiting for.
+	MaxConcurrent int
+	// QueueWait is how long a call may wait for a free slot before failing with ErrBusy.
+	QueueWait time.Duration
+	// CallTimeout bounds one provider call, retries included.
+	CallTimeout time.Duration
 }
 
 // CallMeta describes who the call is for and why. It feeds usage and cost tracking.
@@ -50,10 +59,14 @@ type Gateway struct {
 	recorder  UsageRecorder
 	log       *slog.Logger
 	now       func() time.Time
+	limits    *taskLimiter
 }
 
 func NewGateway(cfg GatewayConfig, recorder UsageRecorder, log *slog.Logger, providers ...Provider) (*Gateway, error) {
-	g := &Gateway{providers: map[string]Provider{}, cfg: cfg, recorder: recorder, log: log, now: time.Now}
+	g := &Gateway{
+		providers: map[string]Provider{}, cfg: cfg, recorder: recorder, log: log, now: time.Now,
+		limits: newTaskLimiter(cfg.MaxConcurrent),
+	}
 	for _, p := range providers {
 		g.providers[p.Name()] = p
 	}
@@ -69,7 +82,7 @@ func NewGateway(cfg GatewayConfig, recorder UsageRecorder, log *slog.Logger, pro
 }
 
 func (g *Gateway) GenerateText(ctx context.Context, meta CallMeta, req TextRequest) (*TextResponse, error) {
-	return invoke(ctx, g, meta, req.Model, func(p Provider, model string) (*TextResponse, Usage, error) {
+	return invoke(ctx, g, meta, req.Model, func(ctx context.Context, p Provider, model string) (*TextResponse, Usage, error) {
 		req.Model = model
 		res, err := p.GenerateText(ctx, req)
 		if err != nil {
@@ -80,7 +93,7 @@ func (g *Gateway) GenerateText(ctx context.Context, meta CallMeta, req TextReque
 }
 
 func (g *Gateway) AnalyzeText(ctx context.Context, meta CallMeta, req AnalysisRequest) (*AnalysisResponse, error) {
-	return invoke(ctx, g, meta, req.Model, func(p Provider, model string) (*AnalysisResponse, Usage, error) {
+	return invoke(ctx, g, meta, req.Model, func(ctx context.Context, p Provider, model string) (*AnalysisResponse, Usage, error) {
 		req.Model = model
 		res, err := p.AnalyzeText(ctx, req)
 		if err != nil {
@@ -91,7 +104,7 @@ func (g *Gateway) AnalyzeText(ctx context.Context, meta CallMeta, req AnalysisRe
 }
 
 func (g *Gateway) TranscribeAudio(ctx context.Context, meta CallMeta, req TranscriptionRequest) (*TranscriptionResponse, error) {
-	return invoke(ctx, g, meta, req.Model, func(p Provider, model string) (*TranscriptionResponse, Usage, error) {
+	return invoke(ctx, g, meta, req.Model, func(ctx context.Context, p Provider, model string) (*TranscriptionResponse, Usage, error) {
 		req.Model = model
 		res, err := p.TranscribeAudio(ctx, req)
 		if err != nil {
@@ -116,7 +129,7 @@ func (g *Gateway) route(task Task) Route {
 }
 
 func invoke[R any](ctx context.Context, g *Gateway, meta CallMeta, requestedModel string,
-	run func(Provider, string) (R, Usage, error), setID func(R, uuid.UUID)) (R, error) {
+	run func(context.Context, Provider, string) (R, Usage, error), setID func(R, uuid.UUID)) (R, error) {
 	var zero R
 	route := g.route(meta.Task)
 	provider := g.providers[route.Provider]
@@ -125,8 +138,35 @@ func invoke[R any](ctx context.Context, g *Gateway, meta CallMeta, requestedMode
 		model = requestedModel
 	}
 
+	// A slot first: past the vendor's concurrency the answer is a 429 anyway, and waiting
+	// here briefly is cheaper than a failed call. Not getting one in time is reported as
+	// busy, which callers turn into "try again in a moment" rather than an outage.
+	release, err := g.limits.acquire(ctx, meta.Task, g.cfg.QueueWait)
+	if err != nil {
+		logger.FromContext(ctx, g.log).Warn("ai call rejected: no capacity",
+			slog.String("task", string(meta.Task)), slog.Int("in_flight", g.limits.inFlight(meta.Task)))
+		return zero, apperr.Wrap(err, apperr.CodeUnavailable, "The coach is busy right now, please try again in a moment")
+	}
+	defer release()
+
+	callCtx := ctx
+	if g.cfg.CallTimeout > 0 {
+		var cancel context.CancelFunc
+		callCtx, cancel = context.WithTimeout(ctx, g.cfg.CallTimeout)
+		defer cancel()
+	}
+
 	start := g.now()
-	res, usage, err := run(provider, model)
+	res, usage, err := run(callCtx, provider, model)
+	// One retry, for the failures that are about the vendor's moment rather than the
+	// request: rate limits and 5xx. Never on a timeout — the budget for the call is spent.
+	if err != nil && retryable(err) && callCtx.Err() == nil {
+		select {
+		case <-time.After(retryDelay()):
+			res, usage, err = run(callCtx, provider, model)
+		case <-callCtx.Done():
+		}
+	}
 	latency := g.now().Sub(start)
 
 	record := UsageRecord{
@@ -162,6 +202,9 @@ func invoke[R any](ctx context.Context, g *Gateway, meta CallMeta, requestedMode
 	return res, nil
 }
 
+// Stats reports calls in flight per task, for the system metrics page and load tests.
+func (g *Gateway) Stats() map[Task]int { return g.limits.snapshot() }
+
 // EstimateCost returns the estimated USD cost of a call. Unknown pricing yields 0, which
 // shows up in cost reports as "unpriced" usage rather than silently wrong numbers.
 func EstimateCost(p Pricing, u Usage) float64 {
@@ -178,6 +221,8 @@ func errorCode(err error) string {
 	switch {
 	case errors.Is(err, ErrUnsupported):
 		return "unsupported"
+	case errors.Is(err, ErrBusy):
+		return "busy"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"
 	case errors.As(err, &pe) && pe.StatusCode == 429:

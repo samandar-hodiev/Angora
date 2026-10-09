@@ -29,6 +29,7 @@ import (
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/cache"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/observability"
+	"github.com/samandar-hodiev/engora/apps/api/internal/practice"
 	"github.com/samandar-hodiev/engora/apps/api/internal/storage"
 	"github.com/samandar-hodiev/engora/apps/api/internal/subscriptions"
 	"github.com/samandar-hodiev/engora/apps/api/internal/users"
@@ -54,14 +55,16 @@ type Container struct {
 	Payments          payments.Provider
 	Evaluator         *ai.PlacementEvaluator
 	AI                *ai.Gateway
-	Storage           storage.ObjectStorage
-	Jobs              jobs.Queue
-	Analytics         analytics.Tracker
-	Notifications     *notifications.Service
-	Plans             *personalization.Service
-	Onboarding        *onboarding.Service
-	Assessment        *assessment.Service
-	GrammarTutor      grammar.Tutor
+	// LiveHub admits live speaking coach conversations and drains them on shutdown.
+	LiveHub       *practice.LiveHub
+	Storage       storage.ObjectStorage
+	Jobs          jobs.Queue
+	Analytics     analytics.Tracker
+	Notifications *notifications.Service
+	Plans         *personalization.Service
+	Onboarding    *onboarding.Service
+	Assessment    *assessment.Service
+	GrammarTutor  grammar.Tutor
 	// GrammarAuthor writes curriculum content for the owner console. It is the same
 	// service as GrammarTutor; the console needs the wider interface.
 	GrammarAuthor *ai.GrammarTutorService
@@ -177,6 +180,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	}
 	c.GrammarAuthor = ai.NewGrammarTutor(c.AI, fastModel, cfg.AI.Model)
 	c.GrammarTutor = c.GrammarAuthor
+	c.LiveHub = practice.NewLiveHub(cfg.Live.MaxSessions, c.Redis)
 
 	log.Info("container ready",
 		slog.String("env", string(cfg.App.Env)),
@@ -191,7 +195,7 @@ func newAIGateway(cfg config.AIConfig, pool *pgxpool.Pool, log *slog.Logger) (*a
 	case openai.Name:
 		provider = openai.New(cfg.OpenAIAPIKey, cfg.OpenAIBaseURL)
 	case mock.Name:
-		provider = mock.New()
+		provider = &mock.Provider{Latency: cfg.MockLatency}
 	default:
 		return nil, fmt.Errorf("unsupported AI provider %q", cfg.Provider)
 	}
@@ -199,7 +203,10 @@ func newAIGateway(cfg config.AIConfig, pool *pgxpool.Pool, log *slog.Logger) (*a
 		DefaultProvider: provider.Name(),
 		DefaultModel:    cfg.Model,
 		// Every call is priced as it is recorded, so the AI page shows what was spent.
-		Pricing: ai.DefaultPricing,
+		Pricing:       ai.DefaultPricing,
+		MaxConcurrent: cfg.MaxConcurrent,
+		QueueWait:     cfg.QueueWait,
+		CallTimeout:   cfg.CallTimeout,
 	}, ai.NewPostgresUsageRecorder(pool, log), log, provider)
 }
 

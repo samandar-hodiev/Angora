@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -57,6 +59,10 @@ const (
 	liveIdleTimeout    = 3 * time.Minute
 	liveSessionTimeout = 30 * time.Minute
 	liveWriteTimeout   = 15 * time.Second
+	// Pings keep the connection alive through proxies and load balancers, most of which
+	// close a WebSocket that has been silent for 60–100 seconds — which is exactly what a
+	// connection looks like while the learner reads their feedback.
+	livePingInterval = 25 * time.Second
 
 	// A turn shorter than this is a false start or a cough. The learner is told, and is not
 	// charged for it.
@@ -114,6 +120,13 @@ type liveSession struct {
 	conn   *websocket.Conn
 	userID uuid.UUID
 
+	// wmu serialises writes: the turn handler and the pinger both write, and a WebSocket
+	// allows one writer at a time.
+	wmu sync.Mutex
+	// inTurn is set while a turn is being judged, so a draining hub lets it finish.
+	inTurn atomic.Bool
+	done   chan struct{}
+
 	id       uuid.UUID
 	prompt   string
 	level    cefr.Level
@@ -151,6 +164,18 @@ func (m *Module) liveSpeaking(c *gin.Context) {
 			return
 		}
 	}
+	// Room for one more conversation, and only one per learner. A full instance says so
+	// with a Retry-After the client honours, rather than taking the learner on and giving
+	// everyone a slower coach.
+	ticket, err := m.live.admit(ctx, p.UserID)
+	if err != nil {
+		if apperr.From(err).Code == apperr.CodeUnavailable {
+			c.Header("Retry-After", "30")
+		}
+		httpx.Fail(c, err)
+		return
+	}
+	defer ticket.release()
 
 	// When a browser offers subprotocols the server has to pick one, or the browser fails
 	// the connection. The learner's client offers ["bearer", "<token>"] to carry the access
@@ -165,8 +190,58 @@ func (m *Module) liveSpeaking(c *gin.Context) {
 	}
 	defer func() { _ = conn.Close() }()
 
-	s := &liveSession{m: m, conn: conn, userID: p.UserID, platform: httpx.ClientPlatform(c), started: time.Now()}
+	s := &liveSession{
+		m: m, conn: conn, userID: p.UserID, platform: httpx.ClientPlatform(c), started: time.Now(),
+		done: make(chan struct{}),
+	}
+	m.live.register(s)
+	defer m.live.unregister(s)
+	go s.ping()
+	defer close(s.done)
 	s.run(context.WithoutCancel(ctx))
+}
+
+// ping keeps the connection open through proxies while nobody is talking.
+func (s *liveSession) ping() {
+	tick := time.NewTicker(livePingInterval)
+	defer tick.Stop()
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-tick.C:
+			s.wmu.Lock()
+			err := s.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(liveWriteTimeout))
+			s.wmu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+// wake is how a draining hub reaches a conversation blocked waiting for the learner: the
+// read is cut short, and the loop sees the drain. A conversation mid-turn is left alone
+// and checks for the drain when the turn is done.
+func (s *liveSession) wake() {
+	if !s.inTurn.Load() {
+		_ = s.conn.SetReadDeadline(time.Now())
+	}
+}
+
+// closeNow ends the connection outright, for a drain that ran out of time.
+func (s *liveSession) closeNow() { _ = s.conn.Close() }
+
+// reconnect saves what was said and tells the client to open a new conversation — on
+// another instance, since this one is going away.
+func (s *liveSession) reconnect(ctx context.Context) {
+	s.abandon(ctx)
+	s.send(liveServerMessage{Type: "reconnect", Message: "The coach is restarting. Reconnecting…"})
+	s.wmu.Lock()
+	_ = s.conn.WriteControl(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseServiceRestart, "restarting"),
+		time.Now().Add(liveWriteTimeout))
+	s.wmu.Unlock()
 }
 
 // upgrader rejects cross-origin upgrades. WebSocket connections are not covered by CORS, so
@@ -207,9 +282,17 @@ func (s *liveSession) run(ctx context.Context) {
 			s.fail(apperr.Conflict("This session has been open too long. Start a new one."))
 			return
 		}
+		if s.m.live.Draining() {
+			s.reconnect(ctx)
+			return
+		}
 		_ = s.conn.SetReadDeadline(time.Now().Add(liveIdleTimeout))
 		kind, data, err := s.conn.ReadMessage()
 		if err != nil {
+			if s.m.live.Draining() {
+				s.reconnect(ctx)
+				return
+			}
 			s.abandon(ctx)
 			return
 		}
@@ -245,7 +328,12 @@ func (s *liveSession) run(ctx context.Context) {
 				s.fail(apperr.Conflict("Send start before speaking"))
 				return
 			}
-			if err := s.handleTurn(ctx, msg); err != nil {
+			s.inTurn.Store(true)
+			started := time.Now()
+			err := s.handleTurn(ctx, msg)
+			s.inTurn.Store(false)
+			s.m.live.observeTurn(time.Since(started), err != nil)
+			if err != nil {
 				// A bad turn is not a bad session: the learner is told what went wrong and
 				// can speak again. Only the protocol errors above end the conversation.
 				s.send(liveServerMessage{Type: "error", Code: apperr.From(err).Code, Message: apperr.From(err).Message})
@@ -290,6 +378,11 @@ func (s *liveSession) start(ctx context.Context, taskID *uuid.UUID) error {
 // handleTurn runs the same three stages as one-shot practice — store, transcribe, judge —
 // and then adds the thing that makes it a conversation: a reply.
 func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) error {
+	// A turn has a deadline as a whole. Each AI call has its own too (in the gateway), but
+	// three slow calls in a row must still not keep a learner waiting past this.
+	ctx, cancel := context.WithTimeout(ctx, s.m.turnTimeout)
+	defer cancel()
+
 	data := append([]byte(nil), s.audio.Bytes()...)
 	s.audio.Reset()
 	if len(data) == 0 {
@@ -327,7 +420,8 @@ func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) err
 	}
 	refund := func() {
 		if s.m.usage != nil {
-			_ = s.m.usage.ReleaseUsage(ctx, s.userID, entitlementSpeakingChecks, 1)
+			// Detached: a turn that timed out must still give back what it was charged.
+			_ = s.m.usage.ReleaseUsage(context.WithoutCancel(ctx), s.userID, entitlementSpeakingChecks, 1)
 		}
 	}
 
@@ -360,6 +454,11 @@ func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) err
 		wpm = float64(countWords(transcription.Text)) / seconds * 60
 	}
 
+	// The next question depends only on what was said, not on how it was judged, so it is
+	// asked while the judging runs. The learner waits for the slower of the two, not both.
+	replyCh := make(chan string, 1)
+	go func() { replyCh <- s.m.followUp(ctx, s.userID, s.level, s.currentPrompt(), transcription.Text) }()
+
 	assessment, meta, err := s.m.speaker.EvaluateSpeaking(ctx, ai.SpeakingAssessmentInput{
 		UserID: s.userID, TaskPrompt: s.currentPrompt(), TargetLevel: s.level,
 		Transcript: transcription.Text, SpeechSeconds: seconds, WordsPerMinute: wpm,
@@ -381,7 +480,7 @@ func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) err
 	s.scores = append(s.scores, score)
 	s.durationMs += msg.DurationMs
 
-	reply := s.m.followUp(ctx, s.userID, s.level, s.currentPrompt(), transcription.Text)
+	reply := <-replyCh
 
 	if _, err := s.m.pool.Exec(ctx, `
 		INSERT INTO speaking_turns (session_id, turn_number, audio_file_id, transcript_id, analysis_id,
@@ -475,6 +574,8 @@ func (s *liveSession) abandon(ctx context.Context) {
 }
 
 func (s *liveSession) send(msg liveServerMessage) {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
 	_ = s.conn.SetWriteDeadline(time.Now().Add(liveWriteTimeout))
 	_ = s.conn.WriteJSON(msg)
 }
@@ -482,6 +583,8 @@ func (s *liveSession) send(msg liveServerMessage) {
 func (s *liveSession) fail(err error) {
 	e := apperr.From(err)
 	s.send(liveServerMessage{Type: "error", Code: e.Code, Message: e.Message})
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
 	_ = s.conn.WriteControl(websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.ClosePolicyViolation, string(e.Code)),
 		time.Now().Add(liveWriteTimeout))

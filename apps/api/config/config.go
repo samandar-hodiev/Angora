@@ -27,6 +27,7 @@ type Config struct {
 	HTTP          HTTPConfig
 	Database      DatabaseConfig
 	Redis         RedisConfig
+	Live          LiveConfig
 	Auth          AuthConfig
 	AI            AIConfig
 	Storage       StorageConfig
@@ -127,6 +128,30 @@ type AIConfig struct {
 	FastModel     string
 	OpenAIAPIKey  string
 	OpenAIBaseURL string
+
+	// Load protection. Every vendor caps concurrent requests; past that it answers 429s
+	// that cost a learner a turn. MaxConcurrent bounds calls in flight per task on this
+	// instance, QueueWait is how long a call may wait for a slot before the learner is told
+	// the coach is busy, and CallTimeout bounds a single call so a hung vendor cannot hold a
+	// session forever.
+	MaxConcurrent int
+	QueueWait     time.Duration
+	CallTimeout   time.Duration
+	// MockLatency makes the mock provider answer as slowly as a real vendor, so load tests
+	// exercise queueing and timeouts rather than an instant fake.
+	MockLatency time.Duration
+}
+
+// LiveConfig sizes the realtime speaking coach.
+type LiveConfig struct {
+	// MaxSessions is how many live conversations one API instance holds. Past it, new
+	// learners get a clear "busy, try again" instead of a slow coach for everyone.
+	MaxSessions int
+	// TurnTimeout bounds one turn — transcribe, judge, reply — end to end.
+	TurnTimeout time.Duration
+	// DrainTimeout is how long a shutting-down instance waits for turns in progress before
+	// telling the remaining learners to reconnect.
+	DrainTimeout time.Duration
 }
 
 type StorageConfig struct {
@@ -202,6 +227,15 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			FastModel:     r.str("AI_FAST_MODEL", ""),
 			OpenAIAPIKey:  r.str("OPENAI_API_KEY", ""),
 			OpenAIBaseURL: r.str("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+			MaxConcurrent: r.int("AI_MAX_CONCURRENT", 200),
+			QueueWait:     r.duration("AI_QUEUE_WAIT", 8*time.Second),
+			CallTimeout:   r.duration("AI_CALL_TIMEOUT", 45*time.Second),
+			MockLatency:   r.duration("MOCK_AI_LATENCY", 0),
+		},
+		Live: LiveConfig{
+			MaxSessions:  r.int("LIVE_MAX_SESSIONS", 1500),
+			TurnTimeout:  r.duration("LIVE_TURN_TIMEOUT", 60*time.Second),
+			DrainTimeout: r.duration("LIVE_DRAIN_TIMEOUT", 15*time.Second),
 		},
 		Storage: StorageConfig{
 			Provider:       strings.ToLower(r.str("STORAGE_PROVIDER", "local")),
