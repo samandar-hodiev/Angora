@@ -103,7 +103,7 @@ export function GrammarTopicView({ slug }: { slug: string }) {
                 onChange={setLanguage}
               />
             </div>
-            <LessonJumpBar sections={lessonSections(t.content)} />
+            <LessonJumpBar sections={lessonSections(t.content, t.content_language)} />
             <CanonicalContent topic={t} />
             {/* The same rule again, written for this learner's level — on request, so the page
                 does not teach it twice in a row. */}
@@ -137,16 +137,67 @@ export function GrammarTopicView({ slug }: { slug: string }) {
   );
 }
 
+/**
+ * The lesson's headings in the language the lesson is written in. An Uzbek explanation under
+ * English headings reads as two half-translated pages; the headings follow the text.
+ */
+const lessonLabels = {
+  en: {
+    whatIs: (name: string) => `What is ${name}?`,
+    rule: "Rule",
+    form: "Form",
+    whenToUse: "When to use",
+    whenTitle: "When do we use it?",
+    exceptions: "Exceptions",
+    examples: "Examples",
+    mistakes: "Mistakes",
+    mistakesTitle: "Common mistakes",
+    practise: "Practise",
+    signalWords: "Signal words",
+  },
+  uz: {
+    whatIs: (name: string) => `${name} nima?`,
+    rule: "Qoida",
+    form: "Tuzilishi",
+    whenToUse: "Qachon ishlatiladi",
+    whenTitle: "Qachon ishlatiladi?",
+    exceptions: "Istisnolar",
+    examples: "Misollar",
+    mistakes: "Xatolar",
+    mistakesTitle: "Ko'p uchraydigan xatolar",
+    practise: "Mashq",
+    signalWords: "Kalit so'zlar",
+  },
+  ru: {
+    whatIs: (name: string) => `Что такое ${name}?`,
+    rule: "Правило",
+    form: "Образование",
+    whenToUse: "Когда используется",
+    whenTitle: "Когда это используется?",
+    exceptions: "Исключения",
+    examples: "Примеры",
+    mistakes: "Ошибки",
+    mistakesTitle: "Типичные ошибки",
+    practise: "Практика",
+    signalWords: "Слова-маркеры",
+  },
+};
+
+function labelsFor(language: string | undefined) {
+  return lessonLabels[language as keyof typeof lessonLabels] ?? lessonLabels.en;
+}
+
 /** The sections of the lesson, in reading order, for the jump bar above it. */
-function lessonSections(c: NonNullable<GrammarTopic["content"]>) {
+function lessonSections(c: NonNullable<GrammarTopic["content"]>, language?: string) {
+  const l = labelsFor(language);
   return [
-    { id: "rule", label: "Rule", show: true },
-    { id: "form", label: "Form", show: c.formulas.length > 0 },
-    { id: "usage", label: "When to use", show: c.usage.length > 0 },
-    { id: "exceptions", label: "Exceptions", show: (c.exceptions?.length ?? 0) > 0 },
-    { id: "examples", label: "Examples", show: c.examples.length > 0 },
-    { id: "mistakes", label: "Mistakes", show: c.common_mistakes.length > 0 },
-    { id: "practice-title", label: "Practise", show: true },
+    { id: "rule", label: l.rule, show: true },
+    { id: "form", label: l.form, show: c.formulas.length > 0 },
+    { id: "usage", label: l.whenToUse, show: c.usage.length > 0 },
+    { id: "exceptions", label: l.exceptions, show: (c.exceptions?.length ?? 0) > 0 },
+    { id: "examples", label: l.examples, show: c.examples.length > 0 },
+    { id: "mistakes", label: l.mistakes, show: c.common_mistakes.length > 0 },
+    { id: "practice-title", label: l.practise, show: true },
   ].filter((s) => s.show);
 }
 
@@ -172,9 +223,10 @@ function LessonJumpBar({ sections }: { sections: { id: string; label: string }[]
 
 function CanonicalContent({ topic }: { topic: GrammarTopic }) {
   const c = topic.content!;
+  const l = labelsFor(topic.content_language);
   return (
     <div className="grid gap-10">
-      <LessonSection id="rule" title={`What is ${topic.name}?`} tone="rule" icon={BookOpenText}>
+      <LessonSection id="rule" title={l.whatIs(topic.name)} tone="rule" icon={BookOpenText}>
         <div data-tone="rule" className="lesson-block grid gap-3 rounded-xl px-5 py-4">
           {c.intro && <RichText text={c.intro} className="text-body-lg font-medium" />}
           {c.explanation
@@ -188,38 +240,38 @@ function CanonicalContent({ topic }: { topic: GrammarTopic }) {
         </div>
         {c.signal_words.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-label text-fg-muted">Signal words</span>
+            <span className="text-label text-fg-muted">{l.signalWords}</span>
             <SignalWords words={c.signal_words} />
           </div>
         )}
       </LessonSection>
 
       {c.formulas.length > 0 && (
-        <LessonSection id="form" title="Form" tone="formula" icon={Sigma} count={c.formulas.length}>
+        <LessonSection id="form" title={l.form} tone="formula" icon={Sigma} count={c.formulas.length}>
           <FormulaList formulas={c.formulas} />
         </LessonSection>
       )}
 
       {c.usage.length > 0 && (
-        <LessonSection id="usage" title="When do we use it?" tone="usage" icon={Target}>
+        <LessonSection id="usage" title={l.whenTitle} tone="usage" icon={Target}>
           <UsageList items={c.usage.map((use) => ({ use }))} />
         </LessonSection>
       )}
 
       {c.exceptions && c.exceptions.length > 0 && (
-        <LessonSection id="exceptions" title="Exceptions" tone="exception" icon={Shuffle} count={c.exceptions.length}>
+        <LessonSection id="exceptions" title={l.exceptions} tone="exception" icon={Shuffle} count={c.exceptions.length}>
           <ExceptionList items={c.exceptions} />
         </LessonSection>
       )}
 
       {c.examples.length > 0 && (
-        <LessonSection id="examples" title="Examples" tone="example" icon={Quote} count={c.examples.length}>
+        <LessonSection id="examples" title={l.examples} tone="example" icon={Quote} count={c.examples.length}>
           <ExampleList items={c.examples} />
         </LessonSection>
       )}
 
       {c.common_mistakes.length > 0 && (
-        <LessonSection id="mistakes" title="Common mistakes" tone="mistake" icon={TriangleAlert} count={c.common_mistakes.length}>
+        <LessonSection id="mistakes" title={l.mistakesTitle} tone="mistake" icon={TriangleAlert} count={c.common_mistakes.length}>
           <MistakeList items={c.common_mistakes} />
         </LessonSection>
       )}

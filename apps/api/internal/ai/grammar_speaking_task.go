@@ -76,7 +76,7 @@ func (s *GrammarTutorService) WriteGrammarSpeakingTask(ctx context.Context, req 
 		return nil, err
 	}
 	var out GrammarSpeakingTask
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, fmt.Errorf("grammar speaking task is not valid JSON: %w", err)
 	}
 	if strings.TrimSpace(out.Prompt) == "" || strings.TrimSpace(out.Title) == "" {

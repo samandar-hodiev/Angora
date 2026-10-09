@@ -138,7 +138,7 @@ func (s *GrammarTutorService) writePracticeBatch(
 		return nil, nil, err
 	}
 	var out generatedPracticeSet
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, nil, fmt.Errorf("generated practice is not valid JSON: %w", err)
 	}
 	return out.Questions, res, nil
@@ -247,7 +247,7 @@ func (s *GrammarTutorService) checkPractice(ctx context.Context, req GrammarPrac
 		return capPractice(questions)
 	}
 	var check practiceCheck
-	if err := json.Unmarshal(res.Output, &check); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &check); err != nil {
 		return capPractice(questions)
 	}
 	return capPractice(agreedPractice(questions, check))

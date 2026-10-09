@@ -364,7 +364,7 @@ func (s *GrammarTutorService) ExplainGrammar(ctx context.Context, topic GrammarT
 	}
 
 	var out GrammarExplanation
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, nil, fmt.Errorf("grammar explanation is not valid JSON: %w", err)
 	}
 	if err := validateExplanation(&out); err != nil {
@@ -585,7 +585,7 @@ func (s *GrammarTutorService) AnalyzeGrammarWriting(ctx context.Context, topic G
 	}
 
 	var out GrammarWritingAnalysis
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, nil, fmt.Errorf("grammar writing analysis is not valid JSON: %w", err)
 	}
 	// A model that returns 1.4 or -0.2 would otherwise be written straight into mastery.
@@ -661,7 +661,7 @@ func (s *GrammarTutorService) VisualizeGrammar(ctx context.Context, topic Gramma
 		return nil, uuid.Nil, err
 	}
 	var spec VisualSpec
-	if err := json.Unmarshal(res.Output, &spec); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &spec); err != nil {
 		return nil, res.AIRequestID, fmt.Errorf("grammar visual is not valid JSON: %w", err)
 	}
 	if strings.TrimSpace(spec.Title) == "" || (len(spec.Panels) == 0 && len(spec.Events) == 0) {

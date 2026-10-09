@@ -191,7 +191,7 @@ func (s *GrammarTutorService) oneLevel(
 		return nil, nil, err
 	}
 	var out GeneratedGrammarContent
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, nil, fmt.Errorf("generated grammar content is not valid JSON: %w", err)
 	}
 	if len(out.Levels) != 1 {

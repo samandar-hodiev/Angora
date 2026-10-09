@@ -156,7 +156,7 @@ func (s *GrammarTutorService) AuthorGrammarContent(
 	}
 
 	var out GeneratedGrammarContent
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, nil, fmt.Errorf("generated grammar content is not valid JSON: %w", err)
 	}
 	out.Levels = shareLesson(out.Levels, req.Levels)

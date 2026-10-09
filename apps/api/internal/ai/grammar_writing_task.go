@@ -90,7 +90,7 @@ func (s *GrammarTutorService) WriteGrammarTask(ctx context.Context, req GrammarW
 		return nil, err
 	}
 	var out GrammarWritingTask
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &out); err != nil {
 		return nil, fmt.Errorf("grammar writing task is not valid JSON: %w", err)
 	}
 	if strings.TrimSpace(out.Prompt) == "" || strings.TrimSpace(out.Title) == "" {

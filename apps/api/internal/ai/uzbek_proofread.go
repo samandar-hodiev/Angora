@@ -118,7 +118,7 @@ func (s *GrammarTutorService) ProofreadUzbek(ctx context.Context, items []UzbekT
 			Corrected string `json:"corrected"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(res.Output, &raw); err != nil {
+	if err := json.Unmarshal(cleanModelJSON(res.Output), &raw); err != nil {
 		return nil, fmt.Errorf("proofreading is not valid JSON: %w", err)
 	}
 	original := map[string]string{}
