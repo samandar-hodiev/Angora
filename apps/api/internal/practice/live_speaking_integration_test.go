@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/samandar-hodiev/engora/apps/api/internal/ai"
 	"github.com/samandar-hodiev/engora/apps/api/internal/analytics"
 	"github.com/samandar-hodiev/engora/apps/api/internal/authz"
 	"github.com/samandar-hodiev/engora/apps/api/internal/platform/database"
@@ -64,8 +66,9 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 		seconds:    24,
 	}
 	plans := subscriptions.NewService(subscriptions.NewPostgresStore(pool))
+	conversation := &stubConversation{output: `{"say": "Yaxshi! “I usually visit” to'g'ri.", "ask": "What do you cook together?"}`}
 	module := NewModule(Deps{Pool: pool, Plans: plans, Usage: plans, Speaker: speaker, Storage: store,
-		MaxUploadBytes: 5 << 20, Tracker: &analytics.Memory{}})
+		MaxUploadBytes: 5 << 20, Tracker: &analytics.Memory{}, Conversation: conversation})
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -106,6 +109,28 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 		}
 	}
 
+	status := func(t *testing.T) (int, string) {
+		t.Helper()
+		res, err := http.Get(server.URL + "/api/v1/speaking/live/status")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = res.Body.Close() }()
+		var envelope struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		_ = json.NewDecoder(res.Body).Decode(&envelope)
+		return res.StatusCode, envelope.Error.Code
+	}
+
+	t.Run("the pre-flight explains a missing plan", func(t *testing.T) {
+		if code, errCode := status(t); code != http.StatusForbidden || errCode != "ENTITLEMENT_REQUIRED" {
+			t.Fatalf("status = %d %s, want 403 ENTITLEMENT_REQUIRED", code, errCode)
+		}
+	})
+
 	t.Run("the free plan cannot open a session", func(t *testing.T) {
 		_, res, err := dial(t)
 		if err == nil {
@@ -134,20 +159,26 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 	}
 
 	t.Run("a turn comes back transcribed, judged and answered", func(t *testing.T) {
+		for i := 0; i < 200 && module.live.Stats().Active > 0; i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if code, _ := status(t); code != http.StatusOK {
+			t.Fatalf("pre-flight = %d, want 200 for a learner on the plan", code)
+		}
 		conn, _, err := dial(t)
 		if err != nil {
 			t.Fatalf("dial: %v", err)
 		}
 		defer func() { _ = conn.Close() }()
 
-		send(t, conn, map[string]any{"type": "start"})
+		send(t, conn, map[string]any{"type": "start", "topic": "Food from your country", "feedback_lang": "uz"})
 		ready := readMessage(t, conn)
 		if ready.Type != "ready" || ready.SessionID == nil {
 			t.Fatalf("first message = %+v, want ready with a session id", ready)
 		}
 		sessionID := *ready.SessionID
-		if ready.Prompt == "" {
-			t.Error("the coach must open with something to talk about")
+		if !strings.Contains(ready.Prompt, "Food from your country") {
+			t.Errorf("prompt = %q, want the chosen topic in the opener", ready.Prompt)
 		}
 
 		if err := conn.WriteMessage(websocket.BinaryMessage, webm()); err != nil {
@@ -165,8 +196,14 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 		if turn.Turn.Feedback == nil || turn.Turn.Feedback.CEFREstimate != "B1" {
 			t.Errorf("feedback = %+v, want the evaluator's verdict", turn.Turn.Feedback)
 		}
-		if turn.Turn.Reply == "" {
-			t.Error("a coach that does not ask anything back is not a conversation")
+		if turn.Turn.Reply != "What do you cook together?" {
+			t.Errorf("reply = %q, want the coach's next question", turn.Turn.Reply)
+		}
+		if !strings.HasPrefix(turn.Turn.Say, "Yaxshi!") {
+			t.Errorf("say = %q, want the spoken feedback in the learner's language", turn.Turn.Say)
+		}
+		if !strings.Contains(conversation.lastSystem(), "Uzbek") {
+			t.Error("the coach must be told to give feedback in Uzbek")
 		}
 		if turn.Turn.WordsPerMinute <= 0 {
 			t.Error("words per minute should be computed from the turn")
@@ -272,6 +309,9 @@ func TestLiveSpeakingPostgres(t *testing.T) {
 			t.Fatalf("message = %+v", ready)
 		}
 
+		if code, errCode := status(t); code != http.StatusConflict || errCode != "CONFLICT" {
+			t.Errorf("pre-flight with a tab open = %d %s, want 409 CONFLICT", code, errCode)
+		}
 		_, res, err := websocket.DefaultDialer.Dial(wsURL, nil)
 		if err == nil {
 			t.Fatal("a second conversation opened for the same learner")
@@ -332,4 +372,24 @@ func usedEvaluations(t *testing.T, pool *pgxpool.Pool, userID uuid.UUID) int {
 		SELECT coalesce(sum(used), 0)::int FROM usage_counters
 		WHERE user_id = $1 AND entitlement_key = 'speaking.evaluations'`, userID).Scan(&used)
 	return used
+}
+
+// stubConversation answers every coach turn with a fixed result and remembers the instructions.
+type stubConversation struct {
+	output string
+	mu     sync.Mutex
+	system string
+}
+
+func (s *stubConversation) AnalyzeText(_ context.Context, _ ai.CallMeta, req ai.AnalysisRequest) (*ai.AnalysisResponse, error) {
+	s.mu.Lock()
+	s.system = req.Instructions
+	s.mu.Unlock()
+	return &ai.AnalysisResponse{Output: []byte(s.output)}, nil
+}
+
+func (s *stubConversation) lastSystem() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.system
 }

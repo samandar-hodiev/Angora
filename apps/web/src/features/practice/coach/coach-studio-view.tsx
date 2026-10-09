@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Home,
   Lightbulb,
+  Loader2,
   MessageCircle,
   Mic,
   Pause,
@@ -48,23 +49,22 @@ import {
   FEEDBACK_LANGS,
   MODES,
   PERSONAS,
-  PREVIEW_SCORES,
-  buildScript,
   canUseCoach,
   type CoachMode,
   type FeedbackLang,
   type CoachPersona,
   type CoachTopic,
 } from "./coach-config";
-import { CHAR_MS, useCoachPreview, type CoachSession } from "./use-coach-preview";
+import { CHAR_MS, useCoachLive, type CoachSession, type CoachSummary } from "./use-coach-live";
 
 /**
  * The realtime speaking coach: pick who you talk to, pick what about, and talk.
  *
  * The coach is a full-body 3D person (coach-3d) who talks with lip-sync, brows, eye contact
- * and gestures. The conversation itself is still scripted (see use-coach-preview)
- * and the stage says "Preview" so nobody reads the feedback as real. The topics are real:
- * they are the speaking tasks the owner has published, with a demo set when there are none.
+ * and gestures; the conversation is the real one (use-coach-live): your recording is
+ * transcribed and judged, and the coach answers with a correction in your feedback language
+ * and its next question. The topics are the speaking tasks the owner has published, with a
+ * demo set of titles when there are none.
  */
 export function CoachStudioView() {
   const tasks = useSpeakingTasks();
@@ -74,6 +74,7 @@ export function CoachStudioView() {
   const [mode, setMode] = useState<CoachMode>("free");
   const [topic, setTopic] = useState<CoachTopic | null>(null);
   const [run, setRun] = useState(0);
+  const [result, setResult] = useState<CoachSummary | null>(null);
 
   const topics = useMemo<CoachTopic[]>(() => {
     const items = tasks.data?.items ?? [];
@@ -149,7 +150,10 @@ export function CoachStudioView() {
           onSettings={setSettings}
           topic={topic}
           mode={mode}
-          onFinish={() => setPhase("summary")}
+          onFinish={(summary) => {
+            setResult(summary);
+            setPhase("summary");
+          }}
         />
       )}
 
@@ -157,6 +161,7 @@ export function CoachStudioView() {
         <Summary
           coach={coach}
           topic={topic}
+          result={result}
           onAgain={() => {
             setRun((r) => r + 1);
             setPhase("session");
@@ -757,20 +762,21 @@ function Session({
   onSettings: (s: CoachSettings) => void;
   topic: CoachTopic | null;
   mode: CoachMode;
-  onFinish: () => void;
+  onFinish: (summary: CoachSummary | null) => void;
 }) {
-  const script = useMemo(() => buildScript(topic, coach, mode), [topic, coach, mode]);
-  const session = useCoachPreview(script, settings.lang);
+  const session = useCoachLive({
+    // Demo topics have no task behind them; their title is what the coach talks about.
+    taskId: topic && !topic.id.startsWith("demo-") ? topic.id : undefined,
+    topic: topic?.title,
+    mode,
+    lang: settings.lang,
+  });
   const langMeta = FEEDBACK_LANGS.find((l) => l.value === settings.lang) ?? FEEDBACK_LANGS[0]!;
   const [captions, setCaptions] = useState(true);
-  // The hint belongs to one question: moving on closes it.
-  const [hintFor, setHintFor] = useState<number | null>(null);
 
   useEffect(() => {
-    if (session.finished) onFinish();
-  }, [session.finished, onFinish]);
-
-  const hint = hintFor === session.index;
+    if (session.finished) onFinish(session.summary);
+  }, [session.finished, session.summary, onFinish]);
 
   const saying = session.stage === "coach" || session.stage === "feedback";
 
@@ -792,13 +798,14 @@ function Session({
   // A thumbs-up while praising a good answer — the kind of thing a person does.
   const gesture = useMemo(
     () =>
-      session.stage === "feedback" && session.turn?.feedback.tone === "good"
+      session.stage === "feedback" && session.lastTone === "good"
         ? { id: `good-${session.index}`, name: "thumbup" }
         : null,
-    [session.stage, session.turn, session.index],
+    [session.stage, session.lastTone, session.index],
   );
 
-  const avatarState: CoachState = session.paused
+  const live = session.connection === "live" || session.connection === "ending";
+  const avatarState: CoachState = session.paused || !live
     ? "idle"
     : saying
       ? "speaking"
@@ -838,14 +845,11 @@ function Session({
                 <span className="max-w-[16rem] truncate">{topic?.title ?? "Free conversation"}</span>
               </span>
               <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-caption backdrop-blur">
-                Question {session.index + 1} of {session.total}
+                Question {Math.min(session.index + 1, session.total)} of {session.total}
               </span>
               <span className="inline-flex h-7 items-center gap-1 rounded-full bg-white/10 px-2.5 text-caption backdrop-blur" title="Feedback language">
                 <span aria-hidden>{langMeta.flag}</span>
                 {langMeta.label}
-              </span>
-              <span className="inline-flex h-7 items-center rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 text-caption font-medium text-amber-200">
-                Preview
               </span>
             </div>
             <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-black/40 px-3 text-caption tabular-nums backdrop-blur">
@@ -854,8 +858,10 @@ function Session({
             </span>
           </div>
 
+          {!live && <ConnectionOverlay session={session} />}
+
           {/* status */}
-          <div className="absolute left-1/2 top-16 -translate-x-1/2">
+          <div className={cn("absolute left-1/2 top-16 -translate-x-1/2", !live && "hidden")}>
             <span className="inline-flex h-8 items-center gap-2 rounded-full bg-black/45 px-3.5 text-caption font-medium text-white backdrop-blur" aria-live="polite">
               <span className={cn("size-2 rounded-full", status.dot, !session.paused && "animate-pulse")} />
               {session.paused ? "Paused" : status.label}
@@ -866,7 +872,7 @@ function Session({
           </div>
 
           {/* captions */}
-          {captions && (
+          {captions && live && (
             <div className="absolute inset-x-4 bottom-4 grid gap-2 sm:inset-x-10">
               {session.stage === "feedback" ? (
                 <p className="mx-auto max-w-2xl rounded-2xl border border-amber-300/30 bg-amber-950/60 px-4 py-3 text-center text-body text-amber-50 backdrop-blur-md">
@@ -883,7 +889,8 @@ function Session({
                 </p>
               ) : session.stage === "listening" ? (
                 <p className="mx-auto max-w-2xl rounded-2xl border border-sky-300/30 bg-sky-950/60 px-4 py-3 text-center text-body text-sky-50 backdrop-blur-md">
-                  {session.liveTranscript || <span className="text-sky-200/70">Start speaking…</span>}
+                  <span className="tabular-nums">{formatClock(Math.floor(session.recordingMs / 1000))}</span>
+                  <span className="text-sky-200/80"> · Speak, then tap ■ when you&apos;re done</span>
                 </p>
               ) : (
                 <p className="mx-auto flex items-center gap-2 rounded-2xl bg-black/60 px-4 py-2.5 text-body-sm text-white/80 backdrop-blur-md">
@@ -914,14 +921,6 @@ function Session({
             }
             icon={ScanFace}
           />
-          <DockButton
-            label="Give me an idea"
-            onClick={() => setHintFor(hint ? null : session.index)}
-            icon={Lightbulb}
-            active={hint}
-            disabled={session.stage === "thinking"}
-          />
-
           <MicButton session={session} />
 
           <DockButton
@@ -932,27 +931,73 @@ function Session({
           <button
             type="button"
             onClick={session.end}
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-error px-5 text-body-sm font-semibold text-error-foreground transition-colors hover:bg-error/90"
+            disabled={!live}
+            className="inline-flex h-12 disabled:opacity-50 items-center gap-2 rounded-full bg-error px-5 text-body-sm font-semibold text-error-foreground transition-colors hover:bg-error/90"
           >
             <PhoneOff className="size-4" aria-hidden />
             End
           </button>
         </div>
 
-        {hint && session.turn && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-body-sm">
-            <Lightbulb className="size-4 text-amber-500" aria-hidden />
-            <span className="text-fg-secondary">Try weaving in:</span>
-            {session.turn.suggestions.map((s) => (
-              <span key={s} className="rounded-full border bg-surface px-2.5 py-0.5 text-caption font-medium">
-                {s}
-              </span>
-            ))}
-          </div>
+        {session.notice && (
+          <p role="status" className="flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-body-sm">
+            <Lightbulb className="size-4 shrink-0 text-amber-500" aria-hidden />
+            {session.notice}
+          </p>
         )}
       </div>
 
       <SidePanel session={session} coach={coach} lang={settings.lang} />
+    </div>
+  );
+}
+
+/**
+ * What the stage shows while there is no conversation yet, or no longer one: checking the
+ * plan and the microphone, connecting, or why it could not start — with the way forward.
+ */
+function ConnectionOverlay({ session }: { session: CoachSession }) {
+  if (session.connection === "error" && session.error) {
+    const code = session.error.code;
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-black/55 p-6 backdrop-blur-sm" role="alert">
+        <div className="grid max-w-sm justify-items-center gap-3 text-center text-white">
+          <p className="text-h4">
+            {code === "ENTITLEMENT_REQUIRED"
+              ? "The live coach is part of Pro"
+              : code === "MIC_DENIED"
+                ? "The coach can't hear you"
+                : code === "CONFLICT"
+                  ? "Already talking in another tab"
+                  : "The conversation stopped"}
+          </p>
+          <p className="text-body-sm text-white/75">{session.error.message}</p>
+          {code === "ENTITLEMENT_REQUIRED" ? (
+            <Button asChild>
+              <Link href="/app/subscription">See plans</Link>
+            </Button>
+          ) : (
+            <Button onClick={session.retry}>
+              <RotateCcw aria-hidden />
+              Try again
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+  const label =
+    session.connection === "checking"
+      ? "Checking your microphone…"
+      : session.connection === "connecting"
+        ? "Connecting to your coach…"
+        : "Saving your conversation…";
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
+      <span className="inline-flex h-8 items-center gap-2 rounded-full bg-black/55 px-3.5 text-caption font-medium text-white backdrop-blur" role="status">
+        <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+        {label}
+      </span>
     </div>
   );
 }
@@ -1032,7 +1077,7 @@ function SidePanel({ session, coach, lang }: { session: CoachSession; coach: Coa
 
   useEffect(() => {
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
-  }, [session.messages.length, session.liveTranscript]);
+  }, [session.messages.length, session.stage]);
 
   return (
     <aside className="flex h-[min(68vh,40rem)] min-h-[26rem] flex-col overflow-hidden rounded-2xl border bg-surface xl:h-[calc(min(68vh,40rem)+5.25rem)]">
@@ -1079,10 +1124,10 @@ function SidePanel({ session, coach, lang }: { session: CoachSession; coach: Coa
               </div>
             </li>
           ))}
-          {session.stage === "listening" && session.liveTranscript && (
+          {(session.stage === "listening" || session.stage === "thinking") && (
             <li className="flex flex-row-reverse">
               <div className="max-w-[85%] rounded-2xl rounded-tr-sm border border-dashed border-primary/50 px-3.5 py-2.5 text-body-sm text-fg-secondary">
-                {session.liveTranscript}…
+                {session.stage === "listening" ? "Recording your answer…" : "Transcribing…"}
               </div>
             </li>
           )}
@@ -1126,7 +1171,7 @@ function SidePanel({ session, coach, lang }: { session: CoachSession; coach: Coa
                       <span className="font-medium text-success">{m.feedback.better}</span>
                     </span>
                   )}
-                  <span className="text-caption text-fg-secondary">{m.feedback?.note[lang]}</span>
+                  <span className="text-caption text-fg-secondary">{m.feedback?.note}</span>
                 </li>
               ))}
             </ul>
@@ -1151,25 +1196,65 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
 
 // ---- Summary --------------------------------------------------------------------------------
 
+const CRITERIA = [
+  { key: "fluency", label: "Fluency & coherence" },
+  { key: "vocabulary", label: "Vocabulary" },
+  { key: "grammar", label: "Grammar" },
+  { key: "relevance", label: "Relevance" },
+] as const;
+
 function Summary({
   coach,
   topic,
+  result,
   onAgain,
   onLobby,
 }: {
   coach: CoachPersona;
   topic: CoachTopic | null;
+  result: CoachSummary | null;
   onAgain: () => void;
   onLobby: () => void;
 }) {
-  const overall = Math.round((PREVIEW_SCORES.reduce((n, s) => n + s.band, 0) / PREVIEW_SCORES.length) * 2) / 2;
-  const ring = (overall / 9) * 100;
+  const results = result?.results ?? [];
+  const scored = results.filter((r) => r.criteria);
+  const average = (key: (typeof CRITERIA)[number]["key"]) =>
+    scored.length ? Math.round(scored.reduce((n, r) => n + (r.criteria?.[key] ?? 0), 0) / scored.length) : null;
+  const overall =
+    result?.overallScore ?? (results.length ? results.reduce((n, r) => n + r.score, 0) / results.length : undefined);
+  const mistakes = results.flatMap((r) => r.mistakes).slice(0, 6);
+  const clean = results.filter((r) => r.mistakes.length === 0);
+  const actions = (
+    <div className="flex flex-wrap justify-center gap-2">
+      <Button onClick={onAgain}>
+        <RotateCcw aria-hidden />
+        Talk again
+      </Button>
+      <Button variant="outline" onClick={onLobby}>
+        New topic
+      </Button>
+    </div>
+  );
+
+  if (!result || result.turns === 0) {
+    return (
+      <section className="grid justify-items-center gap-3 rounded-2xl border bg-surface p-10 text-center">
+        <h2 className="text-h3">Nothing was said this time</h2>
+        <p className="max-w-sm text-body-sm text-fg-secondary">
+          The conversation ended before your first answer, so there is nothing to score — and nothing was charged.
+        </p>
+        {actions}
+      </section>
+    );
+  }
+
+  const ring = Math.max(0, Math.min(100, overall ?? 0));
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
       <section className="grid justify-items-center gap-4 overflow-hidden rounded-2xl border bg-surface p-6 text-center">
         <div className="relative grid size-44 place-items-center">
-          <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
+          <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90" aria-hidden>
             <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth="7" className="text-surface-active" />
             <circle
               cx="50"
@@ -1184,76 +1269,85 @@ function Summary({
             />
           </svg>
           <div className="grid">
-            <span className="text-caption text-fg-muted">Estimated band</span>
-            <span className="text-display tabular-nums leading-none">{overall.toFixed(1)}</span>
+            <span className="text-caption text-fg-muted">Score</span>
+            <span className="text-display tabular-nums leading-none">{Math.round(ring)}</span>
+            <span className="text-caption text-fg-muted">out of 100</span>
           </div>
         </div>
         <div className="grid gap-1">
-          <h2 className="text-h3">Great conversation!</h2>
+          <h2 className="text-h3">Conversation saved</h2>
           <p className="text-body-sm text-fg-secondary">
-            {coach.name} · {topic?.title ?? "Free conversation"}
+            {coach.name} · {topic?.title ?? "Free conversation"} · {result.turns} {result.turns === 1 ? "answer" : "answers"}
           </p>
-          <Badge variant="warning" className="mx-auto mt-1">Preview scores</Badge>
+          {result.cefr && (
+            <Badge variant="outline" className="mx-auto mt-1">
+              Level {result.cefr}
+            </Badge>
+          )}
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          <Button onClick={onAgain}>
-            <RotateCcw aria-hidden />
-            Talk again
-          </Button>
-          <Button variant="outline" onClick={onLobby}>
-            New topic
-          </Button>
-        </div>
+        {actions}
       </section>
 
       <div className="grid gap-5">
-        <section className="grid gap-4 rounded-2xl border bg-surface p-5">
-          <h3 className="text-h4">Your breakdown</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {PREVIEW_SCORES.map((s) => (
-              <div key={s.key} className="grid gap-1.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-body-sm text-fg-secondary">{s.label}</span>
-                  <span className="text-h4 tabular-nums">{s.band.toFixed(1)}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-surface-active">
-                  <div className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary" style={{ width: `${(s.band / 9) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {scored.length > 0 && (
+          <section className="grid gap-4 rounded-2xl border bg-surface p-5">
+            <h3 className="text-h4">Your breakdown</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {CRITERIA.map((c) => {
+                const value = average(c.key) ?? 0;
+                return (
+                  <div key={c.key} className="grid gap-1.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-body-sm text-fg-secondary">{c.label}</span>
+                      <span className="text-h4 tabular-nums">{value}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-surface-active">
+                      <div className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary" style={{ width: `${value}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         <div className="grid gap-5 md:grid-cols-2">
-          <section className="grid content-start gap-3 rounded-2xl border bg-surface p-5">
-            <h3 className="flex items-center gap-2 text-h4">
-              <Award className="size-4 text-success" aria-hidden />
-              What went well
-            </h3>
-            <ul className="grid gap-2 text-body-sm text-fg-secondary">
-              <li>Clear stories with a time, place and feeling.</li>
-              <li>Natural second conditional: “If I could change one thing, I would…”.</li>
-              <li>Steady pace with few long pauses.</li>
-            </ul>
-          </section>
           <section className="grid content-start gap-3 rounded-2xl border bg-surface p-5">
             <h3 className="flex items-center gap-2 text-h4">
               <Sparkles className="size-4 text-warning-text" aria-hidden />
               Practise next
             </h3>
-            <ul className="grid gap-2 text-body-sm">
-              {[
-                ["I was spending a lot of time", "I spent a lot of time"],
-                ["more different", "quite differently"],
-                ["different background", "a different background"],
-              ].map(([from, to]) => (
-                <li key={from}>
-                  <span className="text-error line-through decoration-error/60">{from}</span>
-                  <span className="mx-1.5 text-fg-muted">→</span>
-                  <span className="font-medium text-success">{to}</span>
-                </li>
-              ))}
-            </ul>
+            {mistakes.length === 0 ? (
+              <p className="text-body-sm text-fg-secondary">No mistakes to fix this time — try a harder topic next.</p>
+            ) : (
+              <ul className="grid gap-3 text-body-sm">
+                {mistakes.map((m, i) => (
+                  <li key={`${m.original}-${i}`} className="grid gap-0.5">
+                    <span>
+                      <span className="text-error line-through decoration-error/60">{m.original}</span>
+                      <span className="mx-1.5 text-fg-muted">→</span>
+                      <span className="font-medium text-success">{m.correction}</span>
+                    </span>
+                    <span className="text-caption text-fg-secondary">{m.explanation}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="grid content-start gap-3 rounded-2xl border bg-surface p-5">
+            <h3 className="flex items-center gap-2 text-h4">
+              <Award className="size-4 text-success" aria-hidden />
+              Answers without mistakes
+            </h3>
+            {clean.length === 0 ? (
+              <p className="text-body-sm text-fg-secondary">Every answer had something to fix — that is what practice is for.</p>
+            ) : (
+              <ul className="grid gap-2 text-body-sm text-fg-secondary">
+                {clean.slice(0, 3).map((r) => (
+                  <li key={r.turn}>&ldquo;{r.transcript}&rdquo;</li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       </div>

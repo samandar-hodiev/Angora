@@ -188,6 +188,8 @@ export function Coach3D({
       cancelled = true;
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       if (instance) {
+        // Taken first: the library's dispose clears its own reference to the renderer.
+        const renderer = instance.renderer as typeof instance.renderer | null;
         // The library's dispose assumes a fully loaded model; leaving mid-load must not crash.
         try {
           instance.stop();
@@ -197,8 +199,8 @@ export function Coach3D({
         }
         // Give the WebGL context back now rather than whenever the GC gets to it: browsers
         // allow only a handful, and the next coach screen needs one.
-        instance.renderer.dispose();
-        instance.renderer.forceContextLoss();
+        renderer?.dispose();
+        renderer?.forceContextLoss();
       }
       container.replaceChildren();
     };

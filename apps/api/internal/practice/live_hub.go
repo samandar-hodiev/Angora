@@ -101,6 +101,31 @@ func (h *LiveHub) admit(ctx context.Context, userID uuid.UUID) (*liveTicket, err
 	return t, nil
 }
 
+// check answers "could this learner start a conversation now?" without reserving anything —
+// the browser cannot read why a WebSocket upgrade was refused, so the client asks first.
+func (h *LiveHub) check(ctx context.Context, userID uuid.UUID) error {
+	if h.draining.Load() {
+		return apperr.New(apperr.CodeUnavailable, "The coach is restarting. Try again in a few seconds.")
+	}
+	h.mu.Lock()
+	full := h.reserved >= h.max
+	_, heldLocally := h.local[userID]
+	h.mu.Unlock()
+	if full {
+		return apperr.New(apperr.CodeUnavailable, "The coach is busy right now. Try again in a minute.")
+	}
+	held := heldLocally
+	if h.redis != nil {
+		if n, err := h.redis.Exists(ctx, h.lockKey(userID)).Result(); err == nil {
+			held = n > 0
+		}
+	}
+	if held {
+		return apperr.Conflict("A conversation with your coach is already open in another tab or device. Close it, then try again.")
+	}
+	return nil
+}
+
 func (h *LiveHub) lockKey(userID uuid.UUID) string { return "live:session:" + userID.String() }
 
 func (h *LiveHub) lock(ctx context.Context, t *liveTicket) error {

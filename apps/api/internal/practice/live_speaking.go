@@ -73,7 +73,7 @@ const (
 // no generator the coach still gives feedback, it just asks from a fixed set of follow-ups
 // instead of reacting to what was said.
 type Conversationalist interface {
-	GenerateText(ctx context.Context, meta ai.CallMeta, req ai.TextRequest) (*ai.TextResponse, error)
+	AnalyzeText(ctx context.Context, meta ai.CallMeta, req ai.AnalysisRequest) (*ai.AnalysisResponse, error)
 }
 
 // ---- wire protocol -------------------------------------------------------------------------
@@ -83,6 +83,12 @@ type liveClientMessage struct {
 	TaskID     *uuid.UUID `json:"task_id,omitempty"`
 	DurationMs int        `json:"duration_ms,omitempty"`
 	MimeType   string     `json:"mime_type,omitempty"`
+
+	// On start: how the learner wants to practise. All optional — an old client that sends
+	// none of them gets the conversation it always got.
+	Mode         string `json:"mode,omitempty"`          // free | part1 | part2 | part3
+	Topic        string `json:"topic,omitempty"`         // a topic title, when there is no task id
+	FeedbackLang string `json:"feedback_lang,omitempty"` // en | uz
 }
 
 type liveTurnFeedback struct {
@@ -91,7 +97,10 @@ type liveTurnFeedback struct {
 	WordsPerMinute float64           `json:"words_per_minute"`
 	Score          float64           `json:"score"`
 	Feedback       *SpeakingFeedback `json:"feedback,omitempty"`
-	Reply          string            `json:"reply"`
+	// Say is what the coach says about the answer — a correction or specific praise, in the
+	// learner's feedback language — before asking Reply, the next question, in English.
+	Say   string `json:"say,omitempty"`
+	Reply string `json:"reply"`
 }
 
 type liveServerMessage struct {
@@ -131,6 +140,9 @@ type liveSession struct {
 	prompt   string
 	level    cefr.Level
 	platform string
+	mode     string
+	topic    string
+	lang     string
 
 	turn       int
 	audio      bytes.Buffer
@@ -244,6 +256,33 @@ func (s *liveSession) reconnect(ctx context.Context) {
 	s.wmu.Unlock()
 }
 
+// liveStatus is the pre-flight for a live conversation: the same refusals the upgrade would
+// make — no plan, no room, another tab — as an ordinary JSON answer the client can read and
+// explain. A refused WebSocket gives the browser no status code at all.
+func (m *Module) liveStatus(c *gin.Context) {
+	p, err := authz.CurrentPrincipal(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	if m.speaker == nil || m.store == nil {
+		httpx.Fail(c, apperr.NotImplemented("The live speaking coach"))
+		return
+	}
+	if m.plans != nil {
+		if err := m.plans.RequireFeature(ctx, p.UserID, entitlementLiveCoach); err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+	}
+	if err := m.live.check(ctx, p.UserID); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, gin.H{"available": true, "max_turns": maxLiveTurns})
+}
+
 // upgrader rejects cross-origin upgrades. WebSocket connections are not covered by CORS, so
 // without this check any page on the internet could open a session as a logged-in learner
 // and spend their budget.
@@ -319,6 +358,7 @@ func (s *liveSession) run(ctx context.Context) {
 				s.fail(apperr.Conflict("This session has already started"))
 				return
 			}
+			s.mode, s.topic, s.lang = liveMode(msg.Mode), cleanTopic(msg.Topic), feedbackLang(msg.FeedbackLang)
 			if err := s.start(ctx, msg.TaskID); err != nil {
 				s.fail(err)
 				return
@@ -356,7 +396,7 @@ func (s *liveSession) run(ctx context.Context) {
 
 func (s *liveSession) start(ctx context.Context, taskID *uuid.UUID) error {
 	prompt, level := s.m.speakingPrompt(ctx, s.userID, taskID)
-	s.prompt = prompt
+	s.prompt = openingLine(s.mode, s.topic, prompt, taskID != nil)
 	parsed, err := cefr.Parse(level)
 	if err != nil {
 		parsed = cefr.MustParse("B1")
@@ -456,12 +496,15 @@ func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) err
 
 	// The next question depends only on what was said, not on how it was judged, so it is
 	// asked while the judging runs. The learner waits for the slower of the two, not both.
-	replyCh := make(chan string, 1)
-	go func() { replyCh <- s.m.followUp(ctx, s.userID, s.level, s.currentPrompt(), transcription.Text) }()
+	replyCh := make(chan coachReply, 1)
+	go func() {
+		replyCh <- s.m.coachTurn(ctx, s.userID, s.level, s.mode, s.topic, s.lang, s.currentPrompt(), transcription.Text)
+	}()
 
 	assessment, meta, err := s.m.speaker.EvaluateSpeaking(ctx, ai.SpeakingAssessmentInput{
 		UserID: s.userID, TaskPrompt: s.currentPrompt(), TargetLevel: s.level,
 		Transcript: transcription.Text, SpeechSeconds: seconds, WordsPerMinute: wpm,
+		ExplanationLanguage: s.lang,
 	})
 	if err != nil || assessment == nil {
 		refund()
@@ -480,7 +523,8 @@ func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) err
 	s.scores = append(s.scores, score)
 	s.durationMs += msg.DurationMs
 
-	reply := <-replyCh
+	coach := <-replyCh
+	reply := coach.Ask
 
 	if _, err := s.m.pool.Exec(ctx, `
 		INSERT INTO speaking_turns (session_id, turn_number, audio_file_id, transcript_id, analysis_id,
@@ -498,7 +542,7 @@ func (s *liveSession) handleTurn(ctx context.Context, msg liveClientMessage) err
 	}
 	s.send(liveServerMessage{Type: "turn", Turn: &liveTurnFeedback{
 		Turn: s.turn, Transcript: transcription.Text, WordsPerMinute: round2(wpm),
-		Score: round2(score), Feedback: feedback, Reply: reply,
+		Score: round2(score), Feedback: feedback, Say: coach.Say, Reply: reply,
 	}})
 	s.prompt = reply
 	return nil
@@ -623,35 +667,6 @@ var fallbackFollowUps = []string{
 	"What is the hardest part of that for you?",
 	"What would you tell someone doing it for the first time?",
 	"How do you think it will change in the future?",
-}
-
-// followUp asks the next question. It is a cheap, short call on purpose: the learner is
-// waiting, and a coach who takes eight seconds to think of a question is not a conversation.
-func (m *Module) followUp(ctx context.Context, userID uuid.UUID, level cefr.Level, question, answer string) string {
-	if m.conversation == nil {
-		return fallbackFollowUps[len(answer)%len(fallbackFollowUps)]
-	}
-	reply, err := m.conversation.GenerateText(ctx,
-		ai.CallMeta{Task: ai.TaskRealtimeConversation, UserID: &userID, PromptVersion: "live_speaking.v1"},
-		ai.TextRequest{
-			System: "You are an English speaking partner for a CEFR " + level.String() + " learner. " +
-				"Reply with exactly one short follow-up question about what they just said. " +
-				"Use language at or just below their level. Ask an open question, never a yes/no question. " +
-				"Do not correct them and do not comment on their English — feedback is shown separately. " +
-				"Output only the question.",
-			Messages: []ai.Message{
-				{Role: "user", Content: "You asked: " + question + "\nThey answered: " + answer},
-			},
-			MaxOutputTokens: 60,
-		})
-	if err != nil || reply == nil || strings.TrimSpace(reply.Text) == "" {
-		return fallbackFollowUps[len(answer)%len(fallbackFollowUps)]
-	}
-	text := strings.TrimSpace(reply.Text)
-	if len(text) > 240 {
-		text = text[:240]
-	}
-	return text
 }
 
 func round2(v float64) float64 {

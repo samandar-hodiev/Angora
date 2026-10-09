@@ -97,6 +97,7 @@ func (m *Module) registerSpeakingRoutes(v1 *gin.RouterGroup) {
 	g.GET("/sessions/:id", m.speakingSession)
 	g.GET("/sessions/:id/turns", m.speakingTurns)
 	g.GET("/live", m.liveSpeaking)
+	g.GET("/live/status", m.liveStatus)
 }
 
 func (m *Module) speakingTasks(c *gin.Context) {

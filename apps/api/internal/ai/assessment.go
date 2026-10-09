@@ -72,6 +72,10 @@ type SpeakingAssessmentInput struct {
 	PauseRatio *float64
 	// Focus is the grammar point the task was set to practise, when it was set for one.
 	Focus string
+	// ExplanationLanguage is the language mistake explanations are written in: "uz" for
+	// Uzbek; anything else is English. The original and corrected text stay in English —
+	// they are the English the learner is practising.
+	ExplanationLanguage string
 }
 
 type SpeakingAssessment struct {
@@ -161,6 +165,10 @@ func (e *PlacementEvaluator) EvaluateSpeaking(ctx context.Context, in SpeakingAs
 			"This task was set to practise the focus grammar. Check every place the speaker used it — or should have — " +
 			"and report each error in it as its own mistake, before any other mistakes. Let how well they used it " +
 			"weigh heavily in the grammar score.\n\n" + input
+	}
+	if in.ExplanationLanguage == "uz" {
+		input = "EXPLANATIONS_LANGUAGE: Uzbek (Latin script). Write every mistake's explanation in clear, simple Uzbek. " +
+			"Keep \"original\" and \"correction\" exactly in English.\n\n" + input
 	}
 	var out SpeakingAssessment
 	meta, err := e.analyze(ctx, in.UserID, TaskSpeakingEvaluation, SchemaPlacementSpeaking, speakingSchema,
