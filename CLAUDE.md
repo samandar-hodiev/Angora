@@ -65,9 +65,48 @@ After changing Go code, restart the running API so the change is served.
 - Commit and push each finished task; the pre-push hook (`make gitpulse-hook`) notifies
   GitPulse on localhost:8080, which posts to Telegram.
 
-## Sessions
+## Sessions — one area each
 
-Claude sessions are split by area under the ENGORA sidebar group and numbered:
-`0.xx` landing, `1.xx` auth & onboarding, `2.xx` learner-only, `3.xx` shared owner ↔ learner
-(through Content CMS), `4.xx` owner-only. Stay inside the session's area; cross-area work
-belongs in its own session.
+Claude sessions live under the ENGORA sidebar group, one per area. **The session title says
+which area you own. Work only there.** If a task needs changes in another area, stop and name
+the session that owns it (number + title) instead of doing it. Shared files (`packages/ui`,
+`internal/app/router.go`, `nav.ts`, `navigation.ts`, migrations) may be touched only as far as
+your own area needs. Paths below: web routes under `apps/web/src/app`, API under
+`apps/api/internal`.
+
+| Session | Owns |
+|---|---|
+| 0.01-Landing | `(marketing)/*`, `features/marketing` |
+| 1.01-Auth · Learner | `(auth)/*` (login, register, forgot/reset password, verify email), `features/auth`, API `auth` |
+| 1.02-Auth · Owner | `owner/login`, owner sign-in flow |
+| 2.01-Learner · Onboarding & Placement test | `(journey)/*`, `features/onboarding`, learner side of `features/assessment`, API `onboarding`, `levels` |
+| 2.02-Learner · Home Dashboard | `app/(shell)/dashboard`, `features/dashboard`, API `recommendations`, `personalization` |
+| 2.03-Learner · Practice Overview | `app/(shell)/learn`, `features/practice/learn-view.tsx` |
+| 2.04-Learner · AI Coach | `app/(shell)/ai-coach`, `features/practice/coach`, API `coach` |
+| 2.05-Learner · Pronunciation | `app/(shell)/pronunciation`, API `pronunciation` |
+| 2.06-Learner · Progress | `app/(shell)/progress`, API `progress` |
+| 2.07-Learner · Mistakes | `app/(shell)/mistakes`, API `mistakes` |
+| 2.08-Learner · History | `app/(shell)/history` |
+| 2.09-Learner · Subscription | `app/(shell)/subscription`, `features/subscription` |
+| 2.10-Learner · Settings | `app/(shell)/settings` |
+| 2.11-Learner · Profile | `app/(shell)/profile`, `features/profile`, API `profiles` |
+| 3.01-Learner & Owner · Content CMS | `owner/content` (Overview, All content), `cms-view`, `content-overview`, API `learning` |
+| 3.02-Learner & Owner · Grammar | `owner/content/grammar`, `grammar-*` views, `app/(shell)/grammar`, `features/grammar`, API `grammar` |
+| 3.03-Learner & Owner · Lexicon | `owner/content/lexicon` + vocabulary, `vocabulary-view`, `irregular-verbs-view`, `app/(shell)/{vocabulary,phrases,collocations,irregular-verbs}`, API `vocabulary` |
+| 3.04-Learner & Owner · Speaking | owner speaking content, `app/(shell)/speaking`, `speaking-view`, `live-speaking*`, API `speaking` |
+| 3.05-Learner & Owner · Writing | owner writing content, `app/(shell)/writing`, `writing-view`, API `writing` |
+| 3.06-Learner & Owner · Reading | owner reading content, `app/(shell)/reading`, `reading-view`, API `reading` |
+| 3.07-Learner & Owner · Listening | owner listening content, `app/(shell)/listening`, `listening-view`, API `listening` |
+| 3.08-Learner & Owner · Mock Exam | `owner/content/mock-exam`, `app/(shell)/mock-exam`, `app/(focus)/mock-exam`, `features/mock-exam`, API `mockexam` |
+| 3.09-Learner & Owner · IELTS | owner IELTS content, `app/(shell)/ielts`, `app/(focus)/ielts`, API `ielts` |
+| 3.10-Learner & Owner · Placement & Question Bank | `owner/content/{placement,question-bank}`, `assessments-view`, `question-bank-view`, `question-editor`, API `assessment` |
+| 4.01-Owner · Dashboard | `owner/dashboard`, owner shell/layout/sidebar, `dashboard-view` |
+| 4.02-Owner · Analytics | `owner/analytics`, API `analytics` |
+| 4.03-Owner · Learners | `owner/learners`, `learners-view`, `learner-detail-view`, API `users` |
+| 4.04-Owner · Paywall & Payments | `owner/{paywall,payments}`, API `payments`, `subscriptions` |
+| 4.05-Owner · Notifications | `owner/notifications`, `features/notifications`, API `notifications` |
+| 4.06-Owner · AI & Team Activity | `owner/ai`, `ai-view`, `team-activity`, API `ai` usage/cost |
+| 4.07-Owner · Audit log | `owner/audit`, API `audit` |
+| 4.08-Owner · Learner App config | `owner/learner-app` (defaults, feature switches, wallpapers, maintenance) |
+| 4.09-Owner · Settings | `owner/settings` (operator language, theme, wallpaper, sessions) |
+| 4.10-Owner · Staff & Roles access | `owner/{staff,roles}`, API `authz`, `owner/staff.go`, `owner/visibility.go` |
