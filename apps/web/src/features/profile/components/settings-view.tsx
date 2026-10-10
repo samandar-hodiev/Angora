@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, KeyRound, LogOut, Monitor, Moon, Sun, Trash2 } from "lucide-react";
+import { Download, LogOut, Monitor, Moon, Sun, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OptionCard, Switch } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { useLogout, useSession } from "@/features/auth/hooks";
@@ -28,6 +27,7 @@ import { saveAsJsonFile, useExportAccount } from "../account";
 import { useSaveAppearance } from "../appearance";
 import { useProfile } from "../hooks";
 import { DeleteAccountDialog } from "./delete-account-dialog";
+import { LanguageSettings, PasswordButton } from "./settings-sections";
 import { WallpaperPicker } from "./wallpaper-picker";
 
 const sections = [
@@ -253,14 +253,13 @@ export function SettingsView() {
             </div>
           </SettingsSection>
 
-          <SettingsSection flashed={flash?.id === "language"} id="language" title="Language">
-            <div className="grid max-w-xs gap-2">
-              <Label htmlFor="ui-language">Interface language</Label>
-              <NativeSelect id="ui-language" defaultValue="en" disabled>
-                <option value="en">English</option>
-              </NativeSelect>
-              <p className="text-caption text-fg-muted">More interface languages are planned.</p>
-            </div>
+          <SettingsSection
+            flashed={flash?.id === "language"}
+            id="language"
+            title="Language"
+            description="The language Engora explains things to you in."
+          >
+            <LanguageSettings />
           </SettingsSection>
 
           <SettingsSection
@@ -285,11 +284,9 @@ export function SettingsView() {
 
           <SettingsSection flashed={flash?.id === "security"} id="security" title="Security">
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/forgot-password">
-                  <KeyRound aria-hidden /> Change password
-                </Link>
-              </Button>
+              {/* Changing an existing password needs an endpoint the auth module does not have yet
+                  (asked of 1.01-Auth · Learner); the reset pages turn a signed-in learner away. */}
+              <PasswordButton />
               <Button variant="outline" onClick={() => setConfirmSignOut(true)} loading={logout.isPending}>
                 <LogOut aria-hidden /> Sign out
               </Button>
