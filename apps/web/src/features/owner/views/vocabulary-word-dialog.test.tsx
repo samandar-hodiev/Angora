@@ -20,6 +20,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 import { WordDialog } from "./vocabulary-view";
 
 const hello = {
+  existing: [],
   term: "hello",
   part_of_speech: "exclamation",
   level: "A1",
@@ -80,5 +81,33 @@ describe("WordDialog — AI fills in a typed word", () => {
     await user.type(screen.getByRole("textbox", { name: "Word" }), "bus station");
     await user.tab();
     expect((await screen.findAllByText(/Vocabulary holds single words/)).length).toBeGreaterThan(0);
+  });
+
+  it("says in the dialog, before saving, that the word is already in the library", async () => {
+    api.post.mockResolvedValue({
+      ...hello,
+      level: "",
+      translations: {},
+      level_content: {},
+      tags: [],
+      existing: [{ id: "1", term: "hello", kind: "word", part_of_speech: "noun", level: "A1", status: "draft" }],
+    });
+    const onShowExisting = vi.fn();
+    const client = new QueryClient();
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={client}>
+        <WordDialog kind="word" word={null} onClose={() => {}} onSaved={() => {}} onShowExisting={onShowExisting} />
+      </QueryClientProvider>,
+    );
+    await user.type(screen.getByRole("textbox", { name: "Word" }), "hello");
+    await user.tab();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("“hello” is already in the library");
+    expect(screen.getByRole("alert")).toHaveTextContent("Vocabulary · noun · A1");
+    expect(screen.getByLabelText(/O'zbekcha/)).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Add word" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /Show it in the list/ }));
+    expect(onShowExisting).toHaveBeenCalledWith("hello");
   });
 });

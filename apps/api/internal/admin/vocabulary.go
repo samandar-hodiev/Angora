@@ -993,6 +993,40 @@ type WordSuggestion struct {
 	LevelContent     map[string]ai.LevelText `json:"level_content"`
 	Tags             []string                `json:"tags"`
 	Register         string                  `json:"register"`
+	// Existing are the entries already in the library under this term. When there are any,
+	// nothing else is filled in: the owner is told before writing a second copy.
+	Existing []ExistingEntry `json:"existing"`
+}
+
+// ExistingEntry is an entry already in the library under a term the owner typed.
+type ExistingEntry struct {
+	ID           uuid.UUID `json:"id"`
+	Term         string    `json:"term"`
+	Kind         string    `json:"kind"`
+	PartOfSpeech string    `json:"part_of_speech"`
+	Level        string    `json:"level"`
+	Status       string    `json:"status"`
+}
+
+// existingEntries finds what the library already holds under a term, in any part of speech.
+func (m *Module) existingEntries(ctx context.Context, term string) ([]ExistingEntry, error) {
+	rows, err := m.pool.Query(ctx, `
+		SELECT v.id, v.term, v.kind, v.part_of_speech, COALESCE(l.code, ''), v.status
+		FROM vocabulary v LEFT JOIN levels l ON l.id = v.level_id
+		WHERE lower(v.term) = lower($1) ORDER BY v.created_at`, term)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ExistingEntry{}
+	for rows.Next() {
+		var e ExistingEntry
+		if err := rows.Scan(&e.ID, &e.Term, &e.Kind, &e.PartOfSpeech, &e.Level, &e.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }
 
 // suggestionRefusals say why the editor would not fill in a term, in words the owner can act on.
@@ -1031,12 +1065,22 @@ func (m *Module) suggestWord(c *gin.Context) {
 		httpx.Fail(c, apperr.Validation(map[string]any{"fields": map[string]any{"term": msg}}))
 		return
 	}
+	ctx := c.Request.Context()
+	existing, err := m.existingEntries(ctx, term)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if len(existing) > 0 {
+		httpx.OK(c, WordSuggestion{Term: term, Kind: in.Kind, Translations: map[string]string{}, LevelContent: map[string]ai.LevelText{},
+			Tags: []string{}, Existing: existing})
+		return
+	}
 	writer, ok := m.author.(VocabularyWriter)
 	if !ok {
 		httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "AI content generation is not configured"))
 		return
 	}
-	ctx := c.Request.Context()
 	words, _, err := writer.WriteVocabulary(ctx, ai.VocabularyRequest{Count: 1, Kind: in.Kind, Term: term, ActorID: &p.UserID})
 	if err != nil || len(words) == 0 {
 		httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "The AI could not fill this in. Please try again."))
@@ -1082,6 +1126,6 @@ func (m *Module) suggestWord(c *gin.Context) {
 	httpx.OK(c, WordSuggestion{
 		Term: w.Term, Kind: in.Kind, PartOfSpeech: w.PartOfSpeech, Level: w.Level, LevelSource: w.source,
 		PronunciationIPA: w.PronunciationIPA, Translations: w.Translations, LevelContent: w.LevelContent,
-		Tags: orEmptyStrings(w.Tags), Register: w.Usage.Register,
+		Tags: orEmptyStrings(w.Tags), Register: w.Usage.Register, Existing: []ExistingEntry{},
 	})
 }

@@ -211,6 +211,13 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		if n != 0 {
 			t.Error("a suggestion was saved")
 		}
+		// A term already in the library is reported, not written again.
+		w = call(http.MethodPost, "/vocabulary/suggest", map[string]any{"term": strings.ToUpper("zz" + stamp + "manual"), "kind": "word"})
+		var dup struct{ Data WordSuggestion }
+		_ = json.Unmarshal(w.Body.Bytes(), &dup)
+		if w.Code != http.StatusOK || len(dup.Data.Existing) != 1 || dup.Data.Existing[0].Status != "draft" || dup.Data.Level != "" {
+			t.Errorf("duplicate suggest = %d %+v", w.Code, dup.Data)
+		}
 		if w := call(http.MethodPost, "/vocabulary/suggest", map[string]any{"term": "bus station", "kind": "word"}); w.Code != http.StatusUnprocessableEntity {
 			t.Errorf("two-word vocabulary status = %d, want 422", w.Code)
 		}

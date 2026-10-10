@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, BookA, Check, ChevronRight, Pencil, Plus, Send, Sparkles, Trash2, Undo2, X } from "lucide-react";
+import { Archive, BookA, Check, ChevronRight, CircleAlert, Pencil, Plus, Search, Send, Sparkles, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Highlight } from "@/components/common/highlight";
@@ -206,7 +206,21 @@ interface WordSuggestion {
   translations: { uz?: string; ru?: string; ru_pron?: string; def_uz?: string; def_ru?: string };
   level_content: Partial<Record<CEFRLevel, LevelText>>;
   tags: string[];
+  /** Entries already in the library under this term; when there are any, nothing is filled in. */
+  existing: ExistingEntry[];
 }
+
+interface ExistingEntry {
+  id: string;
+  term: string;
+  kind: Kind;
+  part_of_speech: string;
+  level: CEFRLevel | "";
+  status: Word["status"];
+}
+
+const KIND_PAGE_NAME: Record<Kind, string> = { word: "Vocabulary", phrase: "Phrases", collocation: "Collocations" };
+const STATUS_NAME: Record<Word["status"], string> = { draft: "Draft", review: "In review", published: "Live", archived: "Archived" };
 
 /** Fields the AI can fill in; one the owner has typed into is theirs and is never overwritten. */
 type FillField = "part_of_speech" | "level" | "pronunciation_ipa" | "uz" | "ru" | "ru_pron" | "explanation" | "tags";
@@ -659,6 +673,11 @@ export function VocabularyView({ kind }: { kind: Kind }) {
           kind={kind}
           word={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
+          onShowExisting={(term) => {
+            setEditing(null);
+            setStatus("all");
+            setSearch(term);
+          }}
           onSaved={() => {
             setEditing(null);
             refresh();
@@ -892,11 +911,14 @@ export function WordDialog({
   word,
   onClose,
   onSaved,
+  onShowExisting,
 }: {
   kind: Kind;
   word: Word | null;
   onClose: () => void;
   onSaved: () => void;
+  /** Closes the dialog and finds the term in the list. */
+  onShowExisting?: (term: string) => void;
 }) {
   const [form, setForm] = useState<WordInput>(() => {
     const content: Partial<Record<CEFRLevel, LevelText>> = { ...(word?.level_content ?? {}) };
@@ -929,6 +951,8 @@ export function WordDialog({
   const [suggestedFor, setSuggestedFor] = useState("");
   const [suggestError, setSuggestError] = useState("");
   const [levelChecked, setLevelChecked] = useState(false);
+  // What the library already holds under the typed term — said in the dialog, before saving.
+  const [existing, setExisting] = useState<ExistingEntry[]>([]);
   const [tagsText, setTagsText] = useState<string | null>(null);
   const own = (field: FillField) => {
     setTouched((t) => new Set(t).add(field));
@@ -943,9 +967,14 @@ export function WordDialog({
     onMutate: (term) => {
       setSuggestedFor(term);
       setSuggestError("");
+      setExisting([]);
     },
     onSuccess: (s, term) => {
-      if (term !== form.term.trim()) return;
+      if (term !== form.term.trim().replace(/\s+/g, " ")) return;
+      if (s.existing?.length) {
+        setExisting(s.existing);
+        return;
+      }
       const take = new Set<FillField>();
       setForm((f) => {
         const next = { ...f, translations: { ...f.translations } };
@@ -1031,11 +1060,19 @@ export function WordDialog({
       toast({ title: word ? "Word saved" : "Word added as a draft", variant: "success" });
       onSaved();
     },
-    onError: (error) =>
-      toast({ title: "It could not be saved", description: isApiError(error) ? error.message : undefined, variant: "error" }),
+    onError: (error) => {
+      // Already there: shown in the dialog with what is there, not as a toast.
+      if (isApiError(error) && error.status === 409) {
+        suggest.mutate(form.term.trim().replace(/\s+/g, " "));
+        return;
+      }
+      toast({ title: "It could not be saved", description: isApiError(error) ? error.message : undefined, variant: "error" });
+    },
   });
   const explained = cefrLevels.filter((c) => form.level_content[c]?.definition.trim());
-  const ready = form.term.trim().length > 0 && explained.length > 0;
+  // The same term and part of speech is the same entry; another part of speech is a new one.
+  const duplicate = existing.find((e) => e.part_of_speech === form.part_of_speech);
+  const ready = form.term.trim().length > 0 && explained.length > 0 && !duplicate;
 
   return (
     <ConfirmDialog
@@ -1053,7 +1090,9 @@ export function WordDialog({
       disabled={!ready}
       onConfirm={() => save.mutate()}
       footerStart={
-        suggestError ? (
+        duplicate ? (
+          <span className="text-error">Already in the library</span>
+        ) : suggestError ? (
           <span className="text-error">{suggestError}</span>
         ) : filled.size > 0 ? (
           <span className="inline-flex items-center gap-1 text-success">
@@ -1066,6 +1105,51 @@ export function WordDialog({
     >
       {/* The padding, taken back by the margin, keeps focus rings inside the scroll box. */}
       <div className="-m-1 grid max-h-[62vh] gap-4 overflow-y-auto p-1">
+        {!word && existing.length > 0 && (
+          <div
+            role="alert"
+            className={cn(
+              "grid gap-2 rounded-xl border p-3",
+              duplicate ? "border-error/40 bg-error/10" : "border-warning/40 bg-warning/10",
+            )}
+          >
+            <div className="flex items-start gap-2">
+              <CircleAlert className={cn("mt-0.5 size-4 shrink-0", duplicate ? "text-error" : "text-warning")} aria-hidden />
+              <div className="grid gap-0.5">
+                <p className="text-body-sm font-semibold">
+                  “{existing[0]!.term}” is already in the library
+                </p>
+                <p className="text-caption text-fg-muted">
+                  {duplicate
+                    ? "Adding it again would make a second copy. Open the one that is there to change it."
+                    : "To add it as another part of speech, pick that part of speech below; otherwise open the one that is there."}
+                </p>
+              </div>
+            </div>
+            <ul className="grid gap-1 pl-6">
+              {existing.map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center gap-1.5 text-body-sm">
+                  <span className="font-medium">{e.term}</span>
+                  <span className="text-fg-muted">
+                    · {KIND_PAGE_NAME[e.kind]} · {e.part_of_speech}
+                    {e.level ? ` · ${e.level}` : ""}
+                  </span>
+                  <Badge variant={e.status === "published" ? "success" : "outline"}>{STATUS_NAME[e.status] ?? e.status}</Badge>
+                </li>
+              ))}
+            </ul>
+            {onShowExisting && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-6 justify-self-start"
+                onClick={() => onShowExisting(existing[0]!.term)}
+              >
+                <Search aria-hidden /> Show it in the list
+              </Button>
+            )}
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-[1fr_10rem_7rem]">
           <div className="grid gap-1.5">
             <Label htmlFor="word-term">{kind === "word" ? "Word" : kind === "phrase" ? "Phrase" : "Collocation"}</Label>
