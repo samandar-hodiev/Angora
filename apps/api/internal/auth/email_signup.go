@@ -88,6 +88,11 @@ type SetPasswordInput struct {
 	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"current_password" binding:"required,max=128"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=128"`
+}
+
 // EmailChallenge tells the client what was sent and when it may ask again.
 type EmailChallenge struct {
 	Email             string    `json:"email"`
@@ -339,7 +344,7 @@ func (s *Service) VerifyEmailSignup(ctx context.Context, in EmailVerifyInput, cl
 }
 
 // SetPassword adds a password to an account created without one (email code or Google).
-// Changing an existing password goes through the reset flow.
+// Changing an existing password goes through ChangePassword or the reset flow.
 func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, in SetPasswordInput, client ClientInfo) error {
 	if err := validatePasswordStrength(in.Password); err != nil {
 		return err
@@ -363,6 +368,46 @@ func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, in SetPassw
 	}
 	s.audit.Record(ctx, audit.Entry{ActorID: &userID, Action: audit.ActionPasswordReset, EntityType: "user",
 		EntityID: userID.String(), IP: client.IP, UserAgent: client.UserAgent, Metadata: map[string]any{"kind": "set"}})
+	return nil
+}
+
+// ChangePassword replaces the password of a signed-in account after checking the current
+// one. Accounts without a password use SetPassword instead.
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, in ChangePasswordInput, client ClientInfo) error {
+	user, err := s.users.GetByID(ctx, userID)
+	if errors.Is(err, users.ErrNotFound) {
+		return apperr.Unauthorized("This account no longer exists")
+	}
+	if err != nil {
+		return fmt.Errorf("load user: %w", err)
+	}
+	creds, err := s.users.GetCredentialsByEmail(ctx, user.Email)
+	if err != nil {
+		return fmt.Errorf("load credentials: %w", err)
+	}
+	if creds.PasswordHash == "" {
+		return apperr.Conflict("This account has no password yet").WithDetails(map[string]any{"reason": "no_password"})
+	}
+	ok, err := s.hasher.Verify(in.CurrentPassword, creds.PasswordHash)
+	if err != nil {
+		return fmt.Errorf("verify password: %w", err)
+	}
+	if !ok {
+		return apperr.Validation(map[string]any{"reason": "wrong_password",
+			"fields": map[string]any{"current_password": "is incorrect"}})
+	}
+	if err := validatePasswordStrength(in.NewPassword); err != nil {
+		return err
+	}
+	hash, err := s.hasher.Hash(in.NewPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.users.UpdatePassword(ctx, userID, hash); err != nil {
+		return fmt.Errorf("change password: %w", err)
+	}
+	s.audit.Record(ctx, audit.Entry{ActorID: &userID, Action: audit.ActionPasswordReset, EntityType: "user",
+		EntityID: userID.String(), IP: client.IP, UserAgent: client.UserAgent, Metadata: map[string]any{"kind": "change"}})
 	return nil
 }
 

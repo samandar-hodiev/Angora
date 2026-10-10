@@ -256,3 +256,35 @@ func TestSetPassword(t *testing.T) {
 		t.Errorf("second set: %v", err)
 	}
 }
+
+func TestChangePassword(t *testing.T) {
+	svc, mailer, _, _, _ := newEmailSignupService(t)
+	ctx := context.Background()
+	_, _ = svc.StartEmailSignup(ctx, EmailStartInput{Email: "learner@example.com"}, client)
+	session, err := svc.VerifyEmailSignup(ctx, EmailVerifyInput{Email: "learner@example.com", Code: mailer.lastCode(t)}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := session.User.ID
+	if err := svc.ChangePassword(ctx, id, ChangePasswordInput{CurrentPassword: "anything-1", NewPassword: "new-pass-12"}, client); reason(err) != "no_password" {
+		t.Errorf("without a password: %v", err)
+	}
+	if err := svc.SetPassword(ctx, id, SetPasswordInput{Password: "correct-horse-9"}, client); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ChangePassword(ctx, id, ChangePasswordInput{CurrentPassword: "wrong-horse-9", NewPassword: "new-pass-12"}, client); reason(err) != "wrong_password" {
+		t.Errorf("wrong current password: %v", err)
+	}
+	if err := svc.ChangePassword(ctx, id, ChangePasswordInput{CurrentPassword: "correct-horse-9", NewPassword: "onlyletters"}, client); reason(err) != "weak_password" {
+		t.Errorf("weak new password: %v", err)
+	}
+	if err := svc.ChangePassword(ctx, id, ChangePasswordInput{CurrentPassword: "correct-horse-9", NewPassword: "new-pass-12"}, client); err != nil {
+		t.Fatalf("change: %v", err)
+	}
+	if _, err := svc.Login(ctx, LoginInput{Email: "learner@example.com", Password: "correct-horse-9"}, client); err == nil {
+		t.Error("old password still signs in")
+	}
+	if _, err := svc.Login(ctx, LoginInput{Email: "learner@example.com", Password: "new-pass-12"}, client); err != nil {
+		t.Errorf("login with the new password: %v", err)
+	}
+}

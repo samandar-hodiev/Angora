@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup, rateLimit gin.HandlerFunc)
 	g.POST("/email/resend", h.emailResend)
 	g.POST("/email/verify", h.emailVerify)
 	g.POST("/password/set", authz.RequireAuthenticated(), h.setPassword)
+	g.POST("/password/change", authz.RequireAuthenticated(), h.changePassword)
 	g.GET("/password/status", authz.RequireAuthenticated(), h.passwordStatus)
 	g.POST("/password/forgot", h.forgotPassword)
 	g.POST("/password/reset", h.resetPassword)
@@ -169,6 +170,24 @@ func (h *Handler) setPassword(c *gin.Context) {
 		return
 	}
 	if err := h.svc.SetPassword(c.Request.Context(), p.UserID, in, clientInfo(c)); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.NoContent(c)
+}
+
+func (h *Handler) changePassword(c *gin.Context) {
+	p, err := authz.CurrentPrincipal(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	var in ChangePasswordInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if err := h.svc.ChangePassword(c.Request.Context(), p.UserID, in, clientInfo(c)); err != nil {
 		httpx.Fail(c, err)
 		return
 	}

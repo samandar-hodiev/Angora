@@ -18,6 +18,9 @@ export const emailAuthApi = {
   start: (email: string) => apiClient.post<EmailChallenge>("/auth/email/start", { email }, { auth: false }),
   resend: (email: string) => apiClient.post<EmailChallenge>("/auth/email/resend", { email }, { auth: false }),
   setPassword: (password: string) => apiClient.post<void>("/auth/password/set", { password }),
+  /** Replaces an existing password; fails with reason "wrong_password", "weak_password" or "no_password". */
+  changePassword: (current: string, next: string) =>
+    apiClient.post<void>("/auth/password/change", { current_password: current, new_password: next }),
   passwordStatus: () => apiClient.get<PasswordStatus>("/auth/password/status"),
 };
 
@@ -31,6 +34,12 @@ export function useResendEmailCode() {
 
 export function useSetPassword() {
   return useMutation({ mutationFn: emailAuthApi.setPassword });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { current: string; next: string }) => emailAuthApi.changePassword(input.current, input.next),
+  });
 }
 
 export function usePasswordStatus() {

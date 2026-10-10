@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { track } from "@/lib/analytics";
 import { applyApiErrors } from "@/lib/forms/apply-api-errors";
 
+import { useLogout, useSession } from "../hooks";
 import { useForgotPassword, useResetPassword } from "../password";
 
 function Done({ icon: Icon, title, text, action }: { icon: typeof MailCheck; title: string; text: string; action?: React.ReactNode }) {
@@ -88,6 +89,8 @@ export function ForgotPasswordForm({ signInHref = "/login" }: { signInHref?: str
 
 export function ResetPasswordForm({ token, signInHref = "/login" }: { token: string; signInHref?: string }) {
   const reset = useResetPassword();
+  const { status } = useSession();
+  const logout = useLogout();
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const form = useForm<ResetPasswordInput>({
@@ -130,6 +133,8 @@ export function ResetPasswordForm({ token, signInHref = "/login" }: { token: str
     try {
       await reset.mutateAsync({ token, password });
       track("password_reset_completed");
+      // The API has ended every session, so drop the one this browser still holds.
+      if (status === "authenticated") logout.mutate();
       setDone(true);
     } catch (error) {
       const message = applyApiErrors(error, form.setError, ["password"]);

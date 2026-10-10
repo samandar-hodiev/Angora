@@ -24,6 +24,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   return children;
 }
 
+/** Auth pages a signed-in user may still open: a reset link from email must work in any browser. */
+const SIGNED_IN_ALLOWED = ["/reset-password"];
+
 /**
  * Keeps signed-in users out of login/register. After a sign-in on these pages it sends the
  * user where that sign-in asked (onboarding for new accounts, ?next= for returning ones).
@@ -31,11 +34,13 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 export function GuestGuard({ children }: { children: ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
+  const redirect = status === "authenticated" && !SIGNED_IN_ALLOWED.includes(pathname);
 
   useEffect(() => {
-    if (status === "authenticated") router.replace(takePendingRedirect() ?? DEFAULT_LANDING_PATH);
-  }, [status, router]);
+    if (redirect) router.replace(takePendingRedirect() ?? DEFAULT_LANDING_PATH);
+  }, [redirect, router]);
 
-  if (status === "authenticated") return <FullPageLoader label="Signing you in" />;
+  if (redirect) return <FullPageLoader label="Signing you in" />;
   return children;
 }
