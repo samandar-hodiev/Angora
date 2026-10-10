@@ -41,12 +41,19 @@ function renderDialog() {
 
 describe("WordDialog — AI fills in a typed word", () => {
   it("fills every field from the term, and leaves alone what the owner typed", async () => {
-    api.post.mockResolvedValue(hello);
+    let answer: (value: typeof hello) => void = () => {};
+    api.post.mockReturnValue(new Promise((resolve) => (answer = resolve)));
     const user = userEvent.setup();
     renderDialog();
     await user.type(screen.getByLabelText("Русский"), "здравствуйте");
-    await user.type(screen.getByRole("textbox", { name: "Word" }), "hello");
+    const term = screen.getByRole("textbox", { name: "Word" });
+    await user.type(term, "hello");
     await user.tab();
+
+    // While AI writes, the fields say so in place of their placeholders; the owner's own field does not.
+    await waitFor(() => expect(screen.getByLabelText(/O'zbekcha/)).toHaveAttribute("placeholder", "Filling in with AI…"));
+    expect(screen.getByLabelText("Русский")).not.toHaveAttribute("placeholder", "Filling in with AI…");
+    answer(hello);
 
     await waitFor(() => expect(screen.getByLabelText(/O'zbekcha/)).toHaveValue("salom"));
     expect(api.post).toHaveBeenCalledWith("/admin/vocabulary/suggest", { term: "hello", kind: "word" });
@@ -55,7 +62,7 @@ describe("WordDialog — AI fills in a typed word", () => {
     expect(screen.getByLabelText(/Pronunciation/)).toHaveValue("/həˈləʊ/");
     expect(screen.getByLabelText(/A1 definition/)).toHaveValue("Something you say when you meet someone.");
     expect(screen.getByLabelText("Русский")).toHaveValue("здравствуйте");
-    expect(screen.getByText(/Filled in and checked by AI/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Filled in and checked by AI/).length).toBeGreaterThan(0);
     expect(screen.getByLabelText(/O'zbekcha/).className).toContain("border-success");
   });
 
@@ -72,6 +79,6 @@ describe("WordDialog — AI fills in a typed word", () => {
     renderDialog();
     await user.type(screen.getByRole("textbox", { name: "Word" }), "bus station");
     await user.tab();
-    expect(await screen.findByText(/Vocabulary holds single words/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Vocabulary holds single words/)).length).toBeGreaterThan(0);
   });
 });

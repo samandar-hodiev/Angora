@@ -984,7 +984,16 @@ export function WordDialog({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.term]);
-  const aiClass = (field: FillField) => (filled.has(field) ? "border-success/50 bg-success/5 ring-1 ring-success/30" : undefined);
+  // While AI writes, every field it will fill pulses with "Filling in…" in place of its
+  // placeholder; the layout does not move.
+  const waiting = (field: FillField) => suggest.isPending && !touched.has(field);
+  const aiClass = (field: FillField) =>
+    waiting(field)
+      ? "animate-pulse border-success/40 bg-success/5 placeholder:text-success"
+      : filled.has(field)
+        ? "border-success/50 bg-success/5 ring-1 ring-success/30"
+        : undefined;
+  const hint = (field: FillField, placeholder?: string) => (waiting(field) ? "Filling in with AI…" : placeholder);
   const aiMark = (field: FillField) =>
     filled.has(field) ? (
       <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.625rem] font-semibold text-success">
@@ -1034,9 +1043,20 @@ export function WordDialog({
       loading={save.isPending}
       disabled={!ready}
       onConfirm={() => save.mutate()}
-      footerStart={`Explained for ${explained.length} of 6 levels`}
+      footerStart={
+        suggestError ? (
+          <span className="text-error">{suggestError}</span>
+        ) : filled.size > 0 ? (
+          <span className="inline-flex items-center gap-1 text-success">
+            <Check className="size-3.5" aria-hidden /> Filled in and checked by AI — change anything you like
+          </span>
+        ) : (
+          `Explained for ${explained.length} of 6 levels`
+        )
+      }
     >
-      <div className="grid max-h-[62vh] gap-4 overflow-y-auto pr-1">
+      {/* The padding, taken back by the margin, keeps focus rings inside the scroll box. */}
+      <div className="-m-1 grid max-h-[62vh] gap-4 overflow-y-auto p-1">
         <div className="grid gap-3 sm:grid-cols-[1fr_10rem_7rem]">
           <div className="grid gap-1.5">
             <Label htmlFor="word-term">{kind === "word" ? "Word" : kind === "phrase" ? "Phrase" : "Collocation"}</Label>
@@ -1050,18 +1070,9 @@ export function WordDialog({
               onChange={(e) => set({ term: e.target.value })}
               onBlur={(e) => askAI(e.target.value)}
             />
-            <p id="word-term-status" aria-live="polite" className="min-h-4 text-caption">
-              {suggest.isPending ? (
-                <span className="inline-flex items-center gap-1 text-fg-muted">
-                  <Sparkles className="size-3 animate-spin [animation-duration:2.4s]" aria-hidden /> Filling in with AI…
-                </span>
-              ) : suggestError ? (
-                <span className="text-error">{suggestError}</span>
-              ) : filled.size > 0 ? (
-                <span className="text-success">Filled in and checked by AI — change anything you like.</span>
-              ) : !word ? (
-                <span className="text-fg-muted">Type it and the rest is filled in for you.</span>
-              ) : null}
+            {/* Read out, not shown: the fields themselves show the work, so nothing moves. */}
+            <p id="word-term-status" aria-live="polite" className="sr-only">
+              {suggest.isPending ? "Filling in with AI…" : suggestError || (filled.size > 0 ? "Filled in and checked by AI." : "")}
             </p>
           </div>
           <div className="grid gap-1.5">
@@ -1112,6 +1123,7 @@ export function WordDialog({
             <Input
               id="word-uz"
               autoComplete="off"
+              placeholder={hint("uz")}
               className={aiClass("uz")}
               value={form.translations.uz}
               onChange={(e) => {
@@ -1125,6 +1137,7 @@ export function WordDialog({
             <Input
               id="word-ru"
               autoComplete="off"
+              placeholder={hint("ru")}
               className={aiClass("ru")}
               value={form.translations.ru}
               onChange={(e) => {
@@ -1137,7 +1150,7 @@ export function WordDialog({
             <Label htmlFor="word-ru-pron">Русский — talaffuzi{aiMark("ru_pron")}</Label>
             <Input
               id="word-ru-pron"
-              placeholder="dastích"
+              placeholder={hint("ru_pron", "dastích")}
               autoComplete="off"
               className={aiClass("ru_pron")}
               value={form.translations.ru_pron}
@@ -1151,7 +1164,7 @@ export function WordDialog({
             <Label htmlFor="word-ipa">Pronunciation (IPA){aiMark("pronunciation_ipa")}</Label>
             <Input
               id="word-ipa"
-              placeholder="/ɪɡˈzæmpəl/"
+              placeholder={hint("pronunciation_ipa", "/ɪɡˈzæmpəl/")}
               autoComplete="off"
               className={aiClass("pronunciation_ipa")}
               value={form.pronunciation_ipa}
@@ -1203,6 +1216,7 @@ export function WordDialog({
             <Textarea
               id="word-definition"
               rows={2}
+              placeholder={hint("explanation")}
               className={aiClass("explanation")}
               value={current.definition}
               onChange={(e) => setLevelText({ definition: e.target.value })}
@@ -1217,7 +1231,7 @@ export function WordDialog({
                   autoComplete="off"
                   className={aiClass("explanation")}
                   value={example}
-                  placeholder="A sentence somebody would actually say."
+                  placeholder={hint("explanation", "A sentence somebody would actually say.")}
                   onChange={(e) => setLevelText({ examples: list.map((x, j) => (j === i ? e.target.value : x)) })}
                 />
                 <Button
@@ -1248,7 +1262,7 @@ export function WordDialog({
           <Label htmlFor="word-tags">Topics{aiMark("tags")}</Label>
           <Input
             id="word-tags"
-            placeholder="travel, work"
+            placeholder={hint("tags", "travel, work")}
             autoComplete="off"
             className={aiClass("tags")}
             value={tagsText ?? form.tags.join(", ")}
