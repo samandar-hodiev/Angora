@@ -210,13 +210,21 @@ export function IrregularVerbsView() {
         ]}
         actions={
           <>
-            <Button variant="outline" onClick={() => setEditing("new")}>
+            <Button variant="outline" className="h-9 px-4" onClick={() => setEditing("new")}>
               <Plus aria-hidden /> Add verb
             </Button>
-            <Button variant="outline" loading={generate.isPending} onClick={() => setGenerating(true)}>
-              <Sparkles aria-hidden /> Generate with AI
+            {/* The AI action looks the same as on the grammar builder — a violet-to-green wash —
+                so it reads as "the model writes this" everywhere in the console. */}
+            <Button
+              variant="subtle"
+              className="h-9 border border-primary/35 bg-[linear-gradient(110deg,color-mix(in_oklch,oklch(0.64_0.17_295)_22%,transparent),color-mix(in_oklch,var(--primary)_22%,transparent))] px-4 text-foreground hover:brightness-110"
+              loading={generate.isPending}
+              onClick={() => setGenerating(true)}
+            >
+              <Sparkles aria-hidden className="text-primary" /> Generate with AI
             </Button>
             <Button
+              className="h-9 px-4"
               disabled={!summary || summary.draft === 0 || publishAll.isPending}
               loading={publishAll.isPending}
               onClick={() => publishAll.mutate()}
