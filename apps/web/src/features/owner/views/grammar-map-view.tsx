@@ -19,7 +19,7 @@ import { cefrLevels } from "../types";
 import type { ContentStatusState, LevelStatus, MapTopic } from "../types";
 
 /**
- * The Grammar Tree: the curriculum, and how much of it has been written.
+ * The Grammar page, by category: the curriculum, and how much of it has been written.
  *
  * The map exists whether or not anybody has authored anything — a topic with no content is
  * the normal starting state, not an error and not something to hide. That is the point of

@@ -377,14 +377,14 @@ export function GrammarCmsView() {
                 opens the schema rather than scrolling the list. */}
             <Button size="sm" className="rounded-md" onClick={() => setSchemaOpen(true)}>
               <Waypoints aria-hidden />
-              Grammar Map
+              Curriculum map
             </Button>
             <span aria-hidden className="mx-1 h-5 w-px bg-border" />
             <div role="group" aria-label="View" className="inline-flex gap-0.5">
               {(
                 [
-                  { value: "map", label: "Grammar Tree" },
-                  { value: "all", label: "All content" },
+                  { value: "map", label: "By category" },
+                  { value: "all", label: "Table" },
                 ] as const
               ).map((option) => {
                 const active = view === option.value;

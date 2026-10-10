@@ -17,11 +17,11 @@ import type { MapCategory, MapTopic } from "../types";
 /**
  * The curriculum as a schema, for deciding what to write next.
  *
- * The Grammar Tree lists topics; this map shows their shape. A category is a station on a spine,
+ * The category view lists topics; this map shows their shape. A category is a station on a spine,
  * its ring filled in proportion to how much of it has been written, and every topic hangs off
  * it as a node — solid green once it carries content, dashed grey while it is still only a
  * plan. Nothing is authored here: each node is a door into the builder, which is the whole
- * point of opening this from the "Grammar Map" button.
+ * point of opening this from the "Curriculum map" button.
  *
  * The curriculum is 150 topics, so the schema scrolls. It is built from the same live map the
  * page behind it reads — no second source, nothing hardcoded.
@@ -74,7 +74,7 @@ export function GrammarSchemaDialog({
       <DialogContent className="flex h-[min(86vh,54rem)] w-[min(72rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
         <DialogHeader className="grid gap-3 border-b px-6 pt-6 pb-4 text-left">
           <div className="grid gap-1 pr-10">
-            <DialogTitle className="text-h3">Grammar Map</DialogTitle>
+            <DialogTitle className="text-h3">Curriculum map</DialogTitle>
             <DialogDescription>
               The grammar curriculum, as a map of what is written and what is not. Pick a node to open the
               builder for that topic.
