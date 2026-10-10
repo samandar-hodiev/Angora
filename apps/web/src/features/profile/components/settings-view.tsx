@@ -284,8 +284,6 @@ export function SettingsView() {
 
           <SettingsSection flashed={flash?.id === "security"} id="security" title="Security">
             <div className="flex flex-wrap gap-2">
-              {/* Changing an existing password needs an endpoint the auth module does not have yet
-                  (asked of 1.01-Auth · Learner); the reset pages turn a signed-in learner away. */}
               <PasswordButton />
               <Button variant="outline" onClick={() => setConfirmSignOut(true)} loading={logout.isPending}>
                 <LogOut aria-hidden /> Sign out
