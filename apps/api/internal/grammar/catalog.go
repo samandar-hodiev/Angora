@@ -311,6 +311,19 @@ func (m *Module) topic(c *gin.Context) {
 	// from the client so every platform counts it the same way.
 	if err := m.markOpened(ctx, p.UserID, topicID); err != nil {
 		m.log.Warn("grammar topic open not recorded", "topic", slug, "error", err.Error())
+	} else if topic.Progress.Understanding < 25 {
+		// The progress above was read before this open was recorded. On the first visit
+		// that showed 0%, and the very next request — switching the lesson language — showed
+		// the 25% this visit earned, as if switching had raised it. Recompute now so the
+		// first response already says what was recorded.
+		if r, err := m.recomputeMastery(ctx, p.UserID, topicID); err != nil {
+			m.log.Warn("grammar mastery not recomputed on open", "topic", slug, "error", err.Error())
+		} else {
+			topic.Mastery, topic.State = r.Mastery, r.State
+			topic.Progress.Mastery, topic.Progress.Understanding = r.Mastery, r.Understanding
+			topic.Progress.Practice, topic.Progress.Application = r.Practice, r.Application
+			topic.Progress.State = r.State
+		}
 	}
 	m.track(ctx, p.UserID, EventTopicOpened, map[string]any{"topic": slug, "category": topic.Category})
 

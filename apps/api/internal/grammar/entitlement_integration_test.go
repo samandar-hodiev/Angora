@@ -141,6 +141,35 @@ func TestGrammarEntitlementsPostgres(t *testing.T) {
 		return envelope.Error.Code
 	}
 
+	// Opening a topic records the open; the response that recorded it must already show it.
+	// It used to come back at 0%, and the next request — switching the lesson language —
+	// came back at 25%, so switching looked like it had earned progress.
+	t.Run("the first open already shows the progress it recorded", func(t *testing.T) {
+		get := func(query string) Topic {
+			t.Helper()
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/grammar/topics/"+slugs[0]+query, nil))
+			if w.Code != http.StatusOK {
+				t.Fatalf("GET topic: %d %s", w.Code, w.Body.String())
+			}
+			var envelope struct {
+				Data Topic `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+				t.Fatal(err)
+			}
+			return envelope.Data
+		}
+		first := get("")
+		if first.Progress.Understanding == 0 {
+			t.Fatalf("first open shows understanding 0, want the recorded open")
+		}
+		switched := get("?lang=en")
+		if switched.Progress != first.Progress {
+			t.Fatalf("switching language changed progress: %+v -> %+v", first.Progress, switched.Progress)
+		}
+	})
+
 	// The learner has no subscription, so they are on the default free plan.
 	t.Run("the tutor is not on the free plan", func(t *testing.T) {
 		_, asksBefore := tutor.counts()
