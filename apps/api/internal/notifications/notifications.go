@@ -377,11 +377,11 @@ func (m *Module) updatePreferences(c *gin.Context) {
 	}
 	if _, err := m.svc.pool.Exec(c.Request.Context(), `
 		INSERT INTO notification_preferences (user_id, in_app, email, muted)
-		VALUES ($1, coalesce($2, true), coalesce($3, true), coalesce($4, '{}'))
+		VALUES ($1, coalesce($2, true), coalesce($3, true), coalesce($4::text[], '{}'))
 		ON CONFLICT (user_id) DO UPDATE SET
 			in_app = coalesce($2, notification_preferences.in_app),
 			email  = coalesce($3, notification_preferences.email),
-			muted  = coalesce($4, notification_preferences.muted)`,
+			muted  = coalesce($4::text[], notification_preferences.muted)`,
 		p.UserID, in.InApp, in.Email, in.Muted); err != nil {
 		httpx.Fail(c, err)
 		return
