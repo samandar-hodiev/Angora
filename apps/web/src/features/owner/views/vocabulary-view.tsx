@@ -166,6 +166,8 @@ const vocabularyApi = {
   status: (id: string, status: Word["status"]) => apiClient.post<Word>(`/admin/vocabulary/${id}/status`, { status }),
   setLevel: (id: string, level: CEFRLevel) => apiClient.post<Word>(`/admin/vocabulary/${id}/level`, { level }),
   suggest: (term: string, kind: Kind) => apiClient.post<WordSuggestion>("/admin/vocabulary/suggest", { term, kind }),
+  existing: (term: string) =>
+    apiClient.get<ExistingEntry[]>("/admin/vocabulary/existing", { query: { term } }),
   /** Removes the entry for good, with learners' review history on it. */
   remove: (id: string) => apiClient.delete<{ deleted: string }>(`/admin/vocabulary/${id}`),
   publish: (input: { level?: string; ids?: string[]; kind?: Kind }) =>
@@ -951,8 +953,24 @@ export function WordDialog({
   const [suggestedFor, setSuggestedFor] = useState("");
   const [suggestError, setSuggestError] = useState("");
   const [levelChecked, setLevelChecked] = useState(false);
-  // What the library already holds under the typed term — said in the dialog, before saving.
-  const [existing, setExisting] = useState<ExistingEntry[]>([]);
+  // What the library already holds under the typed term — looked up as the owner types, so a
+  // word added or generated before is said at once, before AI writes anything or it is saved.
+  const client = useQueryClient();
+  const typed = form.term.trim().replace(/\s+/g, " ");
+  const [lookupTerm, setLookupTerm] = useState("");
+  useEffect(() => {
+    if (word) return;
+    const t = setTimeout(() => setLookupTerm(typed), 200);
+    return () => clearTimeout(t);
+  }, [typed, word]);
+  const existingKey = (term: string) => ["owner", "vocabulary", "existing", term.toLowerCase()];
+  const lookup = useQuery({
+    queryKey: existingKey(lookupTerm),
+    queryFn: () => vocabularyApi.existing(lookupTerm),
+    enabled: !word && lookupTerm.length > 0,
+    staleTime: 30_000,
+  });
+  const existing: ExistingEntry[] = !word && lookupTerm === typed ? (lookup.data ?? []) : [];
   const [tagsText, setTagsText] = useState<string | null>(null);
   const own = (field: FillField) => {
     setTouched((t) => new Set(t).add(field));
@@ -967,14 +985,13 @@ export function WordDialog({
     onMutate: (term) => {
       setSuggestedFor(term);
       setSuggestError("");
-      setExisting([]);
     },
     onSuccess: (s, term) => {
-      if (term !== form.term.trim().replace(/\s+/g, " ")) return;
       if (s.existing?.length) {
-        setExisting(s.existing);
+        client.setQueryData(existingKey(term), s.existing);
         return;
       }
+      if (term !== form.term.trim().replace(/\s+/g, " ")) return;
       const take = new Set<FillField>();
       setForm((f) => {
         const next = { ...f, translations: { ...f.translations } };
@@ -1013,6 +1030,8 @@ export function WordDialog({
   });
   const askAI = (term: string) => {
     const t = term.trim().replace(/\s+/g, " ");
+    // Already in the library: nothing for AI to write.
+    if (client.getQueryData<ExistingEntry[]>(existingKey(t))?.length) return;
     if (!word && t && t !== suggestedFor && !suggest.isPending) suggest.mutate(t);
   };
   // A pause in typing is enough; leaving the field does it at once.
@@ -1063,7 +1082,7 @@ export function WordDialog({
     onError: (error) => {
       // Already there: shown in the dialog with what is there, not as a toast.
       if (isApiError(error) && error.status === 409) {
-        suggest.mutate(form.term.trim().replace(/\s+/g, " "));
+        void lookup.refetch();
         return;
       }
       toast({ title: "It could not be saved", description: isApiError(error) ? error.message : undefined, variant: "error" });

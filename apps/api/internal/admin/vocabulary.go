@@ -1129,3 +1129,19 @@ func (m *Module) suggestWord(c *gin.Context) {
 		Tags: orEmptyStrings(w.Tags), Register: w.Usage.Register, Existing: []ExistingEntry{},
 	})
 }
+
+// GET /admin/vocabulary/existing?term= — what the library already holds under a term. Cheap,
+// so the console asks while the owner is still typing and says so before anything is written.
+func (m *Module) existingWord(c *gin.Context) {
+	term := strings.Join(strings.Fields(c.Query("term")), " ")
+	if term == "" || len(term) > 80 {
+		httpx.OK(c, []ExistingEntry{})
+		return
+	}
+	out, err := m.existingEntries(c.Request.Context(), term)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, out)
+}

@@ -11,10 +11,10 @@ import type * as ApiModule from "@/lib/api";
  * owner typed into first is theirs and is not overwritten.
  */
 
-const api = vi.hoisted(() => ({ post: vi.fn() }));
+const api = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof ApiModule>();
-  return { ...actual, apiClient: { ...actual.apiClient, post: api.post } };
+  return { ...actual, apiClient: { ...actual.apiClient, post: api.post, get: api.get } };
 });
 
 import { WordDialog } from "./vocabulary-view";
@@ -42,6 +42,7 @@ function renderDialog() {
 
 describe("WordDialog — AI fills in a typed word", () => {
   it("fills every field from the term, and leaves alone what the owner typed", async () => {
+    api.get.mockResolvedValue([]);
     let answer: (value: typeof hello) => void = () => {};
     api.post.mockReturnValue(new Promise((resolve) => (answer = resolve)));
     const user = userEvent.setup();
@@ -68,6 +69,7 @@ describe("WordDialog — AI fills in a typed word", () => {
   });
 
   it("says why a term was refused", async () => {
+    api.get.mockResolvedValue([]);
     const { ApiError } = await import("@/lib/api");
     api.post.mockRejectedValue(
       new ApiError(422, {
@@ -83,15 +85,9 @@ describe("WordDialog — AI fills in a typed word", () => {
     expect((await screen.findAllByText(/Vocabulary holds single words/)).length).toBeGreaterThan(0);
   });
 
-  it("says in the dialog, before saving, that the word is already in the library", async () => {
-    api.post.mockResolvedValue({
-      ...hello,
-      level: "",
-      translations: {},
-      level_content: {},
-      tags: [],
-      existing: [{ id: "1", term: "hello", kind: "word", part_of_speech: "noun", level: "A1", status: "draft" }],
-    });
+  it("says as the owner types, before AI or saving, that the word is already in the library", async () => {
+    api.post.mockClear();
+    api.get.mockResolvedValue([{ id: "1", term: "hello", kind: "word", part_of_speech: "noun", level: "A1", status: "draft" }]);
     const onShowExisting = vi.fn();
     const client = new QueryClient();
     const user = userEvent.setup();
@@ -101,12 +97,15 @@ describe("WordDialog — AI fills in a typed word", () => {
       </QueryClientProvider>,
     );
     await user.type(screen.getByRole("textbox", { name: "Word" }), "hello");
-    await user.tab();
 
+    // No leaving the field: typing is enough.
     expect(await screen.findByRole("alert")).toHaveTextContent("“hello” is already in the library");
+    expect(api.get).toHaveBeenCalledWith("/admin/vocabulary/existing", { query: { term: "hello" } });
     expect(screen.getByRole("alert")).toHaveTextContent("Vocabulary · noun · A1");
-    expect(screen.getByLabelText(/O'zbekcha/)).toHaveValue("");
     expect(screen.getByRole("button", { name: "Add word" })).toBeDisabled();
+    await user.tab();
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(api.post).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: /Show it in the list/ }));
     expect(onShowExisting).toHaveBeenCalledWith("hello");
   });

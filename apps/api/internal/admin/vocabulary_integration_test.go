@@ -211,6 +211,18 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		if n != 0 {
 			t.Error("a suggestion was saved")
 		}
+		// The console asks while the owner types: found in any case and spacing, nothing for a new term.
+		w = call(http.MethodGet, "/vocabulary/existing?term="+strings.ToUpper("zz"+stamp+"manual")+"%20", nil)
+		var found struct{ Data []ExistingEntry }
+		_ = json.Unmarshal(w.Body.Bytes(), &found)
+		if w.Code != http.StatusOK || len(found.Data) != 1 || found.Data[0].PartOfSpeech != "noun" {
+			t.Errorf("existing = %d %s", w.Code, w.Body.String())
+		}
+		w = call(http.MethodGet, "/vocabulary/existing?term=zz"+stamp+"nothing", nil)
+		_ = json.Unmarshal(w.Body.Bytes(), &found)
+		if len(found.Data) != 0 {
+			t.Errorf("a new term was found: %s", w.Body.String())
+		}
 		// A term already in the library is reported, not written again.
 		w = call(http.MethodPost, "/vocabulary/suggest", map[string]any{"term": strings.ToUpper("zz" + stamp + "manual"), "kind": "word"})
 		var dup struct{ Data WordSuggestion }
