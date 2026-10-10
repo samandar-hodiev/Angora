@@ -189,3 +189,46 @@
 @media (prefers-reduced-motion: reduce) {
   .coach-pulse { animation: none; }
 }
+
+/* ---- Learner wallpaper -----------------------------------------------------------------------
+ * "Live" backgrounds: the picture is laid a little larger than its frame and drifts slowly
+ * inside it, so it feels alive without anything flying past. The frame clips the overflow. */
+@keyframes wallpaper-drift {
+  0% { transform: translate3d(-3%, -2%, 0) scale(1.02); }
+  50% { transform: translate3d(2.5%, 1.5%, 0) scale(1.08); }
+  100% { transform: translate3d(-1%, 3%, 0) scale(1.04); }
+}
+.wallpaper-drift {
+  animation: wallpaper-drift 26s var(--ease-standard) infinite alternate;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wallpaper-drift { animation: none; }
+}
+
+/* The dim slider: a filled track, like a progress bar, with a round thumb. --fill is the value. */
+.wallpaper-range {
+  appearance: none;
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(to right, var(--primary) 0 var(--fill, 0%), var(--surface-active) var(--fill, 0%) 100%);
+  cursor: pointer;
+}
+.wallpaper-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 9999px;
+  background: var(--background);
+  border: 2px solid var(--primary);
+  box-shadow: 0 1px 4px oklch(0 0 0 / 0.35);
+}
+.wallpaper-range::-moz-range-thumb {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 9999px;
+  background: var(--background);
+  border: 2px solid var(--primary);
+  box-shadow: 0 1px 4px oklch(0 0 0 / 0.35);
+}

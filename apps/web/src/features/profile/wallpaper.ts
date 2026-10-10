@@ -3,6 +3,7 @@
 import type { Profile } from "@engora/types";
 
 import { apiAssetUrl } from "@/lib/media";
+import { flowerPresets } from "@/lib/wallpaper-flowers";
 import { isAnimatedPreset, wallpaperPresets, type PresetId, type WallpaperPreset } from "@/lib/wallpapers";
 
 import { useProfile, useUpdateProfile } from "./hooks";
@@ -18,12 +19,46 @@ import { useProfile, useUpdateProfile } from "./hooks";
 // Re-exported so existing imports keep working; the set itself lives in @/lib/wallpapers.
 export { wallpaperPresets, isAnimatedPreset, presetById, type PresetId, type WallpaperPreset } from "@/lib/wallpapers";
 
+/** The flower scenes are the learner app's own; the console offers only the shared set. */
+export type FlowerPreset = (typeof flowerPresets)[number];
+export type LearnerPreset = WallpaperPreset | FlowerPreset;
+export type LearnerPresetId = PresetId | FlowerPreset["id"];
+
+/** Everything the learner can pick, in the order the picker shows it. */
+export const learnerPresets: readonly LearnerPreset[] = [...wallpaperPresets, ...flowerPresets];
+
 /** The preset behind a selection, if the learner picked one of the built-ins. */
-export function wallpaperPreset(profile: Profile | undefined): WallpaperPreset | null {
+export function wallpaperPreset(profile: Profile | undefined): LearnerPreset | null {
   const selection = wallpaperSelection(profile);
-  return wallpaperPresets.find((preset) => preset.id === selection) ?? null;
+  return learnerPresets.find((preset) => preset.id === selection) ?? null;
 }
-export type WallpaperId = PresetId | "custom" | "none";
+export type WallpaperId = LearnerPresetId | "custom" | "none";
+
+/** "live" drifts slowly; "still" holds. Only the aurora moves unless the learner says otherwise. */
+export type WallpaperMotion = "live" | "still";
+
+export function defaultMotion(preset: LearnerPreset | null): WallpaperMotion {
+  return preset && !("tone" in preset) && isAnimatedPreset(preset) ? "live" : "still";
+}
+
+export function wallpaperMotion(profile: Profile | undefined): WallpaperMotion {
+  const saved = profile?.preferences?.wallpaper_motion;
+  return saved === "live" || saved === "still" ? saved : defaultMotion(wallpaperPreset(profile));
+}
+
+/** How far the background is dimmed, 0–100. Nothing is dimmed until the learner asks. */
+export function wallpaperDim(profile: Profile | undefined): number {
+  const saved = profile?.preferences?.wallpaper_dim;
+  return typeof saved === "number" && Number.isFinite(saved) ? Math.min(Math.max(Math.round(saved), 0), 100) : 0;
+}
+
+/** A preset that is a whole picture says which way text over it reads, like a photo. */
+function presetTone(preset: LearnerPreset | null): WallpaperTone | null {
+  if (!preset) return null;
+  if ("tone" in preset) return preset.tone;
+  // The animated aurora is a night scene, so text over it reads light, with a dark halo.
+  return isAnimatedPreset(preset) ? "dark" : null;
+}
 
 /** Whether the photo itself is dark or light. Text over it follows this, not the theme. */
 export type WallpaperTone = "dark" | "light";
@@ -37,7 +72,7 @@ export function wallpaperSelection(profile: Profile | undefined): WallpaperId {
   if (saved === "custom") return profile?.wallpaper_url ? "custom" : "none";
   // The forest preset became the animated aurora; anyone already on it moves across with it.
   if (saved === "forest") return "aurora-live";
-  return wallpaperPresets.some((p) => p.id === saved) ? (saved as PresetId) : "none";
+  return learnerPresets.some((p) => p.id === saved) ? (saved as LearnerPresetId) : "none";
 }
 
 /** The learner's uploaded photo as an absolute URL, or null. */
@@ -60,7 +95,7 @@ export function wallpaperImage(profile: Profile | undefined): string | null {
     const url = wallpaperPhotoUrl(profile);
     return url ? `url("${url}")` : null;
   }
-  return wallpaperPresets.find((p) => p.id === selection)?.image ?? null;
+  return learnerPresets.find((p) => p.id === selection)?.image ?? null;
 }
 
 /**
@@ -105,19 +140,16 @@ export async function measureWallpaperTone(source: File | string): Promise<Wallp
 export function useWallpaper() {
   const { data: profile } = useProfile();
   const preset = wallpaperPreset(profile);
+  const selection = wallpaperSelection(profile);
   return {
     image: wallpaperImage(profile),
-    selection: wallpaperSelection(profile),
-    // The animated aurora is a night scene, so text over it reads the way it does over a dark
-    // photo: light, with a dark halo.
+    selection,
     // A plain colour wash has no tone of its own; it must not inherit the last photo's.
-    tone: isAnimatedPreset(preset)
-      ? ("dark" as WallpaperTone)
-      : wallpaperSelection(profile) === "custom"
-        ? wallpaperTone(profile)
-        : null,
+    tone: selection === "custom" ? wallpaperTone(profile) : presetTone(preset),
     photoUrl: wallpaperPhotoUrl(profile),
     preset,
+    motion: wallpaperMotion(profile),
+    dim: wallpaperDim(profile),
   };
 }
 
@@ -131,6 +163,9 @@ export function useSaveWallpaper() {
     save: (id: WallpaperId, tone?: WallpaperTone | null) => update.mutate({ preferences: preferences(id, tone) }),
     saveAsync: (id: WallpaperId, tone?: WallpaperTone | null) => update.mutateAsync({ preferences: preferences(id, tone) }),
     saveTone: (tone: WallpaperTone) => update.mutate({ preferences: { wallpaper_tone: tone } }),
+    /** Picks a background together with how it moves. */
+    saveWithMotion: (id: WallpaperId, motion: WallpaperMotion) => update.mutate({ preferences: { wallpaper: id, wallpaper_motion: motion } }),
+    saveDim: (dim: number) => update.mutate({ preferences: { wallpaper_dim: dim } }),
     isSaving: update.isPending,
   };
 }
