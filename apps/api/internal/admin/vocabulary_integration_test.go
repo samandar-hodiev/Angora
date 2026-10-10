@@ -195,6 +195,30 @@ func TestVocabularyAuthoringPostgres(t *testing.T) {
 		}
 	})
 
+	t.Run("suggest fills in a typed term without saving it, and refuses a term of the wrong kind", func(t *testing.T) {
+		term := "zz" + stamp + "suggested"
+		w := call(http.MethodPost, "/vocabulary/suggest", map[string]any{"term": " " + term + " ", "kind": "word"})
+		if w.Code != http.StatusOK {
+			t.Fatalf("suggest status = %d body = %s", w.Code, w.Body.String())
+		}
+		var got struct{ Data WordSuggestion }
+		_ = json.Unmarshal(w.Body.Bytes(), &got)
+		if got.Data.Term != term || got.Data.Level == "" || len(got.Data.LevelContent) == 0 {
+			t.Errorf("suggestion %+v", got.Data)
+		}
+		var n int
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM vocabulary WHERE term = $1`, term).Scan(&n)
+		if n != 0 {
+			t.Error("a suggestion was saved")
+		}
+		if w := call(http.MethodPost, "/vocabulary/suggest", map[string]any{"term": "bus station", "kind": "word"}); w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("two-word vocabulary status = %d, want 422", w.Code)
+		}
+		if w := call(http.MethodPost, "/vocabulary/suggest", map[string]any{"term": "explain", "kind": "phrase"}); w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("one-word phrase status = %d, want 422", w.Code)
+		}
+	})
+
 	t.Run("deleting an entry removes it for good, and a second delete is not found", func(t *testing.T) {
 		var id uuid.UUID
 		_ = pool.QueryRow(ctx, `SELECT id FROM vocabulary WHERE term = $1`, "zz"+stamp+"manual").Scan(&id)

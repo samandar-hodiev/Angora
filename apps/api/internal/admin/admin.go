@@ -153,6 +153,7 @@ func (m *Module) RegisterRoutes(v1 *gin.RouterGroup) {
 	g.GET("/vocabulary", content, m.vocabularyList)
 	g.POST("/vocabulary", content, m.createWord)
 	g.POST("/vocabulary/generate", content, m.generateVocabulary)
+	g.POST("/vocabulary/suggest", content, m.suggestWord)
 	g.POST("/vocabulary/publish", content, m.publishWords)
 	g.PATCH("/vocabulary/:id", content, m.updateWord)
 	g.DELETE("/vocabulary/:id", content, m.deleteWord)

@@ -44,7 +44,7 @@ const (
 // KindPartsOfSpeech is what part_of_speech holds for each kind: a word class, a phrase type,
 // or a collocation's pattern.
 var KindPartsOfSpeech = map[string][]string{
-	KindWord:        {"noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "determiner"},
+	KindWord:        {"noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "determiner", "exclamation"},
 	KindPhrase:      {"phrasal verb", "idiom", "phrase"},
 	KindCollocation: {"verb + noun", "adjective + noun", "adverb + adjective", "adverb + verb", "noun + noun", "verb + preposition", "noun + preposition", "verb + adverb"},
 }
@@ -111,6 +111,8 @@ type VocabularyRequest struct {
 	MinLevel, MaxLevel string
 	/** Entries already in the library, or written earlier in this run, so they are not written again. */
 	Exclude []string
+	/** When set, the one entry to write — an owner adding a word by hand asks for the rest of it. */
+	Term    string
 	ActorID *uuid.UUID
 }
 
@@ -234,9 +236,17 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	if kindGuide[kind] == "" {
 		kind = KindWord
 	}
+	term := strings.TrimSpace(req.Term)
+	if term != "" {
+		count = 1
+	}
 	var b strings.Builder
 	b.WriteString("You choose lexicon for an English-learning app whose learners speak Uzbek or Russian. ")
-	fmt.Fprintf(&b, "Write exactly %d useful %s.\n", count, kindGuide[kind])
+	if term != "" {
+		fmt.Fprintf(&b, "Write exactly one entry, for the term given in TERM, kept exactly as given (lower case unless a proper noun). The library holds %s.\n", kindGuide[kind])
+	} else {
+		fmt.Fprintf(&b, "Write exactly %d useful %s.\n", count, kindGuide[kind])
+	}
 	b.WriteString("- Each entry is explained once, at its own level: definition is the main meaning only (no example in it), in English a learner at that level can read; examples are two natural sentences at that level.\n")
 	b.WriteString("- The definition, examples, other_senses and usage all describe the entry as the part_of_speech you give it. A word used as two parts of speech (love as noun and verb) is two entries: pick one, and never illustrate a noun with verb sentences or the other way round.\n")
 	b.WriteString("- level: the level a learner usually meets the entry at in its main sense, by the English Vocabulary Profile. Be strict and honest: everyday concrete words (bed, eat, house) are A1–A2 whatever topic they come from; never label an easy entry higher to look advanced.\n")
@@ -254,6 +264,9 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	b.WriteString("Never include an entry from the excluded list, in any form or spelling, and never the same entry twice.\n")
 
 	input := fmt.Sprintf("COUNT: %d\nKIND: %s\n", count, kind)
+	if term != "" {
+		input += "TERM: " + term + "\n"
+	}
 	if len(req.Topics) > 0 {
 		input += "TOPICS: " + strings.Join(req.Topics, ", ") + "\n"
 	}

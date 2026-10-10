@@ -828,11 +828,7 @@ func (m *Module) reviewWords(ctx context.Context, kind string, words []checkedWo
 	}
 	items := make([]ai.LexiconReviewItem, len(words))
 	for i, w := range words {
-		items[i] = ai.LexiconReviewItem{
-			Term: w.Term, PartOfSpeech: w.PartOfSpeech, Definition: w.Definition, Examples: w.Examples,
-			Uz: w.Translations["uz"], Ru: w.Translations["ru"], RuPron: w.Translations["ru_pron"],
-			DefUz: w.Translations["def_uz"], DefRu: w.Translations["def_ru"],
-		}
+		items[i] = reviewItem(w)
 	}
 	verdicts, err := reviewer.ReviewLexicon(ctx, kind, items)
 	if err != nil {
@@ -844,20 +840,34 @@ func (m *Module) reviewWords(ctx context.Context, kind string, words []checkedWo
 		if !ok || !r.Keep || !ai.FitsKind(w.Term, kind) {
 			continue
 		}
-		w.Translations = map[string]string{"uz": r.Uz, "ru": r.Ru, "def_uz": r.DefUz, "def_ru": r.DefRu}
-		if r.RuPron != "" {
-			w.Translations["ru_pron"] = r.RuPron
-		}
-		if r.Definition != "" && r.Definition != w.Definition {
-			w.Definition = r.Definition
-			if text, ok := w.LevelContent[w.Level]; ok {
-				text.Definition = r.Definition
-				w.LevelContent[w.Level] = text
-			}
-		}
-		kept = append(kept, w)
+		kept = append(kept, applyReview(w, r))
 	}
 	return kept, len(words) - len(kept), nil
+}
+
+// reviewItem is what the reviewer reads of an entry.
+func reviewItem(w checkedWord) ai.LexiconReviewItem {
+	return ai.LexiconReviewItem{
+		Term: w.Term, PartOfSpeech: w.PartOfSpeech, Definition: w.Definition, Examples: w.Examples,
+		Uz: w.Translations["uz"], Ru: w.Translations["ru"], RuPron: w.Translations["ru_pron"],
+		DefUz: w.Translations["def_uz"], DefRu: w.Translations["def_ru"],
+	}
+}
+
+// applyReview puts the reviewer's corrections into an entry it kept.
+func applyReview(w checkedWord, r ai.LexiconReview) checkedWord {
+	w.Translations = map[string]string{"uz": r.Uz, "ru": r.Ru, "def_uz": r.DefUz, "def_ru": r.DefRu}
+	if r.RuPron != "" {
+		w.Translations["ru_pron"] = r.RuPron
+	}
+	if r.Definition != "" && r.Definition != w.Definition {
+		w.Definition = r.Definition
+		if text, ok := w.LevelContent[w.Level]; ok {
+			text.Definition = r.Definition
+			w.LevelContent[w.Level] = text
+		}
+	}
+	return w
 }
 
 // setLevel moves an entry, and its one explanation, to another level.
@@ -963,4 +973,115 @@ func (m *Module) deleteWord(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, gin.H{"deleted": id})
+}
+
+type wordSuggestInput struct {
+	Term string `json:"term" binding:"required,max=80"`
+	Kind string `json:"kind" binding:"omitempty,oneof=word phrase collocation"`
+}
+
+// WordSuggestion is the rest of an entry, filled in for an owner who typed only the term. It is
+// a proposal: nothing is saved until the owner adds the word.
+type WordSuggestion struct {
+	Term             string                  `json:"term"`
+	Kind             string                  `json:"kind"`
+	PartOfSpeech     string                  `json:"part_of_speech"`
+	Level            string                  `json:"level"`
+	LevelSource      string                  `json:"level_source"`
+	PronunciationIPA string                  `json:"pronunciation_ipa"`
+	Translations     map[string]string       `json:"translations"`
+	LevelContent     map[string]ai.LevelText `json:"level_content"`
+	Tags             []string                `json:"tags"`
+	Register         string                  `json:"register"`
+}
+
+// suggestionRefusals say why the editor would not fill in a term, in words the owner can act on.
+var suggestionRefusals = map[string]string{
+	"wrong_kind":    "This is not a %s — add it on the %s page.",
+	"not_standard":  "This is not a standard English %s in this form — check the spelling.",
+	"inappropriate": "This is not suitable for learners.",
+	"cannot_fix":    "No reliable translation could be found — fill it in by hand.",
+}
+
+var kindPages = map[string]string{ai.KindWord: "Vocabulary", ai.KindPhrase: "Phrases", ai.KindCollocation: "Collocations"}
+
+// POST /admin/vocabulary/suggest — the owner types a term; the rest of the entry comes back
+// written the same way generated entries are: written, its level checked, then put past the
+// lexicon reviewer, which corrects the translations and refuses a term of the wrong kind.
+func (m *Module) suggestWord(c *gin.Context) {
+	p, err := authz.CurrentPrincipal(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	var in wordSuggestInput
+	if err := httpx.BindJSON(c, &in); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	if in.Kind == "" {
+		in.Kind = ai.KindWord
+	}
+	term := strings.Join(strings.Fields(in.Term), " ")
+	if !ai.FitsKind(term, in.Kind) {
+		msg := "A " + in.Kind + " has at least two words — a single word belongs on the Vocabulary page."
+		if in.Kind == ai.KindWord {
+			msg = "Vocabulary holds single words — add a combination on the Phrases or Collocations page."
+		}
+		httpx.Fail(c, apperr.Validation(map[string]any{"fields": map[string]any{"term": msg}}))
+		return
+	}
+	writer, ok := m.author.(VocabularyWriter)
+	if !ok {
+		httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "AI content generation is not configured"))
+		return
+	}
+	ctx := c.Request.Context()
+	words, _, err := writer.WriteVocabulary(ctx, ai.VocabularyRequest{Count: 1, Kind: in.Kind, Term: term, ActorID: &p.UserID})
+	if err != nil || len(words) == 0 {
+		httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "The AI could not fill this in. Please try again."))
+		return
+	}
+	words[0].Term = term
+	checked := m.checkLevels(ctx, words[:1])
+	if reviewer, ok := m.author.(LexiconReviewer); ok {
+		w := checked[0]
+		verdicts, err := reviewer.ReviewLexicon(ctx, in.Kind, []ai.LexiconReviewItem{reviewItem(w)})
+		if err != nil {
+			httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "The AI could not check this. Please try again."))
+			return
+		}
+		r, ok := verdicts[strings.ToLower(w.Term)]
+		if !ok {
+			httpx.Fail(c, apperr.New(apperr.CodeUnavailable, "The AI could not check this. Please try again."))
+			return
+		}
+		if !r.Keep {
+			reason := r.Reason
+			if r.Kind != in.Kind {
+				reason = "wrong_kind"
+			}
+			msg := suggestionRefusals[reason]
+			if msg == "" {
+				msg = suggestionRefusals["cannot_fix"]
+			}
+			if reason == "wrong_kind" {
+				msg = fmt.Sprintf(msg, in.Kind, kindPages[r.Kind])
+				if kindPages[r.Kind] == "" {
+					msg = fmt.Sprintf(suggestionRefusals["not_standard"], in.Kind)
+				}
+			} else if strings.Contains(msg, "%s") {
+				msg = fmt.Sprintf(msg, in.Kind)
+			}
+			httpx.Fail(c, apperr.Validation(map[string]any{"fields": map[string]any{"term": msg}}))
+			return
+		}
+		checked[0] = applyReview(w, r)
+	}
+	w := checked[0]
+	httpx.OK(c, WordSuggestion{
+		Term: w.Term, Kind: in.Kind, PartOfSpeech: w.PartOfSpeech, Level: w.Level, LevelSource: w.source,
+		PronunciationIPA: w.PronunciationIPA, Translations: w.Translations, LevelContent: w.LevelContent,
+		Tags: orEmptyStrings(w.Tags), Register: w.Usage.Register,
+	})
 }

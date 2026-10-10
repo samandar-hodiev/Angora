@@ -88,7 +88,7 @@ type LevelFilter = "all" | CEFRLevel;
 
 /** What part_of_speech holds for each kind: a word class, a phrase type, a collocation's pattern. */
 const partsOfSpeechByKind: Record<Kind, string[]> = {
-  word: ["noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "determiner"],
+  word: ["noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "determiner", "exclamation"],
   phrase: ["phrasal verb", "idiom", "phrase"],
   collocation: [
     "verb + noun",
@@ -101,7 +101,6 @@ const partsOfSpeechByKind: Record<Kind, string[]> = {
     "verb + adverb",
   ],
 };
-const partsOfSpeech = Object.values(partsOfSpeechByKind).flat();
 
 const KIND_LABEL: Record<Kind, { tab: string; one: string; many: string }> = {
   word: { tab: "Words", one: "word", many: "words" },
@@ -166,6 +165,7 @@ const vocabularyApi = {
   update: (id: string, input: WordInput) => apiClient.patch<Word>(`/admin/vocabulary/${id}`, input),
   status: (id: string, status: Word["status"]) => apiClient.post<Word>(`/admin/vocabulary/${id}/status`, { status }),
   setLevel: (id: string, level: CEFRLevel) => apiClient.post<Word>(`/admin/vocabulary/${id}/level`, { level }),
+  suggest: (term: string, kind: Kind) => apiClient.post<WordSuggestion>("/admin/vocabulary/suggest", { term, kind }),
   /** Removes the entry for good, with learners' review history on it. */
   remove: (id: string) => apiClient.delete<{ deleted: string }>(`/admin/vocabulary/${id}`),
   publish: (input: { level?: string; ids?: string[]; kind?: Kind }) =>
@@ -192,9 +192,24 @@ interface WordInput {
   /** How hard the word itself is. */
   level: CEFRLevel;
   tags: string[];
-  translations: { uz: string; ru: string; ru_pron: string };
+  translations: { uz: string; ru: string; ru_pron: string; def_uz?: string; def_ru?: string };
   level_content: Partial<Record<CEFRLevel, LevelText>>;
 }
+
+/** The rest of an entry, filled in by AI for a term the owner typed — a proposal until saved. */
+interface WordSuggestion {
+  term: string;
+  part_of_speech: string;
+  level: CEFRLevel;
+  level_source: Word["level_source"] | "list";
+  pronunciation_ipa: string;
+  translations: { uz?: string; ru?: string; ru_pron?: string; def_uz?: string; def_ru?: string };
+  level_content: Partial<Record<CEFRLevel, LevelText>>;
+  tags: string[];
+}
+
+/** Fields the AI can fill in; one the owner has typed into is theirs and is never overwritten. */
+type FillField = "part_of_speech" | "level" | "pronunciation_ipa" | "uz" | "ru" | "ru_pron" | "explanation" | "tags";
 
 /** A generation in progress: enough to show how far it has got after a reload. */
 interface RunningJob {
@@ -632,6 +647,7 @@ export function VocabularyView({ kind }: { kind: Kind }) {
 
       {editing && (
         <WordDialog
+          kind={kind}
           word={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -862,13 +878,23 @@ function SummaryTile({ label, value, tone }: { label: string; value?: number; to
 }
 
 /** Adding a word by hand, or correcting one. Saving a word does not publish it. */
-function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: () => void; onSaved: () => void }) {
+export function WordDialog({
+  kind,
+  word,
+  onClose,
+  onSaved,
+}: {
+  kind: Kind;
+  word: Word | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [form, setForm] = useState<WordInput>(() => {
     const content: Partial<Record<CEFRLevel, LevelText>> = { ...(word?.level_content ?? {}) };
     if (Object.keys(content).length === 0) content[word?.level ?? "B1"] = { definition: word?.definition ?? "", examples: [""] };
     return {
       term: word?.term ?? "",
-      part_of_speech: word?.part_of_speech ?? "noun",
+      part_of_speech: word?.part_of_speech ?? partsOfSpeechByKind[kind][0] ?? "noun",
       pronunciation_ipa: word?.pronunciation_ipa ?? "",
       level: word?.level ?? "B1",
       tags: word?.tags ?? [],
@@ -885,9 +911,92 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
   );
   const set = (patch: Partial<WordInput>) => setForm((f) => ({ ...f, ...patch }));
   const current = form.level_content[tab] ?? { definition: "", examples: [""] };
+
+  // Adding a word, the owner types the term and AI fills in the rest — written, level-checked
+  // and put past the lexicon reviewer like a generated entry. Filled fields show green until
+  // the owner changes them; a field the owner has typed into is never overwritten.
+  const [filled, setFilled] = useState<Set<FillField>>(() => new Set());
+  const [touched, setTouched] = useState<Set<FillField>>(() => new Set());
+  const [suggestedFor, setSuggestedFor] = useState("");
+  const [suggestError, setSuggestError] = useState("");
+  const [levelChecked, setLevelChecked] = useState(false);
+  const [tagsText, setTagsText] = useState<string | null>(null);
+  const own = (field: FillField) => {
+    setTouched((t) => new Set(t).add(field));
+    setFilled((f) => {
+      const next = new Set(f);
+      next.delete(field);
+      return next;
+    });
+  };
+  const suggest = useMutation({
+    mutationFn: (term: string) => vocabularyApi.suggest(term, kind),
+    onMutate: (term) => {
+      setSuggestedFor(term);
+      setSuggestError("");
+    },
+    onSuccess: (s, term) => {
+      if (term !== form.term.trim()) return;
+      const take = new Set<FillField>();
+      setForm((f) => {
+        const next = { ...f, translations: { ...f.translations } };
+        const fill = (field: FillField, apply: () => void, has: boolean) => {
+          if (has && !touched.has(field)) {
+            apply();
+            take.add(field);
+          }
+        };
+        fill("part_of_speech", () => (next.part_of_speech = s.part_of_speech), Boolean(s.part_of_speech));
+        fill("level", () => (next.level = s.level), Boolean(s.level));
+        fill("pronunciation_ipa", () => (next.pronunciation_ipa = s.pronunciation_ipa), Boolean(s.pronunciation_ipa));
+        fill("uz", () => (next.translations.uz = s.translations.uz ?? ""), Boolean(s.translations.uz));
+        fill("ru", () => (next.translations.ru = s.translations.ru ?? ""), Boolean(s.translations.ru));
+        fill("ru_pron", () => (next.translations.ru_pron = s.translations.ru_pron ?? ""), Boolean(s.translations.ru_pron));
+        fill(
+          "explanation",
+          () => {
+            next.level_content = s.level_content;
+            next.translations.def_uz = s.translations.def_uz;
+            next.translations.def_ru = s.translations.def_ru;
+          },
+          Object.keys(s.level_content).length > 0,
+        );
+        fill("tags", () => (next.tags = s.tags), s.tags.length > 0);
+        return next;
+      });
+      setFilled(take);
+      setLevelChecked(s.level_source === "ai_checked" || s.level_source === "list");
+      if (!touched.has("explanation") && s.level_content[s.level]) setTab(s.level);
+    },
+    onError: (error) =>
+      setSuggestError(
+        isApiError(error) ? (error.fieldErrors.term ?? error.message) : "The AI could not fill this in. Please try again.",
+      ),
+  });
+  const askAI = (term: string) => {
+    const t = term.trim().replace(/\s+/g, " ");
+    if (!word && t && t !== suggestedFor && !suggest.isPending) suggest.mutate(t);
+  };
+  // A pause in typing is enough; leaving the field does it at once.
+  useEffect(() => {
+    if (word) return;
+    const t = setTimeout(() => askAI(form.term), 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.term]);
+  const aiClass = (field: FillField) => (filled.has(field) ? "border-success/50 bg-success/5 ring-1 ring-success/30" : undefined);
+  const aiMark = (field: FillField) =>
+    filled.has(field) ? (
+      <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.625rem] font-semibold text-success">
+        <Check className="size-3" aria-hidden /> AI
+      </span>
+    ) : null;
+
   // Editing a level that shared another's text gives it text of its own.
-  const setLevelText = (patch: Partial<LevelText>) =>
+  const setLevelText = (patch: Partial<LevelText>) => {
+    own("explanation");
     set({ level_content: { ...form.level_content, [tab]: { ...current, ...patch, same_as: undefined } } });
+  };
 
   const save = useMutation({
     mutationFn: () => {
@@ -930,13 +1039,46 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
       <div className="grid max-h-[62vh] gap-4 overflow-y-auto pr-1">
         <div className="grid gap-3 sm:grid-cols-[1fr_10rem_7rem]">
           <div className="grid gap-1.5">
-            <Label htmlFor="word-term">Word or phrase</Label>
-            <Input id="word-term" value={form.term} autoFocus onChange={(e) => set({ term: e.target.value })} />
+            <Label htmlFor="word-term">{kind === "word" ? "Word" : kind === "phrase" ? "Phrase" : "Collocation"}</Label>
+            <Input
+              id="word-term"
+              value={form.term}
+              autoFocus
+              autoComplete="off"
+              aria-describedby="word-term-status"
+              aria-invalid={suggestError ? true : undefined}
+              onChange={(e) => set({ term: e.target.value })}
+              onBlur={(e) => askAI(e.target.value)}
+            />
+            <p id="word-term-status" aria-live="polite" className="min-h-4 text-caption">
+              {suggest.isPending ? (
+                <span className="inline-flex items-center gap-1 text-fg-muted">
+                  <Sparkles className="size-3 animate-spin [animation-duration:2.4s]" aria-hidden /> Filling in with AI…
+                </span>
+              ) : suggestError ? (
+                <span className="text-error">{suggestError}</span>
+              ) : filled.size > 0 ? (
+                <span className="text-success">Filled in and checked by AI — change anything you like.</span>
+              ) : !word ? (
+                <span className="text-fg-muted">Type it and the rest is filled in for you.</span>
+              ) : null}
+            </p>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="word-pos">Part of speech</Label>
-            <NativeSelect id="word-pos" value={form.part_of_speech} onChange={(e) => set({ part_of_speech: e.target.value })}>
-              {partsOfSpeech.map((p) => (
+            <Label htmlFor="word-pos">Part of speech{aiMark("part_of_speech")}</Label>
+            <NativeSelect
+              id="word-pos"
+              className={aiClass("part_of_speech")}
+              value={form.part_of_speech}
+              onChange={(e) => {
+                own("part_of_speech");
+                set({ part_of_speech: e.target.value });
+              }}
+            >
+              {(partsOfSpeechByKind[kind].includes(form.part_of_speech)
+                ? partsOfSpeechByKind[kind]
+                : [form.part_of_speech, ...partsOfSpeechByKind[kind]]
+              ).map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
@@ -944,8 +1086,18 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
             </NativeSelect>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="word-level">Word level</Label>
-            <NativeSelect id="word-level" value={form.level} onChange={(e) => set({ level: e.target.value as CEFRLevel })}>
+            <Label htmlFor="word-level" title={filled.has("level") && levelChecked ? "Level confirmed by a second, independent AI check" : undefined}>
+              Level{aiMark("level")}
+            </Label>
+            <NativeSelect
+              id="word-level"
+              className={aiClass("level")}
+              value={form.level}
+              onChange={(e) => {
+                own("level");
+                set({ level: e.target.value as CEFRLevel });
+              }}
+            >
               {cefrLevels.map((code) => (
                 <option key={code} value={code}>
                   {code}
@@ -956,44 +1108,64 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="word-uz">O&apos;zbekcha</Label>
+            <Label htmlFor="word-uz">O&apos;zbekcha{aiMark("uz")}</Label>
             <Input
               id="word-uz"
+              autoComplete="off"
+              className={aiClass("uz")}
               value={form.translations.uz}
-              onChange={(e) => set({ translations: { ...form.translations, uz: e.target.value } })}
+              onChange={(e) => {
+                own("uz");
+                set({ translations: { ...form.translations, uz: e.target.value } });
+              }}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="word-ru">Русский</Label>
+            <Label htmlFor="word-ru">Русский{aiMark("ru")}</Label>
             <Input
               id="word-ru"
+              autoComplete="off"
+              className={aiClass("ru")}
               value={form.translations.ru}
-              onChange={(e) => set({ translations: { ...form.translations, ru: e.target.value } })}
+              onChange={(e) => {
+                own("ru");
+                set({ translations: { ...form.translations, ru: e.target.value } });
+              }}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="word-ru-pron">Русский — talaffuzi</Label>
+            <Label htmlFor="word-ru-pron">Русский — talaffuzi{aiMark("ru_pron")}</Label>
             <Input
               id="word-ru-pron"
               placeholder="dastích"
+              autoComplete="off"
+              className={aiClass("ru_pron")}
               value={form.translations.ru_pron}
-              onChange={(e) => set({ translations: { ...form.translations, ru_pron: e.target.value } })}
+              onChange={(e) => {
+                own("ru_pron");
+                set({ translations: { ...form.translations, ru_pron: e.target.value } });
+              }}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="word-ipa">Pronunciation (IPA)</Label>
+            <Label htmlFor="word-ipa">Pronunciation (IPA){aiMark("pronunciation_ipa")}</Label>
             <Input
               id="word-ipa"
               placeholder="/ɪɡˈzæmpəl/"
+              autoComplete="off"
+              className={aiClass("pronunciation_ipa")}
               value={form.pronunciation_ipa}
-              onChange={(e) => set({ pronunciation_ipa: e.target.value })}
+              onChange={(e) => {
+                own("pronunciation_ipa");
+                set({ pronunciation_ipa: e.target.value });
+              }}
             />
           </div>
         </div>
 
         <section className="grid gap-3 rounded-xl border p-3">
           <div className="grid gap-1">
-            <h3 className="text-label">Explanation by level</h3>
+            <h3 className="text-label">Explanation by level{aiMark("explanation")}</h3>
             <p className="text-caption text-fg-muted">
               A learner sees the one for their own level — simpler at A1, fuller at C1.
             </p>
@@ -1031,6 +1203,7 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
             <Textarea
               id="word-definition"
               rows={2}
+              className={aiClass("explanation")}
               value={current.definition}
               onChange={(e) => setLevelText({ definition: e.target.value })}
             />
@@ -1041,6 +1214,8 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
               <div key={i} className="flex items-center gap-2">
                 <Input
                   aria-label={`${tab} example ${i + 1}`}
+                  autoComplete="off"
+                  className={aiClass("explanation")}
                   value={example}
                   placeholder="A sentence somebody would actually say."
                   onChange={(e) => setLevelText({ examples: list.map((x, j) => (j === i ? e.target.value : x)) })}
@@ -1070,20 +1245,25 @@ function WordDialog({ word, onClose, onSaved }: { word: Word | null; onClose: ()
         </section>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="word-tags">Topics</Label>
+          <Label htmlFor="word-tags">Topics{aiMark("tags")}</Label>
           <Input
             id="word-tags"
             placeholder="travel, work"
-            value={form.tags.join(", ")}
-            onChange={(e) =>
+            autoComplete="off"
+            className={aiClass("tags")}
+            value={tagsText ?? form.tags.join(", ")}
+            onChange={(e) => {
+              own("tags");
+              // The text is kept as typed, so a comma can be typed before the next topic.
+              setTagsText(e.target.value);
               set({
                 tags: e.target.value
                   .split(",")
                   .map((t) => t.trim())
                   .filter(Boolean)
                   .slice(0, 6),
-              })
-            }
+              });
+            }}
           />
         </div>
       </div>
