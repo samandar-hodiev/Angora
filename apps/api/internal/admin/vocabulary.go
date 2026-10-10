@@ -42,6 +42,13 @@ type LevelChecker interface {
 	CheckLevels(ctx context.Context, items []ai.LevelCheckItem) (map[string]string, error)
 }
 
+// LexiconReviewer is the second pair of eyes on generated entries: is each one really of the
+// kind it was written as, fit to teach, and right in meaning and spelling in every language.
+// The content author implements it.
+type LexiconReviewer interface {
+	ReviewLexicon(ctx context.Context, kind string, items []ai.LexiconReviewItem) (map[string]ai.LexiconReview, error)
+}
+
 // Word is one vocabulary entry as the console lists and edits it.
 type Word struct {
 	ID               uuid.UUID         `json:"id"`
@@ -268,9 +275,11 @@ func (in wordInput) clean() (ai.GeneratedWord, error) {
 		}
 	}
 	if kind := ai.KindOf(w.PartOfSpeech); !ai.FitsKind(w.Term, kind) {
-		return w, apperr.Validation(map[string]any{
-			"fields": map[string]any{"term": "a " + kind + " has at least two words — a single word belongs in Vocabulary"},
-		})
+		msg := "a " + kind + " has at least two words — a single word belongs in Vocabulary"
+		if kind == ai.KindWord {
+			msg = "Vocabulary holds single words — a combination belongs in Phrases or Collocations"
+		}
+		return w, apperr.Validation(map[string]any{"fields": map[string]any{"term": msg}})
 	}
 	kept := ai.UsableWords([]ai.GeneratedWord{w}, nil)
 	if len(kept) == 0 {
@@ -620,15 +629,15 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 	}
 	target := min(max(plan.Count, 1), 100)
 	actor := plan.Actor
-	added, skipped, outOfRange, failedBatches, batchIndex := 0, 0, 0, 0, 0
+	added, skipped, outOfRange, failedBatches, batchIndex, rejected := 0, 0, 0, 0, 0, 0
 	verified := map[string]int{}
 
 	// Entries are saved the moment their batch comes back, not when the whole run ends, so the
 	// console can show the count climbing while the rest are still being written.
 	var mu sync.Mutex
-	seen := map[string]bool{}
+	seen := map[string]string{} // spelling key → the term as written
 	for _, t := range exclude {
-		seen[t] = true
+		seen[ai.SpellingKey(t)] = t
 	}
 	store := func(words []checkedWord, requestID *uuid.UUID) error {
 		mu.Lock()
@@ -637,8 +646,8 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 			if added >= target {
 				return nil
 			}
-			key := strings.ToLower(w.Term)
-			if seen[key] {
+			key := ai.SpellingKey(w.Term)
+			if seen[key] != "" {
 				skipped++
 				continue
 			}
@@ -650,7 +659,7 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 			if err != nil {
 				return err
 			}
-			seen[key] = true
+			seen[key] = strings.ToLower(w.Term)
 			if stored {
 				added++
 				verified[w.source]++
@@ -665,7 +674,7 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 		mu.Lock()
 		want := target - added
 		known := make([]string, 0, len(seen))
-		for t := range seen {
+		for _, t := range seen {
 			known = append(known, t)
 		}
 		mu.Unlock()
@@ -707,6 +716,16 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 					requestID = &meta.AIRequestID
 				}
 				checked := m.checkLevels(ctx, words)
+				checked, dropped, err := m.reviewWords(ctx, plan.Kind, checked)
+				mu.Lock()
+				rejected += dropped
+				mu.Unlock()
+				if err != nil {
+					mu.Lock()
+					failedBatches++
+					mu.Unlock()
+					return
+				}
 				m.proofreadWords(ctx, checked)
 				if err := store(checked, requestID); err != nil {
 					mu.Lock()
@@ -725,7 +744,7 @@ func (m *Module) runVocabularyGeneration(ctx context.Context, plan vocabularyPla
 		return nil, apperr.New(apperr.CodeUnavailable, "AI vocabulary generation failed. Please try again.")
 	}
 	return map[string]any{
-		"added": added, "requested": target, "skipped_duplicates": skipped, "out_of_range": outOfRange,
+		"added": added, "requested": target, "skipped_duplicates": skipped, "out_of_range": outOfRange, "rejected": rejected,
 		"failed_batches": failedBatches, "level_sources": verified,
 	}, nil
 }
@@ -795,6 +814,50 @@ func (m *Module) checkLevels(ctx context.Context, words []ai.GeneratedWord) []ch
 		}
 	}
 	return out
+}
+
+// reviewWords puts a batch past the lexicon reviewer and keeps only what it keeps, with its
+// corrections applied: the definition, the Uzbek and Russian translations and definitions. An
+// entry the reviewer rejects or does not answer for is dropped — a wrong translation taught as
+// right is worse than one entry fewer — and if the review cannot be had at all, the whole
+// batch is dropped for the same reason. Returns the kept entries and how many were dropped.
+func (m *Module) reviewWords(ctx context.Context, kind string, words []checkedWord) ([]checkedWord, int, error) {
+	reviewer, ok := m.author.(LexiconReviewer)
+	if !ok || len(words) == 0 {
+		return words, 0, nil
+	}
+	items := make([]ai.LexiconReviewItem, len(words))
+	for i, w := range words {
+		items[i] = ai.LexiconReviewItem{
+			Term: w.Term, PartOfSpeech: w.PartOfSpeech, Definition: w.Definition, Examples: w.Examples,
+			Uz: w.Translations["uz"], Ru: w.Translations["ru"], RuPron: w.Translations["ru_pron"],
+			DefUz: w.Translations["def_uz"], DefRu: w.Translations["def_ru"],
+		}
+	}
+	verdicts, err := reviewer.ReviewLexicon(ctx, kind, items)
+	if err != nil {
+		return nil, len(words), err
+	}
+	kept := make([]checkedWord, 0, len(words))
+	for _, w := range words {
+		r, ok := verdicts[strings.ToLower(w.Term)]
+		if !ok || !r.Keep || !ai.FitsKind(w.Term, kind) {
+			continue
+		}
+		w.Translations = map[string]string{"uz": r.Uz, "ru": r.Ru, "def_uz": r.DefUz, "def_ru": r.DefRu}
+		if r.RuPron != "" {
+			w.Translations["ru_pron"] = r.RuPron
+		}
+		if r.Definition != "" && r.Definition != w.Definition {
+			w.Definition = r.Definition
+			if text, ok := w.LevelContent[w.Level]; ok {
+				text.Definition = r.Definition
+				w.LevelContent[w.Level] = text
+			}
+		}
+		kept = append(kept, w)
+	}
+	return kept, len(words) - len(kept), nil
 }
 
 // setLevel moves an entry, and its one explanation, to another level.

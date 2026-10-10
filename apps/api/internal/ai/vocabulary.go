@@ -21,15 +21,17 @@ import (
 // level, and a second, independent call (CheckLevels) checks it.
 
 const (
-	VocabularyPrompt = "vocabulary_author.v5"
+	VocabularyPrompt = "vocabulary_author.v6"
 	SchemaVocabulary = "vocabulary_words"
 	LevelCheckPrompt = "vocabulary_level_check.v1"
 	SchemaLevelCheck = "vocabulary_levels"
 
 	TaskVocabularyLevelCheck Task = "vocabulary_level_check"
 
-	// VocabularyBatch is how many entries one call writes.
-	VocabularyBatch = 10
+	// VocabularyBatch is how many entries one call writes. Small, because the lexicon runs on
+	// the strongest model, which takes some seconds an entry, and a call must finish inside the
+	// gateway's time limit; batches run side by side.
+	VocabularyBatch = 4
 )
 
 // Kinds of lexicon entry.
@@ -47,18 +49,36 @@ var KindPartsOfSpeech = map[string][]string{
 	KindCollocation: {"verb + noun", "adjective + noun", "adverb + adjective", "adverb + verb", "noun + noun", "verb + preposition", "noun + preposition", "verb + adverb"},
 }
 
-// FitsKind reports whether a term has the shape its kind needs. A phrase or a collocation is
-// learned as more than one word — "explain" or "together" is a word, however the model labels
-// it — and an infinitive "to" in front ("to mention") does not count as a second word.
+// FitsKind reports whether a term has the shape its kind needs, so the three lists never mix.
+// Vocabulary holds single words — "bus station" or "hand luggage" is a combination, not a
+// word; a hyphenated word counts as one. A phrase or a collocation is learned as more than one
+// word — "explain" or "together" is a word, however the model labels it — and an infinitive
+// "to" in front ("to mention") does not count as a second word.
 func FitsKind(term, kind string) bool {
-	if kind != KindPhrase && kind != KindCollocation {
-		return true
-	}
 	words := strings.Fields(strings.ToLower(term))
+	if kind != KindPhrase && kind != KindCollocation {
+		return len(words) == 1
+	}
 	if len(words) > 0 && words[0] == "to" {
 		words = words[1:]
 	}
 	return len(words) >= 2
+}
+
+// spellingVariants fold British and American spellings together, so "traveller" and
+// "traveler", or "colour" and "color", are the same entry.
+var spellingVariants = []struct{ from, to string }{
+	{"ll", "l"}, {"our", "or"}, {"ise", "ize"}, {"isation", "ization"}, {"yse", "yze"}, {"tre", "ter"}, {"ogue", "og"}, {"ence", "ense"},
+}
+
+// SpellingKey is the term with British/American spelling differences folded, for telling
+// whether two terms are the same entry.
+func SpellingKey(term string) string {
+	key := strings.Join(strings.Fields(strings.ToLower(term)), " ")
+	for _, v := range spellingVariants {
+		key = strings.ReplaceAll(key, v.from, v.to)
+	}
+	return key
 }
 
 // PartsOfSpeech are every value a part of speech may take, across kinds.
@@ -202,8 +222,8 @@ func vocabularySchema(kind string) json.RawMessage {
 }
 
 var kindGuide = map[string]string{
-	KindWord:        "single English words",
-	KindPhrase:      "phrases learned as a whole: phrasal verbs (look after), idioms (break the ice) and fixed phrases (by the way) — never single words, never free combinations; every term has at least two words (not counting an infinitive \"to\")",
+	KindWord:        "single English words — exactly one word each (a hyphenated word counts as one), never two-word combinations such as bus station, never phrasal verbs, never phrases",
+	KindPhrase:      "phrases learned as a whole: phrasal verbs (look after), idioms (break the ice) and fixed phrases (by the way) — never single words, never free combinations, never whole sentences or questions (how much does it cost); every term has at least two words (not counting an infinitive \"to\")",
 	KindCollocation: "collocations: two or three words that naturally go together where another word would sound wrong (make a decision, heavy rain, deeply sorry) — never single words, never idioms; every term has at least two words",
 }
 
@@ -230,7 +250,8 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 	} else {
 		b.WriteString("- A natural mix of levels, from everyday to advanced.\n")
 	}
-	b.WriteString("Never include an entry from the excluded list, in any form, and never the same entry twice.\n")
+	b.WriteString("- Standard, commonly used English only, in its usual dictionary form; British spelling. Never a fragment of a sentence (what time does, where is the). Family-friendly: nothing sexual, vulgar or offensive.\n")
+	b.WriteString("Never include an entry from the excluded list, in any form or spelling, and never the same entry twice.\n")
 
 	input := fmt.Sprintf("COUNT: %d\nKIND: %s\n", count, kind)
 	if len(req.Topics) > 0 {
@@ -246,7 +267,7 @@ func (s *GrammarTutorService) WriteVocabulary(ctx context.Context, req Vocabular
 		PromptVersion: VocabularyPrompt,
 		Metadata:      map[string]any{"kind": "vocabulary", "entry_kind": kind, "topics": req.Topics, "count": count},
 	}, AnalysisRequest{
-		Model:        s.mainModel,
+		Model:        s.lexicon(),
 		Instructions: b.String(),
 		Input:        input,
 		SchemaName:   SchemaVocabulary,
@@ -347,7 +368,7 @@ func (s *GrammarTutorService) CheckLevels(ctx context.Context, items []LevelChec
 		PromptVersion: LevelCheckPrompt,
 		Metadata:      map[string]any{"kind": "vocabulary_level_check", "count": len(items)},
 	}, AnalysisRequest{
-		Model: s.mainModel,
+		Model: s.lexicon(),
 		Instructions: "You are a CEFR vocabulary examiner. For each English entry, in the sense given, say the level at which a learner " +
 			"usually meets it, following the English Vocabulary Profile (and the English Grammar/Phrasal Verb profiles for phrases). " +
 			"Be strict: everyday concrete words are A1–A2; a level is about the entry, not the topic it came from. Answer for every entry, in order.",

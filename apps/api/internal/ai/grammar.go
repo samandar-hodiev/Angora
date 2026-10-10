@@ -153,6 +153,33 @@ type GrammarTutorService struct {
 	gateway   *Gateway
 	fastModel string
 	mainModel string
+	// lexiconModel writes the lexicon; lexiconReviewModel checks it — kind, meaning,
+	// translations, Uzbek spelling — and corrects it. Every learner reads each entry, and a
+	// wrong translation or a misspelt Uzbek word is taught as truth, so the reviewer is the
+	// strongest model there is: slower, but it only reads and corrects. Empty means the main
+	// model.
+	lexiconModel       string
+	lexiconReviewModel string
+}
+
+// WithLexiconModels sets the models the lexicon is written and reviewed with.
+func (s *GrammarTutorService) WithLexiconModels(writer, reviewer string) *GrammarTutorService {
+	s.lexiconModel, s.lexiconReviewModel = writer, reviewer
+	return s
+}
+
+func (s *GrammarTutorService) lexicon() string {
+	if s.lexiconModel != "" {
+		return s.lexiconModel
+	}
+	return s.mainModel
+}
+
+func (s *GrammarTutorService) lexiconReviewer() string {
+	if s.lexiconReviewModel != "" {
+		return s.lexiconReviewModel
+	}
+	return s.lexicon()
 }
 
 func NewGrammarTutor(g *Gateway, fastModel, mainModel string) *GrammarTutorService {

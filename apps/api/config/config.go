@@ -125,9 +125,14 @@ type AIConfig struct {
 	// Model routing. Not every AI task is the same size of job: rewriting a known grammar
 	// rule for an A2 learner is cheap work, analysing free text is not. Both default to
 	// Model, so a single AI_MODEL still configures everything.
-	FastModel     string
-	OpenAIAPIKey  string
-	OpenAIBaseURL string
+	FastModel string
+	// LexiconModel writes the lexicon (words, phrases, collocations); LexiconReviewModel
+	// checks and corrects it — kind, meaning, translations, Uzbek spelling. Both default to
+	// Model; the reviewer to LexiconModel.
+	LexiconModel       string
+	LexiconReviewModel string
+	OpenAIAPIKey       string
+	OpenAIBaseURL      string
 
 	// Load protection. Every vendor caps concurrent requests; past that it answers 429s
 	// that cost a learner a turn. MaxConcurrent bounds calls in flight per task on this
@@ -222,15 +227,17 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			OwnerEmail:      strings.ToLower(strings.TrimSpace(r.str("OWNER_EMAIL", ""))),
 		},
 		AI: AIConfig{
-			Provider:      strings.ToLower(r.str("AI_PROVIDER", "mock")),
-			Model:         r.str("AI_MODEL", ""),
-			FastModel:     r.str("AI_FAST_MODEL", ""),
-			OpenAIAPIKey:  r.str("OPENAI_API_KEY", ""),
-			OpenAIBaseURL: r.str("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-			MaxConcurrent: r.int("AI_MAX_CONCURRENT", 200),
-			QueueWait:     r.duration("AI_QUEUE_WAIT", 8*time.Second),
-			CallTimeout:   r.duration("AI_CALL_TIMEOUT", 45*time.Second),
-			MockLatency:   r.duration("MOCK_AI_LATENCY", 0),
+			Provider:           strings.ToLower(r.str("AI_PROVIDER", "mock")),
+			Model:              r.str("AI_MODEL", ""),
+			FastModel:          r.str("AI_FAST_MODEL", ""),
+			LexiconModel:       r.str("AI_LEXICON_MODEL", ""),
+			LexiconReviewModel: r.str("AI_LEXICON_REVIEW_MODEL", ""),
+			OpenAIAPIKey:       r.str("OPENAI_API_KEY", ""),
+			OpenAIBaseURL:      r.str("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+			MaxConcurrent:      r.int("AI_MAX_CONCURRENT", 200),
+			QueueWait:          r.duration("AI_QUEUE_WAIT", 8*time.Second),
+			CallTimeout:        r.duration("AI_CALL_TIMEOUT", 45*time.Second),
+			MockLatency:        r.duration("MOCK_AI_LATENCY", 0),
 		},
 		Live: LiveConfig{
 			MaxSessions:  r.int("LIVE_MAX_SESSIONS", 1500),

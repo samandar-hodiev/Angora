@@ -103,7 +103,7 @@ func (s *GrammarTutorService) ProofreadUzbek(ctx context.Context, items []UzbekT
 		PromptVersion: UzbekProofreadPrompt,
 		Metadata:      map[string]any{"kind": "uzbek_proofread", "count": len(items)},
 	}, AnalysisRequest{
-		Model: s.mainModel,
+		Model: s.lexiconReviewer(),
 		Instructions: "You are a meticulous proofreader of Uzbek (Latin script). Each input line is: key<TAB>text. Correct spelling " +
 			"mistakes only — wrong letters, missing o'/g' apostrophes, q/k and x/h confusions, misspelt words. " + UzbekOrthography +
 			" Do not change the wording, the meaning, the punctuation or the style; do not translate. Answer every key.",

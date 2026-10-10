@@ -178,7 +178,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger) (*Container,
 	if fastModel == "" {
 		fastModel = cfg.AI.Model
 	}
-	c.GrammarAuthor = ai.NewGrammarTutor(c.AI, fastModel, cfg.AI.Model)
+	c.GrammarAuthor = ai.NewGrammarTutor(c.AI, fastModel, cfg.AI.Model).WithLexiconModels(cfg.AI.LexiconModel, cfg.AI.LexiconReviewModel)
 	c.GrammarTutor = c.GrammarAuthor
 	c.LiveHub = practice.NewLiveHub(cfg.Live.MaxSessions, c.Redis)
 

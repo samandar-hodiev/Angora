@@ -14,7 +14,8 @@ func TestFitsKind(t *testing.T) {
 		{"to be honest", KindPhrase, true},
 		{"make a decision", KindCollocation, true},
 		{"bed", KindWord, true},
-		{"bus station", KindWord, true},
+		{"bus station", KindWord, false},
+		{"well-known", KindWord, true},
 	}
 	for _, c := range cases {
 		if got := FitsKind(c.term, c.kind); got != c.want {
@@ -32,5 +33,16 @@ func TestUsableWordsDropsSingleWordPhrases(t *testing.T) {
 	}, nil)
 	if len(kept) != 1 || kept[0].Term != "look after" {
 		t.Errorf("kept %+v, want only look after", kept)
+	}
+}
+
+func TestSpellingKey(t *testing.T) {
+	for _, pair := range [][2]string{{"traveller", "traveler"}, {"colour", "color"}, {"organise", "organize"}, {"theatre", "theater"}} {
+		if SpellingKey(pair[0]) != SpellingKey(pair[1]) {
+			t.Errorf("%s and %s should be the same entry", pair[0], pair[1])
+		}
+	}
+	if SpellingKey("travel") == SpellingKey("trouble") {
+		t.Error("different words folded together")
 	}
 }

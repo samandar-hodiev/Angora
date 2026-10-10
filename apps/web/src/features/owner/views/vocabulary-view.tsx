@@ -173,7 +173,7 @@ const vocabularyApi = {
   generate: (input: GenerateInput) => apiClient.post<{ job_id?: string; added?: number }>("/admin/vocabulary/generate", input),
   job: (id: string) =>
     apiClient.get<
-      JobState & { result?: { added?: number; requested?: number; skipped_duplicates?: number; failed_batches?: number } }
+      JobState & { result?: { added?: number; requested?: number; skipped_duplicates?: number; failed_batches?: number; rejected?: number } }
     >(`/jobs/${id}`),
 };
 
@@ -296,6 +296,7 @@ export function VocabularyView({ kind }: { kind: Kind }) {
         title: `${total} new ${KIND_LABEL[kind][total === 1 ? "one" : "many"]} written as drafts`,
         description:
           (r.skipped_duplicates ? `${r.skipped_duplicates} already in the library were skipped. ` : "") +
+          (r.rejected ? `${r.rejected} failed the editor's check (wrong kind, translation or spelling) and were left out. ` : "") +
           (short > 0 ? `${short} fewer than asked — generate again for the rest.` : "Read them, then publish."),
         variant: short > 0 ? "default" : "success",
       });
