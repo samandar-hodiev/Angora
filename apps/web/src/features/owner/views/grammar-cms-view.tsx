@@ -22,7 +22,6 @@ import {
   OwnerPageHeader,
   SearchInput,
   SectionCard,
-  SegmentedControl,
 } from "../components/primitives";
 import { useGrammarAdminCategories, useGrammarAdminTopics, useSetGrammarTopicStatus } from "../hooks";
 import { formatDate, formatNumber } from "../lib/format";
@@ -372,22 +371,39 @@ export function GrammarCmsView() {
           { label: "Grammar" },
         ]}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          // One frame for the action and the view switch, so the header reads as one control.
+          <div role="toolbar" aria-label="Grammar" className="inline-flex items-center gap-0.5 rounded-lg border bg-surface p-0.5">
             {/* "What should I write next?" is a question about shape, not about rows, so it
                 opens the schema rather than scrolling the list. */}
-            <Button onClick={() => setSchemaOpen(true)}>
+            <Button size="sm" className="rounded-md" onClick={() => setSchemaOpen(true)}>
               <Waypoints aria-hidden />
-              Create content
+              Grammar Map
             </Button>
-            <SegmentedControl
-              label="View"
-              value={view}
-              onChange={(value) => setView(value as "map" | "all")}
-              options={[
-                { value: "map", label: "Grammar Map" },
-                { value: "all", label: "All content" },
-              ]}
-            />
+            <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+            <div role="group" aria-label="View" className="inline-flex gap-0.5">
+              {(
+                [
+                  { value: "map", label: "Grammar Tree" },
+                  { value: "all", label: "All content" },
+                ] as const
+              ).map((option) => {
+                const active = view === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setView(option.value)}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-md px-3 text-body-sm font-medium outline-none transition-colors duration-micro focus-visible:ring-[3px] focus-visible:ring-ring/40",
+                      active ? "bg-surface-active text-foreground shadow-xs" : "text-fg-secondary hover:bg-surface-hover hover:text-foreground",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         }
       />

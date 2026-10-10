@@ -258,7 +258,7 @@ export function GrammarBuilderView({ slug }: { slug: string }) {
             )}
             <Button variant="ghost" className="h-9" onClick={() => router.push("/owner/content/grammar")}>
               <ArrowLeft aria-hidden />
-              Grammar Map
+              Grammar Tree
             </Button>
             {/* The AI action has its own look — a violet-to-green wash — so it reads as "the
                 model writes this", not as one more neutral button beside Publish. */}
@@ -780,7 +780,7 @@ function LevelEditor({ slug, language, content }: { slug: string; language: Cont
           {content.summary || "This topic is not worth teaching at this level."}
         </p>
         <p className="mt-2 text-caption text-fg-muted">
-          The Grammar Map counts this level as settled rather than as work still to do.
+          The Grammar Tree counts this level as settled rather than as work still to do.
         </p>
       </SectionCard>
     );
