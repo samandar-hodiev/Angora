@@ -21,7 +21,7 @@ import type { MapCategory, MapTopic } from "../types";
  * its ring filled in proportion to how much of it has been written, and every topic hangs off
  * it as a node — solid green once it carries content, dashed grey while it is still only a
  * plan. Nothing is authored here: each node is a door into the builder, which is the whole
- * point of opening this from the "Curriculum map" button.
+ * point of opening this from "Create content".
  *
  * The curriculum is 150 topics, so the schema scrolls. It is built from the same live map the
  * page behind it reads — no second source, nothing hardcoded.

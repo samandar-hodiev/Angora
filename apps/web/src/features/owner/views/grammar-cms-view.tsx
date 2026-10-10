@@ -375,9 +375,14 @@ export function GrammarCmsView() {
           <div role="toolbar" aria-label="Grammar" className="inline-flex items-center gap-0.5 rounded-lg border bg-surface p-0.5">
             {/* "What should I write next?" is a question about shape, not about rows, so it
                 opens the schema rather than scrolling the list. */}
-            <Button size="sm" className="rounded-md" onClick={() => setSchemaOpen(true)}>
+            <Button
+              size="sm"
+              className="rounded-md"
+              title="Open the curriculum map and pick a topic to write"
+              onClick={() => setSchemaOpen(true)}
+            >
               <Waypoints aria-hidden />
-              Curriculum map
+              Create content
             </Button>
             <span aria-hidden className="mx-1 h-5 w-px bg-border" />
             <div role="group" aria-label="View" className="inline-flex gap-0.5">
